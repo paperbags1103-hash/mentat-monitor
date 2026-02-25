@@ -13,10 +13,10 @@
  * │    │  하단 스트립 (지표 스크롤)         │               │
  * └────┴────────────────────────────────────┴───────────────┘
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useStore } from '@/store';
 import { Sidebar }      from './Sidebar';
-import { WorldMapView } from './WorldMapView';
+const WorldMapView = lazy(() => import('./WorldMapView').then(m => ({ default: m.WorldMapView })));
 import { HeatMapView }  from './HeatMapView';
 import { ChartView }    from './ChartView';
 import { LiveFeed }     from './LiveFeed';
@@ -112,7 +112,7 @@ interface Props {
 
 export function AIPLayout({ onSwitchToGrid }: Props) {
   const { fetchAll, globalRiskScore } = useStore();
-  const [mainView, setMainView] = useState<MainViewType>('map');
+  const [mainView, setMainView] = useState<MainViewType>('heatmap');
 
   useEffect(() => {
     void fetchAll();
@@ -137,7 +137,7 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Main view */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            {mainView === 'map'     && <WorldMapView />}
+            {mainView === 'map'     && <Suspense fallback={<div className="flex items-center justify-center h-full text-muted">지도 로딩 중...</div>}><WorldMapView /></Suspense>}
             {mainView === 'heatmap' && <HeatMapView />}
             {mainView === 'charts'  && <ChartView />}
             {mainView === 'grid'    && <PanelGrid />}

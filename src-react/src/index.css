@@ -4,10 +4,40 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { background: #0a0a0f; color: #f1f5f9; }
-  ::-webkit-scrollbar { width: 4px; }
+  html, body { height: 100%; background: #0a0a0f; color: #f1f5f9; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #2a2a3f; border-radius: 2px; }
   ::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+}
+
+/* ── react-grid-layout overrides ─────────────────────────────────────── */
+.react-grid-layout { position: relative; }
+.react-grid-item.react-grid-placeholder {
+  background: #7c3aed33 !important;
+  border: 1px dashed #7c3aed;
+  border-radius: 8px;
+  z-index: 2;
+}
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 16px; height: 16px;
+  cursor: se-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.react-grid-item:hover > .react-resizable-handle { opacity: 1; }
+.react-grid-item > .react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 3px; bottom: 3px;
+  width: 6px; height: 6px;
+  border-right: 2px solid #7c3aed;
+  border-bottom: 2px solid #7c3aed;
+}
+.react-grid-item.react-draggable-dragging {
+  z-index: 100;
+  opacity: 0.85;
+  box-shadow: 0 8px 32px #7c3aed44;
 }

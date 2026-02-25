@@ -2,7 +2,7 @@
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "",
-    "frontendDist": "../dist",
+    "frontendDist": "../src-react/dist",
     "devUrl": "http://localhost:5173"
   }
 }

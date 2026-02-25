@@ -1,10 +1,18 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+// react-grid-layout layout item type (inline to avoid module issues)
+export interface RGLItem {
+  i: string; x: number; y: number; w: number; h: number;
+  minW?: number; minH?: number; maxW?: number; maxH?: number;
+  static?: boolean; isDraggable?: boolean; isResizable?: boolean;
+}
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 export type Severity = 'CRITICAL' | 'ELEVATED' | 'WATCH' | 'INFO';
 export type Sentiment = 'risk_on' | 'risk_off' | 'neutral' | 'ambiguous';
-export type Momentum = 'rising' | 'falling' | 'stable';
+export type Momentum  = 'rising' | 'falling' | 'stable';
 
 export interface Inference {
   ruleId: string;
@@ -13,18 +21,12 @@ export interface Inference {
   summaryKo: string;
   suggestedActionKo?: string;
   confidence: number;
+  affectedEntityIds?: string[];
   expectedImpact?: {
     kospiRange?: [number, number];
     krwDirection?: 'weaken' | 'strengthen' | 'neutral';
     safeHavens?: string[];
   };
-}
-
-export interface MarketOutlook {
-  kospiSentiment: Sentiment;
-  keyRisks: string[];
-  keyOpportunities: string[];
-  hedgeSuggestions: string[];
 }
 
 export interface InsightBriefing {
@@ -34,7 +36,12 @@ export interface InsightBriefing {
   narrativeKo: string;
   narrativeMethod: 'llm' | 'template';
   topInferences: Inference[];
-  marketOutlook: MarketOutlook;
+  marketOutlook: {
+    kospiSentiment: Sentiment;
+    keyRisks: string[];
+    keyOpportunities: string[];
+    hedgeSuggestions: string[];
+  };
   signalSummary: {
     total: number;
     bySeverity: Record<Severity, number>;
@@ -45,7 +52,7 @@ export interface InsightBriefing {
 export interface ActiveTheme {
   id: string;
   nameKo: string;
-  strength: number;       // 0–100
+  strength: number;
   momentum: Momentum;
   evidenceKo: string[];
   beneficiaryKo: string[];
@@ -62,98 +69,237 @@ export interface SignalItem {
   timestamp: number;
 }
 
-export interface KoreaMarket {
-  kospi: { price: number; changePercent: number } | null;
-  kosdaq: { price: number; changePercent: number } | null;
-  usdkrw: { rate: number; changePercent: number } | null;
-  btcKrw: { price: number; changePercent: number } | null;
-  kimchiPremium: number | null;
+export interface MarketTick {
+  price: number;
+  changePercent: number;
+  sparkline?: number[];
 }
 
-// ─── Store ─────────────────────────────────────────────────────────────────
-
-interface AppState extends KoreaMarket {
-  globalRiskScore: number;
-  riskLabel: string;
-  briefing: InsightBriefing | null;
-  activeThemes: ActiveTheme[];
-  signals: SignalItem[];
-  isLoading: boolean;
-  lastUpdated: number | null;
-  error: string | null;
-
-  fetchAll: () => Promise<void>;
+export interface OHLCBar {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
 }
 
-// Tauri desktop: no Vite proxy → call sidecar directly on port 46123
+export interface PreciousMetalsData {
+  gold: { price: number; changePercent: number };
+  silver: { price: number; changePercent: number };
+  goldSilverRatio: number;
+  timestamp: number;
+}
+
+export interface BlackSwanData {
+  tailRiskScore: number;
+  modules: Record<string, { score: number; label: string }>;
+  timestamp: number;
+}
+
+export interface EconCalendarEvent {
+  title: string;
+  institution: string;
+  daysUntil: number;
+  date: string;
+  importance: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+export interface CreditStressData {
+  igSpread: number;   // Investment Grade spread (bps)
+  hySpread: number;   // High Yield spread (bps)
+  igChange: number;
+  hyChange: number;
+  stressLevel: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+  timestamp: number;
+}
+
+// Panel layout definition
+export interface PanelDef {
+  id: string;
+  type: string;
+  title: string;
+  config?: Record<string, unknown>;
+}
+
+// ─── Layout store (persisted) ────────────────────────────────────────────────
+
+interface LayoutState {
+  layouts: RGLItem[];
+  panels: PanelDef[];
+  setLayouts: (layouts: RGLItem[]) => void;
+  addPanel: (panel: PanelDef, layout?: Partial<RGLItem>) => void;
+  removePanel: (id: string) => void;
+  resetLayout: () => void;
+}
+
+const DEFAULT_PANELS: PanelDef[] = [
+  { id: 'briefing',   type: 'briefing',      title: '🧠 멘탯 브리핑' },
+  { id: 'market',     type: 'market',        title: '📊 시장 현황' },
+  { id: 'themes',     type: 'themes',        title: '🎯 활성 테마' },
+  { id: 'signals',    type: 'signals',       title: '⚡ 신호 피드' },
+  { id: 'chart-kospi', type: 'chart',        title: '📈 KOSPI', config: { symbol: '^KS11', nameKo: 'KOSPI' } },
+  { id: 'chart-spx',   type: 'chart',        title: '📈 S&P500', config: { symbol: '^GSPC', nameKo: 'S&P500' } },
+  { id: 'metals',     type: 'precious-metals', title: '🥇 귀금속' },
+  { id: 'blackswan',  type: 'blackswan',     title: '🌡️ 블랙스완' },
+  { id: 'calendar',   type: 'econ-calendar', title: '📅 경제 캘린더' },
+];
+
+const DEFAULT_LAYOUTS: RGLItem[] = [
+  { i: 'briefing',    x: 0, y: 0, w: 4, h: 8, minW: 3, minH: 6 },
+  { i: 'market',      x: 4, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+  { i: 'themes',      x: 8, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+  { i: 'signals',     x: 4, y: 4, w: 4, h: 4, minW: 2, minH: 3 },
+  { i: 'chart-kospi', x: 8, y: 4, w: 4, h: 4, minW: 3, minH: 3 },
+  { i: 'chart-spx',   x: 0, y: 8, w: 4, h: 4, minW: 3, minH: 3 },
+  { i: 'metals',      x: 4, y: 8, w: 4, h: 4, minW: 2, minH: 3 },
+  { i: 'blackswan',   x: 8, y: 8, w: 2, h: 4, minW: 2, minH: 3 },
+  { i: 'calendar',    x: 10, y: 8, w: 2, h: 4, minW: 2, minH: 3 },
+];
+
+export const useLayoutStore = create<LayoutState>()(
+  persist(
+    (set) => ({
+      layouts: DEFAULT_LAYOUTS,
+      panels: DEFAULT_PANELS,
+      setLayouts: (layouts) => set({ layouts }),
+      addPanel: (panel, layoutHint) => set((s) => {
+        if (s.panels.find(p => p.id === panel.id)) return s;
+        const newLayout: RGLItem = {
+          i: panel.id,
+          x: 0, y: Infinity,
+          w: layoutHint?.w ?? 4, h: layoutHint?.h ?? 4,
+          minW: 2, minH: 3,
+          ...layoutHint,
+        };
+        return { panels: [...s.panels, panel], layouts: [...s.layouts, newLayout] };
+      }),
+      removePanel: (id) => set((s) => ({
+        panels: s.panels.filter(p => p.id !== id),
+        layouts: s.layouts.filter(l => l.i !== id),
+      })),
+      resetLayout: () => set({ layouts: DEFAULT_LAYOUTS, panels: DEFAULT_PANELS }),
+    }),
+    { name: 'mentat-layout-v1' }
+  )
+);
+
+// ─── Data store ──────────────────────────────────────────────────────────────
+
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 const API_BASE = isTauri ? 'http://localhost:46123' : '';
 
-async function safeFetch<T>(path: string): Promise<T | null> {
+export async function apiFetch<T>(path: string): Promise<T | null> {
   try {
-    const url = `${API_BASE}${path}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    const res = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(12_000) });
     if (!res.ok) return null;
     return res.json() as Promise<T>;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-export const useStore = create<AppState>((set) => ({
+interface DataState {
   // Risk
+  globalRiskScore: number;
+  riskLabel: string;
+  briefing: InsightBriefing | null;
+
+  // Market
+  kospi:  MarketTick | null;
+  kosdaq: MarketTick | null;
+  usdkrw: { rate: number; changePercent: number } | null;
+  btcKrw: MarketTick | null;
+  kimchiPremium: number | null;
+  spx:    MarketTick | null;
+  nasdaq: MarketTick | null;
+  dxy:    MarketTick | null;
+  vix:    MarketTick | null;
+  gold:   MarketTick | null;
+  oil:    MarketTick | null;
+
+  // Signals
+  signals: SignalItem[];
+  activeThemes: ActiveTheme[];
+
+  // Extended data
+  preciousMetals: PreciousMetalsData | null;
+  blackSwan: BlackSwanData | null;
+  econCalendar: EconCalendarEvent[];
+  creditStress: CreditStressData | null;
+
+  // Meta
+  isLoading: boolean;
+  lastUpdated: number | null;
+
+  // Chart data cache
+  chartCache: Record<string, OHLCBar[]>;
+
+  // Actions
+  fetchAll: () => Promise<void>;
+  fetchChart: (symbol: string, range?: string) => Promise<OHLCBar[]>;
+}
+
+export const useStore = create<DataState>()((set, get) => ({
   globalRiskScore: 0,
   riskLabel: '—',
-  // Market
-  kospi: null,
-  kosdaq: null,
-  usdkrw: null,
-  btcKrw: null,
-  kimchiPremium: null,
-  // Insight
   briefing: null,
-  activeThemes: [],
-  signals: [],
-  // Meta
-  isLoading: false,
-  lastUpdated: null,
-  error: null,
+  kospi: null, kosdaq: null, usdkrw: null, btcKrw: null, kimchiPremium: null,
+  spx: null, nasdaq: null, dxy: null, vix: null, gold: null, oil: null,
+  signals: [], activeThemes: [],
+  preciousMetals: null, blackSwan: null, econCalendar: [], creditStress: null,
+  isLoading: false, lastUpdated: null,
+  chartCache: {},
 
   fetchAll: async () => {
-    set({ isLoading: true, error: null });
-
-    const [briefingRaw, marketRaw] = await Promise.all([
-      safeFetch<InsightBriefing>('/api/insight-briefing'),
-      safeFetch<{
-        kospi: { price: number; changePercent: number };
-        kosdaq: { price: number; changePercent: number };
-        usdkrw: { rate: number; changePercent: number };
-        btcKrw: { price: number; changePercent: number };
-        kimchiPremium: number;
-      }>('/api/korea-market'),
+    set({ isLoading: true });
+    const [briefingRaw, mktRaw, metalsRaw, bsRaw, calRaw] = await Promise.all([
+      apiFetch<InsightBriefing>('/api/insight-briefing'),
+      apiFetch<Record<string, unknown>>('/api/korea-market'),
+      apiFetch<PreciousMetalsData>('/api/precious-metals'),
+      apiFetch<{ tailRiskScore: number; modules: Record<string, { score: number }> }>('/api/blackswan'),
+      apiFetch<{ events: EconCalendarEvent[] }>('/api/economic-calendar'),
     ]);
 
-    // Map briefing → signals feed
-    const signals: SignalItem[] = briefingRaw?.topInferences?.map((inf) => ({
-      id: inf.ruleId,
-      source: 'insight',
-      headlineKo: inf.titleKo,
-      severity: inf.severity,
-      timestamp: briefingRaw.generatedAt ?? Date.now(),
+    const signals: SignalItem[] = briefingRaw?.topInferences?.map(inf => ({
+      id: inf.ruleId, source: 'insight', headlineKo: inf.titleKo,
+      severity: inf.severity, timestamp: briefingRaw.generatedAt ?? Date.now(),
     })) ?? [];
 
+    const bsModules: Record<string, { score: number; label: string }> = {};
+    const MODULE_LABELS: Record<string, string> = {
+      financial: '금융', pandemic: '팬데믹', nuclear: '핵', cyber: '사이버', geopolitical: '지정학', supplyChain: '공급망'
+    };
+    if (bsRaw?.modules) {
+      Object.entries(bsRaw.modules).forEach(([k, v]) => {
+        bsModules[k] = { score: (v as { score: number }).score, label: MODULE_LABELS[k] ?? k };
+      });
+    }
+
     set({
-      isLoading: false,
-      lastUpdated: Date.now(),
+      isLoading: false, lastUpdated: Date.now(),
       globalRiskScore: briefingRaw?.globalRiskScore ?? 0,
       riskLabel: briefingRaw?.riskLabel ?? '—',
       briefing: briefingRaw,
       signals,
-      kospi:        marketRaw?.kospi   ?? null,
-      kosdaq:       marketRaw?.kosdaq  ?? null,
-      usdkrw:       marketRaw?.usdkrw  ?? null,
-      btcKrw:       marketRaw?.btcKrw  ?? null,
-      kimchiPremium: marketRaw?.kimchiPremium ?? null,
+      kospi:  mktRaw?.kospi  as MarketTick ?? null,
+      kosdaq: mktRaw?.kosdaq as MarketTick ?? null,
+      usdkrw: mktRaw?.usdkrw as { rate: number; changePercent: number } ?? null,
+      btcKrw: mktRaw?.btcKrw as MarketTick ?? null,
+      kimchiPremium: typeof mktRaw?.kimchiPremium === 'number' ? mktRaw.kimchiPremium : null,
+      preciousMetals: metalsRaw,
+      blackSwan: bsRaw ? { tailRiskScore: bsRaw.tailRiskScore, modules: bsModules, timestamp: Date.now() } : null,
+      econCalendar: calRaw?.events ?? [],
     });
+  },
+
+  fetchChart: async (symbol, range = '3mo') => {
+    const cacheKey = `${symbol}:${range}`;
+    const cached = get().chartCache[cacheKey];
+    if (cached && cached.length > 0) return cached;
+    const data = await apiFetch<{ bars: OHLCBar[] }>(`/api/chart-data?symbol=${encodeURIComponent(symbol)}&range=${range}`);
+    const bars = data?.bars ?? [];
+    if (bars.length > 0) {
+      set(s => ({ chartCache: { ...s.chartCache, [cacheKey]: bars } }));
+    }
+    return bars;
   },
 }));

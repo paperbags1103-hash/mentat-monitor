@@ -1,0 +1,91 @@
+import { useState } from 'react';
+import { useLayoutStore, type PanelDef } from '@/store';
+
+interface CatalogItem {
+  type: string;
+  title: string;
+  desc: string;
+  config?: Record<string, unknown>;
+  defaultSize?: { w: number; h: number };
+}
+
+const CATALOG: CatalogItem[] = [
+  // Charts
+  { type: 'chart', title: '📈 KOSPI 차트',    desc: '코스피 캔들스틱 차트', config: { symbol: '^KS11', nameKo: 'KOSPI' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 KOSDAQ 차트',   desc: '코스닥 캔들스틱 차트', config: { symbol: '^KQ11', nameKo: 'KOSDAQ' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 S&P500 차트',   desc: 'S&P500 캔들스틱 차트', config: { symbol: '^GSPC', nameKo: 'S&P500' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 나스닥 차트',   desc: '나스닥 캔들스틱 차트', config: { symbol: '^IXIC', nameKo: '나스닥' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 BTC/KRW 차트',  desc: '비트코인 원화 차트', config: { symbol: 'BTC-KRW', nameKo: 'BTC/KRW' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 금 (Gold) 차트', desc: '금 선물 차트', config: { symbol: 'GC=F', nameKo: '금 선물' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 WTI 원유 차트', desc: '원유 선물 차트', config: { symbol: 'CL=F', nameKo: 'WTI 원유' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 USD/KRW 차트',  desc: '원달러 차트', config: { symbol: 'KRW=X', nameKo: 'USD/KRW' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 VIX 차트',      desc: '공포지수 차트', config: { symbol: '^VIX', nameKo: 'VIX' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 삼성전자 차트', desc: '삼성전자 차트', config: { symbol: '005930.KS', nameKo: '삼성전자' }, defaultSize: { w: 5, h: 5 } },
+  { type: 'chart', title: '📈 SK하이닉스',    desc: 'SK하이닉스 차트', config: { symbol: '000660.KS', nameKo: 'SK하이닉스' }, defaultSize: { w: 5, h: 5 } },
+  // Data panels
+  { type: 'live-tv',   title: '📺 경제 방송',   desc: 'Bloomberg/CNBC/YTN 라이브', defaultSize: { w: 5, h: 6 } },
+  { type: 'webcam',    title: '📡 지역 웹캠',    desc: '위기 지역 자동 전환 웹캠', defaultSize: { w: 4, h: 5 } },
+  { type: 'briefing',  title: '🧠 멘탯 브리핑', desc: 'AI 의미 추출 브리핑', defaultSize: { w: 4, h: 8 } },
+  { type: 'market',    title: '📊 시장 현황',   desc: '주요 지수 스냅샷', defaultSize: { w: 3, h: 6 } },
+  { type: 'themes',    title: '🎯 활성 테마',   desc: 'AI 투자 테마 발견', defaultSize: { w: 4, h: 5 } },
+  { type: 'signals',   title: '⚡ 신호 피드',   desc: '실시간 위협 신호', defaultSize: { w: 3, h: 6 } },
+  { type: 'blackswan', title: '🌡️ 블랙스완',    desc: '테일 리스크 지수', defaultSize: { w: 3, h: 5 } },
+  { type: 'econ-calendar', title: '📅 경제 캘린더', desc: 'FOMC/BOK/BOJ 일정', defaultSize: { w: 3, h: 5 } },
+];
+
+interface Props { onClose: () => void }
+
+export function PanelCatalog({ onClose }: Props) {
+  const { addPanel, panels } = useLayoutStore();
+  const [filter, setFilter] = useState('');
+
+  const filtered = CATALOG.filter(c =>
+    !filter || c.title.toLowerCase().includes(filter.toLowerCase()) || c.desc.includes(filter)
+  );
+
+  function handleAdd(item: CatalogItem) {
+    const id = `${item.type}-${Date.now()}`;
+    const panel: PanelDef = { id, type: item.type, title: item.title, config: item.config };
+    addPanel(panel, item.defaultSize ? { w: item.defaultSize.w, h: item.defaultSize.h } : undefined);
+    onClose();
+  }
+
+  void panels; // suppress unused warning
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-panel border border-border rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl"
+        onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-bold text-primary">📦 패널 추가</h2>
+          <button onClick={onClose} className="text-muted hover:text-primary text-xl leading-none">×</button>
+        </div>
+        {/* Search */}
+        <div className="px-4 py-3 border-b border-border">
+          <input
+            autoFocus
+            type="text"
+            placeholder="패널 검색..."
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-accent"
+          />
+        </div>
+        {/* Grid */}
+        <div className="overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {filtered.map((item, i) => (
+            <button
+              key={i}
+              onClick={() => handleAdd(item)}
+              className="text-left bg-surface border border-border rounded-lg p-3 hover:border-accent/60 hover:bg-accent/5 transition-all group"
+            >
+              <div className="text-sm font-semibold text-primary mb-1 group-hover:text-accent-light transition-colors">{item.title}</div>
+              <div className="text-xs text-muted leading-relaxed">{item.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

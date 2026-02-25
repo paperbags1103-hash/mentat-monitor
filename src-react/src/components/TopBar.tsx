@@ -1,8 +1,11 @@
 import { useStore } from '@/store';
 
+import type { ReactNode } from 'react';
+
 interface Props {
   onAddPanel: () => void;
   onResetLayout: () => void;
+  extraActions?: ReactNode;
 }
 
 const RISK_COLOR: Record<string, string> = {
@@ -21,7 +24,7 @@ function Tick({ label, value, pct }: { label: string; value: string; pct?: numbe
   );
 }
 
-export function TopBar({ onAddPanel, onResetLayout }: Props) {
+export function TopBar({ onAddPanel, onResetLayout, extraActions }: Props) {
   const { globalRiskScore, riskLabel, kospi, usdkrw, btcKrw, kimchiPremium, isLoading, lastUpdated } = useStore();
   const riskCls = RISK_COLOR[riskLabel] ?? 'text-primary';
   const ts = lastUpdated
@@ -70,6 +73,7 @@ export function TopBar({ onAddPanel, onResetLayout }: Props) {
           className="text-xs px-2 py-1 text-muted hover:text-primary transition-colors"
           title="레이아웃 초기화"
         >⟳</button>
+        {extraActions}
       </div>
     </header>
   );

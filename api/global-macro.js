@@ -19,14 +19,17 @@ let cache = null, cacheTs = 0;
 
 // Yahoo Finance symbols
 const YAHOO_SYMBOLS = {
-  dxy:   'DX-Y.NYB',
-  y2:    '^IRX',      // 13-week T-Bill (proxy for 3M); use ^IRX for short end
-  y10:   '^TNX',      // 10Y yield
-  y30:   '^TYX',      // 30Y yield
-  gold:  'GC=F',
-  copper:'HG=F',
-  tips10:'TIP',       // TIPS ETF (proxy for real rates)
-  vix:   '^VIX',
+  dxy:    'DX-Y.NYB',
+  y2:     '^IRX',      // 13-week T-Bill (proxy for 3M); use ^IRX for short end
+  y10:    '^TNX',      // 10Y yield
+  y30:    '^TYX',      // 30Y yield
+  gold:   'GC=F',
+  copper: 'HG=F',
+  tips10: 'TIP',       // TIPS ETF (proxy for real rates)
+  vix:    '^VIX',
+  spx:    '^GSPC',     // S&P 500
+  nasdaq: '^IXIC',     // 나스닥
+  oil:    'CL=F',      // WTI 원유
 };
 
 // FRED for real rates
@@ -108,6 +111,9 @@ export default async function handler(req) {
   const gold   = yahoo.gold;
   const copper = yahoo.copper;
   const vix    = yahoo.vix;
+  const spx    = yahoo.spx;
+  const nasdaq = yahoo.nasdaq;
+  const oil    = yahoo.oil;
 
   // Yield curve
   const y2Rate  = y2?.price   ?? null;
@@ -163,7 +169,11 @@ export default async function handler(req) {
       signal: copperGoldSignal,
       copper: copper ? { price: copper.price, changePct: copper.changePct } : null,
     },
-    vix: vix ? { price: vix.price, changePct: vix.changePct } : null,
+    vix:    vix    ? { price: vix.price,    changePct: vix.changePct    } : null,
+    spx:    spx    ? { price: spx.price,    changePct: spx.changePct    } : null,
+    nasdaq: nasdaq ? { price: nasdaq.price, changePct: nasdaq.changePct } : null,
+    gold:   gold   ? { price: gold.price,   changePct: gold.changePct   } : null,
+    oil:    oil    ? { price: oil.price,    changePct: oil.changePct    } : null,
     timestamp: Date.now(),
   };
 

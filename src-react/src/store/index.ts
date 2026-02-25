@@ -128,11 +128,15 @@ export interface YieldCurveData {
 }
 
 export interface GlobalMacroData {
-  dxy: { price: number; changePct: number; signal: { ko: string; sentiment: string } } | null;
+  dxy:    { price: number; changePct: number; signal: { ko: string; sentiment: string } } | null;
   yieldCurve: YieldCurveData;
   realRate: { value: number | null; change: number | null; source: string; goldSignal: string | null };
   copperGold: { ratio: number | null; signal: string | null; copper: { price: number; changePct: number } | null };
-  vix: { price: number; changePct: number } | null;
+  vix:    { price: number; changePct: number } | null;
+  spx:    { price: number; changePct: number } | null;
+  nasdaq: { price: number; changePct: number } | null;
+  gold:   { price: number; changePct: number } | null;
+  oil:    { price: number; changePct: number } | null;
   timestamp: number;
 }
 
@@ -327,13 +331,15 @@ export const useStore = create<DataState>()((set, get) => ({
       });
     }
 
-    // Extract DXY from macro data if available
-    const dxyFromMacro = macroRaw?.dxy
-      ? { price: macroRaw.dxy.price, changePercent: macroRaw.dxy.changePct } as MarketTick
-      : null;
-    const vixFromMacro = macroRaw?.vix
-      ? { price: macroRaw.vix.price, changePercent: macroRaw.vix.changePct } as MarketTick
-      : null;
+    // Extract global tickers from macro data
+    const toTick = (o: { price: number; changePct?: number } | null | undefined): MarketTick | null =>
+      o ? { price: o.price, changePercent: o.changePct } : null;
+    const dxyFromMacro    = toTick(macroRaw?.dxy);
+    const vixFromMacro    = toTick(macroRaw?.vix);
+    const spxFromMacro    = toTick(macroRaw?.spx);
+    const nasdaqFromMacro = toTick(macroRaw?.nasdaq);
+    const goldFromMacro   = toTick(macroRaw?.gold);
+    const oilFromMacro    = toTick(macroRaw?.oil);
 
     set({
       isLoading: false, lastUpdated: Date.now(),
@@ -347,6 +353,8 @@ export const useStore = create<DataState>()((set, get) => ({
       btcKrw: mktRaw?.btcKrw as MarketTick ?? null,
       kimchiPremium: typeof mktRaw?.kimchiPremium === 'number' ? mktRaw.kimchiPremium : null,
       dxy: dxyFromMacro, vix: vixFromMacro,
+      spx: spxFromMacro, nasdaq: nasdaqFromMacro,
+      gold: goldFromMacro, oil: oilFromMacro,
       preciousMetals: metalsRaw,
       blackSwan: bsRaw ? { tailRiskScore: bsRaw.tailRiskScore, modules: bsModules, timestamp: Date.now() } : null,
       econCalendar: calRaw?.events ?? [],

@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
   },
+  base: './',
   build: {
     outDir: './dist',
     emptyOutDir: true,

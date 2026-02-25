@@ -85,8 +85,12 @@ export interface OHLCBar {
 }
 
 export interface PreciousMetalsData {
-  gold: { price: number; changePercent: number };
-  silver: { price: number; changePercent: number };
+  // API returns goldFutures/silverFutures (change field, not changePercent)
+  goldFutures: { symbol: string; price: number; change: number; sparkline?: number[] } | null;
+  silverFutures: { symbol: string; price: number; change: number; sparkline?: number[] } | null;
+  // Legacy shape aliases — computed in store for backward compat
+  gold?: { price: number; changePercent: number };
+  silver?: { price: number; changePercent: number };
   goldSilverRatio: number;
   timestamp: number;
 }

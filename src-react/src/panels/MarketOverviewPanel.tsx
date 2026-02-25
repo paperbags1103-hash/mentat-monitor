@@ -56,14 +56,14 @@ export function MarketOverviewPanel() {
       {dxy    && <TickerRow label="DXY"      value={fmt(dxy.price)}    changePct={dxy.changePercent} sub="달러지수" />}
 
       <SectionHeader title="원자재" />
-      {(gold ?? preciousMetals?.gold) && (
-        <TickerRow label="금 (Gold)" value={`$${fmt(gold?.price ?? preciousMetals?.gold.price)}`}
-          changePct={gold?.changePercent ?? preciousMetals?.gold.changePercent} />
+      {(gold ?? preciousMetals?.goldFutures) && (
+        <TickerRow label="금 (Gold)" value={`$${fmt(gold?.price ?? preciousMetals?.goldFutures?.price)}`}
+          changePct={gold?.changePercent ?? preciousMetals?.goldFutures?.change} />
       )}
       {oil && <TickerRow label="WTI 원유" value={`$${fmt(oil.price)}`} changePct={oil.changePercent} />}
-      {preciousMetals?.silver && (
-        <TickerRow label="은 (Silver)" value={`$${fmt(preciousMetals.silver.price)}`}
-          changePct={preciousMetals.silver.changePercent} />
+      {preciousMetals?.silverFutures && (
+        <TickerRow label="은 (Silver)" value={`$${fmt(preciousMetals.silverFutures.price)}`}
+          changePct={preciousMetals.silverFutures.change} />
       )}
     </div>
   );

@@ -19,6 +19,7 @@ import { Sidebar }      from './Sidebar';
 const WorldMapView = lazy(() => import('./WorldMapView').then(m => ({ default: m.WorldMapView })));
 import { HeatMapView }  from './HeatMapView';
 import { ChartView }    from './ChartView';
+import { LiveNews }     from './LiveNews';
 import { LiveFeed }     from './LiveFeed';
 import { BottomStrip }  from './BottomStrip';
 import { PanelGrid }    from '@/layout/PanelGrid';
@@ -147,9 +148,12 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
           <BottomStrip />
         </div>
 
-        {/* Live feed — right panel */}
-        <div className="w-72 shrink-0 min-h-0 overflow-hidden">
-          <LiveFeed />
+        {/* Live feed + News — right panel */}
+        <div className="w-72 shrink-0 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <LiveFeed />
+          </div>
+          <LiveNews />
         </div>
       </div>
     </div>

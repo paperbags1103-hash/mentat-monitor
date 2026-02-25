@@ -22,15 +22,18 @@ World Monitor (https://github.com/koala73/worldmonitor) 포크 기반.
 
 ## Phase 2: 신호 수집 강화 (W7-10)
 
-- [ ] 블랙스완 조기경보
-  - Google Trends 키워드 모니터링 (방사능 약, 비상식량 등)
-  - FRED API: TED Spread, 레포금리, VIX
-  - ProMED/HealthMap: 팬데믹 조기경보
-  - Cloudflare Radar: 인터넷 장애 감지
-- [ ] 군용기/정부기 항공 추적 (OpenSky Network API)
-- [ ] 이벤트 자동 태깅 (섹터, 자산 클래스 연결)
-- [ ] 수렴 감지 엔진 (다중 신호 동일 지역 겹침 → 에스컬레이션)
-- [ ] 반도체 공급망 트래커 (삼성/SK하이닉스/TSMC/ASML 관련 뉴스 태깅)
+- [x] 블랙스완 조기경보 (6개 모듈, Tail Risk Index 0-100)
+  - 금융 스트레스: VIX, HY 스프레드, 엔화 흐름
+  - 팬데믹: ProMED RSS + WHO + Google News
+  - 핵/방사능: IAEA + 구글뉴스 키워드
+  - 사이버: Cloudflare Radar + 구글뉴스
+  - 지정학: 6시간 내 에스컬레이션 키워드
+  - 공급망: BDRY ETF + 해운 뉴스
+- [x] VIP/군용기 항공 추적 (OpenSky Network API, 직접 연결)
+  - 24개국 주요 항공기 ICAO DB (한국 대통령, Air Force One 등)
+- [x] 이벤트 자동 태깅 (rule-based, 섹터/자산/지역 매핑)
+- [x] 수렴 감지 엔진 (Haversine 기반 지역별 신호 집계, 다중 신호 → 에스컬레이션)
+- [x] 반도체 공급망 트래커 (11개 주요 기업 노드, 4개 리스크 시나리오)
 
 ## Phase 3: 투자 인텔리전스 (W11-13)
 

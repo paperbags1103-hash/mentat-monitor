@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd src-react && npm install && npm run build",
+  "buildCommand": "cd src-react && npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "src-react/dist",
-  "installCommand": "npm install",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": null,
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" }
@@ -29,6 +29,6 @@
   ],
   "env": {
     "VITE_APP_NAME": "Mentat Monitor",
-    "VITE_APP_VERSION": "0.6.5"
+    "VITE_APP_VERSION": "0.6.6"
   }
 }

@@ -16,9 +16,9 @@ World Monitor (https://github.com/koala73/worldmonitor) 포크 기반.
 - [x] 한국 뉴스 RSS 피드 추가 (연합뉴스, YTN, MBC, 매일경제, 한겨레 등)
 - [x] 한반도 인텔리전스 피드 (38North, NK News, CSIS Korea, KCNA Watch)
 - [ ] 한국 시장 데이터 (코스피/코스닥, 원달러 환율, 김치 프리미엄)
-- [ ] 경제 캘린더 레이어 (FOMC, BOK, ECB 금리 결정 일정)
-- [ ] 원자재 피드 (WTI, 금, 구리)
-- [ ] 북한 도발 타임라인 데이터 (JSON DB)
+- [x] 경제 캘린더 API (FOMC, BOK, ECB, BOJ 금리 결정 일정 + FMP 연동)
+- [ ] 원자재 피드 UI 통합 (WTI, 금, 구리 — 서버 핸들러 기존 존재)
+- [x] 북한 도발 타임라인 데이터 (JSON DB, 2006-2024, 20개+ 이벤트, 좌표 포함)
 
 ## Phase 2: 신호 수집 강화 (W7-10)
 

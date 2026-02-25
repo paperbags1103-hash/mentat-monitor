@@ -40,6 +40,7 @@ const CATALOG: CatalogItem[] = [
   { type: 'news',       title: '📰 뉴스 피드',    desc: '한국·글로벌 경제 RSS 뉴스 (연합/YTN/Reuters)', defaultSize: { w: 4, h: 6 } },
   { type: 'fear-greed', title: '😱 공포탐욕지수', desc: 'VIX·수익률곡선·신용으로 자체 계산 + CNN F&G', defaultSize: { w: 3, h: 6 } },
   { type: 'scenario',   title: '🎯 시나리오 시뮬',  desc: '대만해협/북한/연준/중국 시나리오 스트레스 테스트', defaultSize: { w: 5, h: 8 } },
+  { type: 'var',        title: '📐 VaR 분석',       desc: '포트폴리오 Value at Risk + 스트레스 테스트', defaultSize: { w: 3, h: 7 } },
 ];
 
 interface Props { onClose: () => void }

@@ -656,11 +656,30 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     // Vietnam
     { name: 'VnExpress', url: rss('https://vnexpress.net/rss'), lang: 'vi' },
     { name: 'Tuoi Tre News', url: rss('https://news.google.com/rss/search?q=site:tuoitrenews.vn+when:2d&hl=vi&gl=VN&ceid=VN:vi'), lang: 'vi' },
+    // Korea (KO)
+    { name: '연합뉴스', url: rss('https://www.yonhapnewstv.co.kr/browse/feed/'), lang: 'ko' },
+    { name: 'YTN', url: rss('https://www.ytn.co.kr/rss/rss.php?t=02'), lang: 'ko' },
+    { name: 'MBC 뉴스', url: rss('https://imnews.imbc.com/rss/news/news_00.xml'), lang: 'ko' },
+    { name: '매일경제', url: rss('https://www.mk.co.kr/rss/30100041/'), lang: 'ko' },
+    { name: '한겨레', url: rss('https://www.hani.co.kr/rss/'), lang: 'ko' },
+    { name: 'Korea Herald', url: rss('https://www.koreaherald.com/common/rss.php') },
     // Australia
     { name: 'ABC News Australia', url: rss('https://www.abc.net.au/news/feed/2942460/rss.xml') },
     { name: 'Guardian Australia', url: rss('https://www.theguardian.com/australia-news/rss') },
     // Pacific Islands
     { name: 'Island Times (Palau)', url: rss('https://islandtimes.org/feed/') },
+  ],
+  korea: [
+    // Korean Peninsula intelligence — NK analysis & Korean market
+    { name: '38 North', url: rss('https://www.38north.org/feed/') },
+    { name: 'NK News', url: rss('https://www.nknews.org/feed/') },
+    { name: 'CSIS Korea Chair', url: rss('https://www.csis.org/programs/korea-chair/feed') },
+    { name: 'KCNA Watch', url: rss('https://kcnawatch.org/newstream/atom/') },
+    { name: 'Korea JoongAng Daily', url: rss('https://koreajoongangdaily.joins.com/rss/') },
+    { name: 'Korea Times', url: rss('https://www.koreatimes.co.kr/www/rss/rss.xml') },
+    { name: 'KBS World', url: rss('https://world.kbs.co.kr/rss/rss_news.htm?lang=e') },
+    { name: '한국은행', url: rss('https://news.google.com/rss/search?q=site:bok.or.kr+when:7d&hl=ko&gl=KR&ceid=KR:ko'), lang: 'ko' },
+    { name: '금융감독원', url: rss('https://news.google.com/rss/search?q=site:fss.or.kr+when:7d&hl=ko&gl=KR&ceid=KR:ko'), lang: 'ko' },
   ],
   energy: [
     { name: 'Oil & Gas', url: rss('https://news.google.com/rss/search?q=(oil+price+OR+OPEC+OR+"natural+gas"+OR+pipeline+OR+LNG)+when:2d&hl=en-US&gl=US&ceid=US:en') },
@@ -1023,7 +1042,7 @@ export const FEEDS = SITE_VARIANT === 'tech'
     ? FINANCE_FEEDS
     : SITE_VARIANT === 'happy'
       ? HAPPY_FEEDS
-      : FULL_FEEDS;
+      : FULL_FEEDS; // 'signal' variant uses FULL_FEEDS with korea category enabled
 
 export const SOURCE_REGION_MAP: Record<string, { labelKey: string; feedKeys: string[] }> = {
   // Full (geopolitical) variant regions
@@ -1034,6 +1053,7 @@ export const SOURCE_REGION_MAP: Record<string, { labelKey: string; feedKeys: str
   africa: { labelKey: 'header.sourceRegionAfrica', feedKeys: ['africa'] },
   latam: { labelKey: 'header.sourceRegionLatAm', feedKeys: ['latam'] },
   asia: { labelKey: 'header.sourceRegionAsiaPacific', feedKeys: ['asia'] },
+  korea: { labelKey: 'header.sourceRegionKorea', feedKeys: ['korea'] },
   topical: { labelKey: 'header.sourceRegionTopical', feedKeys: ['energy', 'tech', 'ai', 'finance', 'layoffs', 'thinktanks'] },
   intel: { labelKey: 'header.sourceRegionIntel', feedKeys: [] },
 

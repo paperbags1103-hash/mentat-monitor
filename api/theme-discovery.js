@@ -69,8 +69,8 @@ const THEME_SEEDS = [
   },
 ];
 
-async function discoverThemes(signals, inferences, marketSnapshot) {
-  const groqKey = process.env.GROQ_API_KEY;
+async function discoverThemes(signals, inferences, marketSnapshot, overrideGroqKey = '') {
+  const groqKey = process.env.GROQ_API_KEY || overrideGroqKey;
   if (!groqKey) return generateTemplateThemes(signals, inferences);
 
   const signalSummary = signals.slice(0, 10).map(s =>
@@ -212,8 +212,9 @@ export default async function handler(req) {
     }
   } catch { /* graceful */ }
 
+  const overrideGroqKey = req.headers?.get?.('x-groq-key') ?? '';
   const marketSnapshot = await fetchMarketSnapshot();
-  const { themes, method } = await discoverThemes(signals, inferences, marketSnapshot);
+  const { themes, method } = await discoverThemes(signals, inferences, marketSnapshot, overrideGroqKey);
 
   const payload = { themes, method, generatedAt: Date.now(), nextUpdate: Date.now() + CACHE_TTL };
   cache   = payload;

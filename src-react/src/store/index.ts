@@ -221,9 +221,24 @@ export const useLayoutStore = create<LayoutState>()(
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 const API_BASE = isTauri ? 'http://localhost:46123' : '';
 
+function getStoredApiKeys() {
+  try {
+    const raw = localStorage.getItem('mentat-api-keys-v1');
+    return raw ? JSON.parse(raw) as Record<string, string> : {};
+  } catch { return {}; }
+}
+
 export async function apiFetch<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(12_000) });
+    const keys = getStoredApiKeys();
+    const headers: Record<string, string> = {};
+    if (keys.groq)         headers['x-groq-key']         = keys.groq;
+    if (keys.fred)         headers['x-fred-key']         = keys.fred;
+    if (keys.alphavantage) headers['x-alphavantage-key'] = keys.alphavantage;
+    const res = await fetch(`${API_BASE}${path}`, {
+      signal: AbortSignal.timeout(12_000),
+      headers,
+    });
     if (!res.ok) return null;
     return res.json() as Promise<T>;
   } catch { return null; }

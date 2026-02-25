@@ -54,10 +54,10 @@ export interface ActiveTheme {
   nameKo: string;
   strength: number;
   momentum: Momentum;
-  evidenceKo: string[];
-  beneficiaryKo: string[];
-  riskKo: string[];
-  koreanStocks: string[];
+  evidenceKo?: string[];
+  beneficiaryKo?: string[];
+  riskKo?: string[];
+  koreanStocks?: string[];
   updatedAt: number;
 }
 
@@ -377,7 +377,15 @@ export const useStore = create<DataState>()((set, get) => ({
   fetchThemes: async () => {
     const data = await apiFetch<{ themes: ActiveTheme[]; method: 'llm' | 'template' }>('/api/theme-discovery');
     if (data?.themes) {
-      set({ activeThemes: data.themes, themeDiscoveryMethod: data.method });
+      // 배열 필드 정규화 — LLM이 빠뜨릴 수 있음
+      const themes = data.themes.map(t => ({
+        ...t,
+        evidenceKo:   t.evidenceKo   ?? [],
+        beneficiaryKo: t.beneficiaryKo ?? [],
+        riskKo:       t.riskKo        ?? [],
+        koreanStocks:  t.koreanStocks  ?? [],
+      }));
+      set({ activeThemes: themes, themeDiscoveryMethod: data.method });
     }
   },
 

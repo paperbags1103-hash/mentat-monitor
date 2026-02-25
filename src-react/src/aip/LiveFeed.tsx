@@ -161,7 +161,7 @@ export function LiveFeed() {
                     }} />
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {t.koreanStocks.slice(0, 3).map(s => (
+                    {(t.koreanStocks ?? []).slice(0, 3).map(s => (
                       <span key={s} className="text-xs bg-accent/10 text-accent-light px-1 rounded">{s}</span>
                     ))}
                   </div>

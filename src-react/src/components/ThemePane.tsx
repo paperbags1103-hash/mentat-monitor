@@ -32,9 +32,9 @@ function ThemeCard({ theme }: { theme: ActiveTheme }) {
       </div>
       <StrengthBar value={theme.strength} />
 
-      {theme.koreanStocks.length > 0 && (
+      {(theme.koreanStocks ?? []).length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {theme.koreanStocks.slice(0, 4).map(s => (
+          {(theme.koreanStocks ?? []).slice(0, 4).map(s => (
             <span key={s} className="text-xs bg-accent/10 text-accent-light px-1.5 py-0.5 rounded border border-accent/20">{s}</span>
           ))}
         </div>
@@ -42,26 +42,26 @@ function ThemeCard({ theme }: { theme: ActiveTheme }) {
 
       {expanded && (
         <div className="mt-2 pt-2 border-t border-border space-y-1.5">
-          {theme.evidenceKo.length > 0 && (
+          {(theme.evidenceKo ?? []).length > 0 && (
             <div>
               <span className="text-xs text-muted font-semibold">📌 근거</span>
-              {theme.evidenceKo.map((e, i) => (
+              {(theme.evidenceKo ?? []).map((e, i) => (
                 <p key={i} className="text-xs text-secondary leading-snug">· {e}</p>
               ))}
             </div>
           )}
-          {theme.beneficiaryKo.length > 0 && (
+          {(theme.beneficiaryKo ?? []).length > 0 && (
             <div>
               <span className="text-xs text-muted font-semibold">✅ 수혜</span>
-              {theme.beneficiaryKo.map((b, i) => (
+              {(theme.beneficiaryKo ?? []).map((b, i) => (
                 <p key={i} className="text-xs text-risk-safe leading-snug">· {b}</p>
               ))}
             </div>
           )}
-          {theme.riskKo.length > 0 && (
+          {(theme.riskKo ?? []).length > 0 && (
             <div>
               <span className="text-xs text-muted font-semibold">⚠️ 리스크</span>
-              {theme.riskKo.map((r, i) => (
+              {(theme.riskKo ?? []).map((r, i) => (
                 <p key={i} className="text-xs text-risk-elevated leading-snug">· {r}</p>
               ))}
             </div>

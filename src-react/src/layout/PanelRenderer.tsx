@@ -19,6 +19,7 @@ import { FearGreedPanel }      from '@/panels/FearGreedPanel';
 import { ScenarioPanel }       from '@/panels/ScenarioPanel';
 import { VaRPanel }            from '@/panels/VaRPanel';
 import { SettingsPanel }       from '@/panels/SettingsPanel';
+import { StockDetailPanel }    from '@/panels/StockDetailPanel';
 
 interface Props { panel: PanelDef }
 
@@ -43,6 +44,14 @@ export function PanelRenderer({ panel }: Props) {
     case 'scenario':       return <ScenarioPanel />;
     case 'var':            return <VaRPanel />;
     case 'settings':       return <SettingsPanel />;
+    case 'stock': {
+      const cfg = {
+        symbol:   (panel.config?.symbol   as string) ?? 'AAPL',
+        nameKo:   (panel.config?.nameKo   as string) ?? (panel.config?.symbol as string) ?? 'AAPL',
+        exchange: (panel.config?.exchange as string) ?? '',
+      };
+      return <StockDetailPanel config={cfg} />;
+    }
     case 'chart': {
       const symbol = (panel.config?.symbol as string) ?? '^KS11';
       const nameKo = (panel.config?.nameKo as string) ?? symbol;

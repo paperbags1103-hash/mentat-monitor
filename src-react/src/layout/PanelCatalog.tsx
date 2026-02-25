@@ -37,6 +37,8 @@ const CATALOG: CatalogItem[] = [
   { type: 'portfolio',  title: '💼 포트폴리오', desc: '보유 종목 P&L 실시간 추적', defaultSize: { w: 4, h: 7 } },
   { type: 'alerts',     title: '🔔 알림',       desc: '가격 목표 + 위협 등급 알림 (데스크탑 푸시)', defaultSize: { w: 3, h: 6 } },
   { type: 'screener',   title: '🔍 종목 스크리너', desc: '테마 연계 자동 관심종목 서제스트', defaultSize: { w: 4, h: 6 } },
+  { type: 'news',       title: '📰 뉴스 피드',    desc: '한국·글로벌 경제 RSS 뉴스 (연합/YTN/Reuters)', defaultSize: { w: 4, h: 6 } },
+  { type: 'fear-greed', title: '😱 공포탐욕지수', desc: 'VIX·수익률곡선·신용으로 자체 계산 + CNN F&G', defaultSize: { w: 3, h: 6 } },
 ];
 
 interface Props { onClose: () => void }

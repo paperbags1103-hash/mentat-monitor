@@ -77,3 +77,36 @@ World Monitor (https://github.com/koala73/worldmonitor) 포크 기반.
 - **Desktop**: Tauri (macOS / Windows / Linux)
 - **AI**: Groq API (무료) / OpenAI API (선택) / Ollama (로컬)
 - **License**: AGPL v3
+
+---
+
+## v0.3.0 — Bloomberg-style 그리드 대시보드 ✅ (2025-02)
+
+- [x] react-grid-layout v1.4: 드래그/리사이즈 패널, localStorage 저장
+- [x] PanelCatalog: 22+ 패널 카탈로그, + 버튼으로 즉석 추가
+- [x] ChartPanel: lightweight-charts v4 캔들스틱 (1개월~2년 범위)
+- [x] MarketOverviewPanel: KR/US/원자재 한눈에
+- [x] BlackSwanPanel: 6개 모듈 게이지
+- [x] EconCalendarPanel: FOMC/BOK D-카운트다운
+- [x] LiveTVPanel: Bloomberg/CNBC/YTN/KBS YouTube embed
+- [x] WebcamPanel: 8개 지역, CRITICAL 신호 시 자동 전환
+- [x] api/chart-data.js: Yahoo Finance OHLCV
+
+## v0.4.0 — Phase 2 완성: AI 테마 + 신용/매크로 + Action 레이어 ✅ (2025-02)
+
+- [x] api/theme-discovery.js: Groq AI 투자 테마 자동 발견
+- [x] api/credit-stress.js: IG/HY 스프레드 (FRED + Yahoo 폴백)
+- [x] api/global-macro.js: DXY + 수익률 곡선 + TIPS 실질금리 + 구리/금 비율
+- [x] CreditStressPanel: 스프레드 게이지 + 스트레스 레벨
+- [x] GlobalMacroPanel: DXY 신호 + 수익률 곡선 해석 + 실질금리
+- [x] ActionPanel: 팔란티어 "Action" 레이어 (HEDGE/REDUCE/INCREASE/ALERT)
+- [x] ThemePane 실제 Groq 연결 (30분 캐시, 확장형 카드)
+- [x] 12패널 기본 레이아웃
+
+## v0.5.0 — 예정
+
+- [ ] Vercel 웹 배포 (Desktop + Web 동시 지원)
+- [ ] 포트폴리오 트래킹 (종목 추가, P&L, VaR 계산)
+- [ ] 알림 시스템 (Desktop notification via Tauri)
+- [ ] 대만해협/중동/한반도 시나리오 시뮬레이터
+- [ ] 종목 스크리너 (테마 연계 자동 추천)

@@ -11,6 +11,9 @@ import { WebcamPanel }         from '@/panels/WebcamPanel';
 import { CreditStressPanel }   from '@/panels/CreditStressPanel';
 import { GlobalMacroPanel }    from '@/panels/GlobalMacroPanel';
 import { ActionPanel }         from '@/panels/ActionPanel';
+import { PortfolioPanel }      from '@/panels/PortfolioPanel';
+import { AlertPanel }          from '@/panels/AlertPanel';
+import { ScreenerPanel }       from '@/panels/ScreenerPanel';
 
 interface Props { panel: PanelDef }
 
@@ -27,6 +30,9 @@ export function PanelRenderer({ panel }: Props) {
     case 'credit-stress':  return <CreditStressPanel />;
     case 'global-macro':   return <GlobalMacroPanel />;
     case 'actions':        return <ActionPanel />;
+    case 'portfolio':      return <PortfolioPanel />;
+    case 'alerts':         return <AlertPanel />;
+    case 'screener':       return <ScreenerPanel />;
     case 'chart': {
       const symbol = (panel.config?.symbol as string) ?? '^KS11';
       const nameKo = (panel.config?.nameKo as string) ?? symbol;

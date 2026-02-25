@@ -56,7 +56,7 @@ World Monitor (https://github.com/koala73/worldmonitor) 포크 기반.
   - 6개 소스: 블랙스완, VIP기, 시장 스트레스, 포트폴리오 리스크, 팬데믹, 핵
   - 스누즈 / 카테고리 음소거 / 일괄 확인 지원
 - [x] Tail Risk Index → `api/blackswan.js` (Phase 2에서 완료)
-- [ ] v0.1.0 릴리스 (macOS/Windows/Linux 바이너리)
+- [x] v0.1.0 릴리스 (macOS Apple Silicon DMG — 2026-02-25)
 
 ---
 

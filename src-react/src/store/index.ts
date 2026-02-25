@@ -290,6 +290,11 @@ interface DataState {
   // Chart data cache
   chartCache: Record<string, OHLCBar[]>;
 
+  // Selected stock (for cross-panel navigation)
+  selectedSymbol: string | null;
+  selectedSymbolName: string | null;
+  selectSymbol: (symbol: string, name?: string) => void;
+
   // Actions
   fetchAll: () => Promise<void>;
   fetchThemes: () => Promise<void>;
@@ -307,6 +312,8 @@ export const useStore = create<DataState>()((set, get) => ({
   globalMacro: null, themeDiscoveryMethod: null,
   isLoading: false, lastUpdated: null,
   chartCache: {},
+  selectedSymbol: null, selectedSymbolName: null,
+  selectSymbol: (symbol, name) => set({ selectedSymbol: symbol, selectedSymbolName: name ?? symbol }),
 
   fetchAll: async () => {
     set({ isLoading: true });

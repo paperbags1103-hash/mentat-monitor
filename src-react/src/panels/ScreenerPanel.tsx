@@ -62,6 +62,8 @@ export function ScreenerPanel() {
   const { activeThemes } = useStore();
   const { holdings }     = usePortfolioStore();
   const [filter, setFilter] = useState<string>('all');
+  const selectSymbol = useStore(s => s.selectSymbol);
+  const selectedSym  = useStore(s => s.selectedSymbol);
   const [marketFilter, setMarketFilter] = useState<'ALL' | 'KR' | 'US'>('ALL');
 
   const ownedSymbols = new Set(holdings.map(h => h.symbol));
@@ -126,7 +128,9 @@ export function ScreenerPanel() {
           filtered.map((c, i) => {
             const owned = ownedSymbols.has(c.symbol);
             return (
-              <div key={i} className={`py-2 border-b border-border/40 last:border-0 ${owned ? 'opacity-50' : ''}`}>
+              <div key={i}
+                onClick={() => selectSymbol(c.symbol, c.nameKo)}
+                className={`py-2 border-b border-border/40 last:border-0 cursor-pointer hover:bg-surface/60 rounded px-1 transition-colors ${owned ? 'opacity-50' : ''} ${selectedSym === c.symbol ? 'bg-accent/10 border-accent/30' : ''}`}>
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5 flex-wrap">

@@ -86,25 +86,25 @@ export function SignalFeed() {
           {kospi && (
             <div className="flex justify-between text-xs font-mono">
               <span className="text-muted">KOSPI</span>
-              <span className={kospi.changePercent >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
+              <span className={(kospi.changePercent ?? 0) >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
                 {kospi.price.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}
-                {' '}({kospi.changePercent > 0 ? '+' : ''}{kospi.changePercent.toFixed(2)}%)
+                {' '}({(kospi.changePercent ?? 0) > 0 ? '+' : ''}{(kospi.changePercent ?? 0).toFixed(2)}%)
               </span>
             </div>
           )}
           {kosdaq && (
             <div className="flex justify-between text-xs font-mono">
               <span className="text-muted">KOSDAQ</span>
-              <span className={kosdaq.changePercent >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
+              <span className={(kosdaq.changePercent ?? 0) >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
                 {kosdaq.price.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}
-                {' '}({kosdaq.changePercent > 0 ? '+' : ''}{kosdaq.changePercent.toFixed(2)}%)
+                {' '}({(kosdaq.changePercent ?? 0) > 0 ? '+' : ''}{(kosdaq.changePercent ?? 0).toFixed(2)}%)
               </span>
             </div>
           )}
           {btcKrw && (
             <div className="flex justify-between text-xs font-mono">
               <span className="text-muted">BTC/KRW</span>
-              <span className={btcKrw.changePercent >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
+              <span className={(btcKrw.changePercent ?? 0) >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
                 ₩{btcKrw.price.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}
               </span>
             </div>

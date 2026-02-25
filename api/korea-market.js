@@ -124,31 +124,32 @@ export default async function handler(req) {
       symbol: '^KS11',
       name: '코스피',
       price: Math.round(kospi.price * 100) / 100,
-      change: Math.round(kospi.change * 100) / 100,
+      changePercent: Math.round(kospi.change * 100) / 100,
     } : null,
     kosdaq: kosdaq ? {
       symbol: '^KQ11',
       name: '코스닥',
       price: Math.round(kosdaq.price * 100) / 100,
-      change: Math.round(kosdaq.change * 100) / 100,
+      changePercent: Math.round(kosdaq.change * 100) / 100,
     } : null,
-    usdKrw: usdKrw ? {
+    usdkrw: usdKrw ? {
       symbol: 'KRW=X',
       name: '원/달러',
+      rate: Math.round(usdKrw.price * 10) / 10,
       price: Math.round(usdKrw.price * 10) / 10,
-      change: Math.round(usdKrw.change * 100) / 100,
+      changePercent: Math.round(usdKrw.change * 100) / 100,
     } : null,
     btcKrw: upbit ? {
       exchange: 'upbit',
       name: 'BTC/KRW',
       price: upbit.price,
-      change: Math.round(upbit.change * 100) / 100,
+      changePercent: Math.round(upbit.change * 100) / 100,
     } : null,
     btcUsdt: binance ? {
       exchange: 'binance',
       name: 'BTC/USDT',
       price: Math.round(binance.price * 100) / 100,
-      change: Math.round(binance.change * 100) / 100,
+      changePercent: Math.round(binance.change * 100) / 100,
     } : null,
     kimchiPremium,
     errors: {

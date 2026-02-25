@@ -33,7 +33,10 @@ const CATALOG: CatalogItem[] = [
   { type: 'econ-calendar',title: '📅 경제 캘린더', desc: 'FOMC/BOK/BOJ 일정', defaultSize: { w: 3, h: 5 } },
   { type: 'credit-stress',title: '💳 신용 스트레스', desc: 'IG/HY 스프레드 게이지', defaultSize: { w: 3, h: 5 } },
   { type: 'global-macro', title: '🌐 글로벌 매크로', desc: 'DXY·수익률 곡선·실질금리', defaultSize: { w: 3, h: 7 } },
-  { type: 'actions',      title: '⚡ 행동 제안',    desc: '팔란티어 Action 레이어 — 구조화된 투자 행동', defaultSize: { w: 4, h: 6 } },
+  { type: 'actions',    title: '⚡ 행동 제안',  desc: '팔란티어 Action 레이어 — 구조화된 투자 행동', defaultSize: { w: 4, h: 6 } },
+  { type: 'portfolio',  title: '💼 포트폴리오', desc: '보유 종목 P&L 실시간 추적', defaultSize: { w: 4, h: 7 } },
+  { type: 'alerts',     title: '🔔 알림',       desc: '가격 목표 + 위협 등급 알림 (데스크탑 푸시)', defaultSize: { w: 3, h: 6 } },
+  { type: 'screener',   title: '🔍 종목 스크리너', desc: '테마 연계 자동 관심종목 서제스트', defaultSize: { w: 4, h: 6 } },
 ];
 
 interface Props { onClose: () => void }

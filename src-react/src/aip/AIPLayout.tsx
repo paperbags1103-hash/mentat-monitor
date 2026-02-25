@@ -126,7 +126,7 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-base text-primary font-mono overflow-hidden">
+    <div className="flex flex-col h-screen bg-appbase text-primary font-mono overflow-hidden">
       <AIPTopBar onLayoutSwitch={onSwitchToGrid} />
 
       <div className="flex flex-1 min-h-0">

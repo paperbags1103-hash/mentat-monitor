@@ -28,7 +28,7 @@ export function App() {
 
   // Grid mode (free-form Bloomberg)
   return (
-    <div className="flex flex-col h-screen bg-base text-primary font-mono overflow-hidden">
+    <div className="flex flex-col h-screen bg-appbase text-primary font-mono overflow-hidden">
       <TopBar
         onAddPanel={() => setShowCatalog(true)}
         onResetLayout={resetLayout}

@@ -29,6 +29,6 @@
   ],
   "env": {
     "VITE_APP_NAME": "Mentat Monitor",
-    "VITE_APP_VERSION": "0.5.0"
+    "VITE_APP_VERSION": "0.6.5"
   }
 }

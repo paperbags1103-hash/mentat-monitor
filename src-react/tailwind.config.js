@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        base:      '#0a0a0f',
+        appbase:   '#0a0a0f',
         surface:   '#12121a',
         panel:     '#1a1a28',
         border:    '#2a2a3f',

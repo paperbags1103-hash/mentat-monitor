@@ -49,7 +49,10 @@
     "desktop:package:windows:tech:sign": "node scripts/desktop-package.mjs --os windows --variant tech --sign",
     "desktop:package": "node scripts/desktop-package.mjs",
     "dev:signal": "VITE_VARIANT=signal vite",
-    "build:signal": "VITE_VARIANT=signal tsc && VITE_VARIANT=signal vite build"
+    "build:signal": "VITE_VARIANT=signal tsc && VITE_VARIANT=signal vite build",
+    "mentat:dev": "cd src-react && npm install && npm run dev",
+    "mentat:build": "cd src-react && npm install && npm run build",
+    "desktop:build:mentat": "npm run version:sync && cd src-react && npm run build && cd .. && VITE_DESKTOP_RUNTIME=1 tauri build"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",

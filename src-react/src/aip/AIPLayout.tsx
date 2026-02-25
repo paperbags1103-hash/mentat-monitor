@@ -62,8 +62,8 @@ function AIPTopBar({ onLayoutSwitch }: { onLayoutSwitch: () => void }) {
           <div className="flex items-baseline gap-1 text-xs font-mono shrink-0">
             <span className="text-muted">KOSPI</span>
             <span className="font-bold text-primary tabular-nums">{kospi.price.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}</span>
-            <span className={kospi.changePercent >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
-              {kospi.changePercent >= 0 ? '+' : ''}{kospi.changePercent.toFixed(2)}%
+            <span className={(kospi.changePercent ?? 0) >= 0 ? 'text-risk-safe' : 'text-risk-critical'}>
+              {(kospi.changePercent ?? 0) >= 0 ? '+' : ''}{(kospi.changePercent ?? 0).toFixed(2)}%
             </span>
           </div>
         )}
@@ -71,8 +71,8 @@ function AIPTopBar({ onLayoutSwitch }: { onLayoutSwitch: () => void }) {
           <div className="flex items-baseline gap-1 text-xs font-mono shrink-0">
             <span className="text-muted">USD/KRW</span>
             <span className="font-bold text-primary tabular-nums">₩{usdkrw.rate.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}</span>
-            <span className={usdkrw.changePercent >= 0 ? 'text-risk-critical' : 'text-risk-safe'}>
-              {usdkrw.changePercent >= 0 ? '+' : ''}{usdkrw.changePercent.toFixed(2)}%
+            <span className={(usdkrw.changePercent ?? 0) >= 0 ? 'text-risk-critical' : 'text-risk-safe'}>
+              {(usdkrw.changePercent ?? 0) >= 0 ? '+' : ''}{(usdkrw.changePercent ?? 0).toFixed(2)}%
             </span>
           </div>
         )}

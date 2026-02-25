@@ -71,7 +71,7 @@ export interface SignalItem {
 
 export interface MarketTick {
   price: number;
-  changePercent: number;
+  changePercent?: number;   // API 응답에 없을 수 있음 — 사용 시 ?? 0
   sparkline?: number[];
 }
 

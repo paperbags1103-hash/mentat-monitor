@@ -120,3 +120,23 @@ World Monitor (https://github.com/koala73/worldmonitor) 포크 기반.
 - [x] FearGreedPanel: 공포탐욕지수 (SVG arc + CNN API + 자체계산)
 - [x] vercel.json: Vercel 배포 설정
 - [x] 총 26개 패널 카탈로그
+
+## v0.6.0 — 팔란티어 AIP 스타일 UI ✅ (2025-02)
+
+- [x] AIPLayout.tsx: 팔란티어 ATC/AIP 스타일 전체 레이아웃
+- [x] Sidebar: 아이콘 네비게이션 (지도/히트맵/차트/그리드)
+- [x] WorldMapView: Leaflet 세계 지도 + 위협 핀
+- [x] HeatMapView: 국가별 리스크 히트맵 그리드
+- [x] ChartView: 2x2 멀티 차트 뷰
+- [x] LiveFeed: 전체/위기/테마/브리핑 탭 피드
+- [x] BottomStrip: 하단 지표 스크롤 바
+- [x] App.tsx: AIP ↔ Grid 모드 전환
+- [x] react-leaflet 설치
+
+## v0.7.0 — 예정
+
+- [ ] 지도에 뉴스 헤드라인 오버레이 (클릭 시 전체 기사)
+- [ ] 포트폴리오 VaR 정량 계산 (Monte Carlo)
+- [ ] 시나리오 시뮬레이터 (대만해협/중동/한반도 스트레스 테스트)
+- [ ] Vercel 실제 배포
+- [ ] 모바일 반응형 (최소화 사이드바, 스와이프 뷰)

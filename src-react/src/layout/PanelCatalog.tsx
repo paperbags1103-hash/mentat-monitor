@@ -39,6 +39,7 @@ const CATALOG: CatalogItem[] = [
   { type: 'screener',   title: '🔍 종목 스크리너', desc: '테마 연계 자동 관심종목 서제스트', defaultSize: { w: 4, h: 6 } },
   { type: 'news',       title: '📰 뉴스 피드',    desc: '한국·글로벌 경제 RSS 뉴스 (연합/YTN/Reuters)', defaultSize: { w: 4, h: 6 } },
   { type: 'fear-greed', title: '😱 공포탐욕지수', desc: 'VIX·수익률곡선·신용으로 자체 계산 + CNN F&G', defaultSize: { w: 3, h: 6 } },
+  { type: 'scenario',   title: '🎯 시나리오 시뮬',  desc: '대만해협/북한/연준/중국 시나리오 스트레스 테스트', defaultSize: { w: 5, h: 8 } },
 ];
 
 interface Props { onClose: () => void }

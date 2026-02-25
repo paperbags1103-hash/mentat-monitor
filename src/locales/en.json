@@ -1,7 +1,7 @@
 {
   "app": {
-    "title": "World Monitor",
-    "description": "Global Situation with AI Insights"
+    "title": "Mentat Monitor",
+    "description": "Global Intelligence with AI-Powered Market Insights"
   },
   "countryBrief": {
     "identifying": "Identifying country...",
@@ -319,7 +319,7 @@
         "some": "Some features need API keys"
       },
       "openSettings": "Open Settings",
-      "skipSetup": "Skip the setup \u2014 a single World Monitor license unlocks everything. Join the waitlist for early access.",
+      "skipSetup": "Skip the setup — a single World Monitor license unlocks everything. Join the waitlist for early access.",
       "summary": {
         "desktop": "Desktop mode",
         "web": "Web mode (read-only, server-managed credentials)",
@@ -1914,7 +1914,7 @@
     "noDataAvailable": "No data available",
     "updated": "Updated just now",
     "ago": "{{time}} ago",
-    "retrying": "Retrying…",
+    "retrying": "Retrying...",
     "failedToLoad": "Failed to load data",
     "noDataShort": "No data",
     "upstreamUnavailable": "Upstream API unavailable — will retry automatically",
@@ -1963,7 +1963,6 @@
     "close": "Close",
     "currentVariant": "(current)",
     "retry": "Retry",
-    "retrying": "Retrying...",
     "refresh": "Refresh"
   }
 }

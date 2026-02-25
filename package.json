@@ -1,5 +1,5 @@
 {
-  "name": "world-monitor",
+  "name": "mentat-monitor",
   "private": true,
   "version": "2.5.8",
   "license": "AGPL-3.0-only",
@@ -47,7 +47,9 @@
     "desktop:package:macos:tech:sign": "node scripts/desktop-package.mjs --os macos --variant tech --sign",
     "desktop:package:windows:full:sign": "node scripts/desktop-package.mjs --os windows --variant full --sign",
     "desktop:package:windows:tech:sign": "node scripts/desktop-package.mjs --os windows --variant tech --sign",
-    "desktop:package": "node scripts/desktop-package.mjs"
+    "desktop:package": "node scripts/desktop-package.mjs",
+    "dev:signal": "VITE_VARIANT=signal vite",
+    "build:signal": "VITE_VARIANT=signal tsc && VITE_VARIANT=signal vite build"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
@@ -91,5 +93,6 @@
   },
   "overrides": {
     "fast-xml-parser": "^5.3.7"
-  }
+  },
+  "description": "Investment Intelligence — Real-time geopolitical signals mapped to market impact"
 }

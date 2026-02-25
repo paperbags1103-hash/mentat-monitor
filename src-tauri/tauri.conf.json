@@ -1,9 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "World Monitor",
+  "productName": "Mentat Monitor",
   "mainBinaryName": "world-monitor",
   "version": "2.5.8",
-  "identifier": "app.worldmonitor.desktop",
+  "identifier": "app.mentatmonitor",
   "build": {
     "beforeDevCommand": "npm run build:sidecar-sebuf && npm run dev",
     "beforeBuildCommand": "npm run build:desktop",

@@ -110,3 +110,13 @@ World Monitor (https://github.com/koala73/worldmonitor) 포크 기반.
 - [ ] 알림 시스템 (Desktop notification via Tauri)
 - [ ] 대만해협/중동/한반도 시나리오 시뮬레이터
 - [ ] 종목 스크리너 (테마 연계 자동 추천)
+
+## v0.5.0 — 개인 금융 인텔리전스 플랫폼 ✅ (2025-02)
+
+- [x] PortfolioPanel: 보유 종목 P&L 실시간 추적 (퀵픽 10종목)
+- [x] AlertPanel: 가격 목표 + 위협 등급 알림 (Tauri 푸시 + Web Notification)
+- [x] ScreenerPanel: AI 테마 연계 자동 관심종목 서제스트
+- [x] NewsFeedPanel: 연합뉴스/YTN/Reuters RSS (3분 새로고침)
+- [x] FearGreedPanel: 공포탐욕지수 (SVG arc + CNN API + 자체계산)
+- [x] vercel.json: Vercel 배포 설정
+- [x] 총 26개 패널 카탈로그

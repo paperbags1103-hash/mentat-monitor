@@ -530,20 +530,52 @@ export default async function handler(req) {
 
   // ── Result ────────────────────────────────────────────────────────────────────
 
+  // ── Fallback 인퍼런스 — 외부 신호 없을 때 기본 제공 ─────────────────────
+  const BASELINE_INFERENCES = [
+    {
+      ruleId: 'BASELINE_MACRO', severity: 'INFO',
+      titleKo: '📊 글로벌 매크로 감시 중',
+      descriptionKo: '연준 금리 경로, 달러 강세 여부, 중국 부양책이 핵심 변수. KOSPI는 외국인 수급에 민감하게 반응.',
+      affectedAssets: ['asset:KS11', 'asset:USDKRW', 'asset:SPX'],
+      expectedImpact: { kospiRange: [0, 0], currency: 'neutral' },
+      suggestedActionKo: '포트폴리오 환노출 점검',
+      confidence: 0.7, ruleConfidence: 0.7,
+    },
+    {
+      ruleId: 'BASELINE_AI_THEME', severity: 'INFO',
+      titleKo: '💡 AI 인프라 투자 사이클 지속',
+      descriptionKo: '엔비디아 실적·HBM 수요·전력 인프라 투자가 국내 반도체·전력주 수급에 직접 영향.',
+      affectedAssets: ['sector:semiconductor', 'asset:KS11'],
+      expectedImpact: { kospiRange: [1, 3], currency: 'neutral' },
+      suggestedActionKo: '삼성전자·SK하이닉스 비중 유지',
+      confidence: 0.65, ruleConfidence: 0.65,
+    },
+    {
+      ruleId: 'BASELINE_GEOPOLITICAL', severity: 'WATCH',
+      titleKo: '⚠️ 지정학 리스크 상시 경계',
+      descriptionKo: '한반도·대만해협·중동 3개 축 모니터링 중. 단기 충격 시 KOSPI -2~-5% 반응 패턴.',
+      affectedAssets: ['asset:KS11', 'asset:GOLD', 'asset:USDKRW'],
+      expectedImpact: { kospiRange: [-5, -1], currency: 'KRW_WEAK' },
+      suggestedActionKo: '금·달러 헤지 비중 5~10% 유지',
+      confidence: 0.6, ruleConfidence: 0.6,
+    },
+  ];
+  const finalInferences = inferences.length > 0 ? inferences : BASELINE_INFERENCES;
+
   const result = {
     generatedAt: now,
     globalRiskScore,
     riskLabel,
-    topInferences: inferences.slice(0, 5),
+    topInferences: finalInferences.slice(0, 5),
     narrativeKo,
     narrativeMethod,
     signalSummary: {
       total: signals.length,
       bySeverity: {
-        CRITICAL: inferences.filter(i => i.severity === 'CRITICAL').length,
-        ELEVATED: inferences.filter(i => i.severity === 'ELEVATED').length,
-        WATCH:    inferences.filter(i => i.severity === 'WATCH').length,
-        INFO:     inferences.filter(i => i.severity === 'INFO').length,
+        CRITICAL: finalInferences.filter(i => i.severity === 'CRITICAL').length,
+        ELEVATED: finalInferences.filter(i => i.severity === 'ELEVATED').length,
+        WATCH:    finalInferences.filter(i => i.severity === 'WATCH').length,
+        INFO:     finalInferences.filter(i => i.severity === 'INFO').length,
       },
       topEntities: fusion.entitySignals.slice(0, 5).map(e => ({
         entityId: e.entityId,
@@ -553,8 +585,8 @@ export default async function handler(req) {
     },
     marketOutlook: {
       kospiSentiment: kospiSignal?.fusedDirection ?? 'neutral',
-      keyRisks: inferences.filter(i => i.severity !== 'INFO').map(i => i.titleKo).slice(0, 3),
-      keyOpportunities: inferences
+      keyRisks: finalInferences.filter(i => i.severity !== 'INFO').map(i => i.titleKo).slice(0, 3),
+      keyOpportunities: finalInferences
         .filter(i => i.expectedImpact?.kospiRange?.[1] > 0)
         .map(i => i.suggestedActionKo).slice(0, 2),
       hedgeSuggestions: safeHavens.map(id => ENTITY_KO[id] ?? id).filter(Boolean).slice(0, 3),

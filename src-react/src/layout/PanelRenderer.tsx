@@ -8,6 +8,9 @@ import { BlackSwanPanel }      from '@/panels/BlackSwanPanel';
 import { EconCalendarPanel }   from '@/panels/EconCalendarPanel';
 import { LiveTVPanel }         from '@/panels/LiveTVPanel';
 import { WebcamPanel }         from '@/panels/WebcamPanel';
+import { CreditStressPanel }   from '@/panels/CreditStressPanel';
+import { GlobalMacroPanel }    from '@/panels/GlobalMacroPanel';
+import { ActionPanel }         from '@/panels/ActionPanel';
 
 interface Props { panel: PanelDef }
 
@@ -21,6 +24,9 @@ export function PanelRenderer({ panel }: Props) {
     case 'econ-calendar':  return <EconCalendarPanel />;
     case 'live-tv':        return <LiveTVPanel />;
     case 'webcam':         return <WebcamPanel />;
+    case 'credit-stress':  return <CreditStressPanel />;
+    case 'global-macro':   return <GlobalMacroPanel />;
+    case 'actions':        return <ActionPanel />;
     case 'chart': {
       const symbol = (panel.config?.symbol as string) ?? '^KS11';
       const nameKo = (panel.config?.nameKo as string) ?? symbol;

@@ -23,14 +23,17 @@ const CATALOG: CatalogItem[] = [
   { type: 'chart', title: '📈 삼성전자 차트', desc: '삼성전자 차트', config: { symbol: '005930.KS', nameKo: '삼성전자' }, defaultSize: { w: 5, h: 5 } },
   { type: 'chart', title: '📈 SK하이닉스',    desc: 'SK하이닉스 차트', config: { symbol: '000660.KS', nameKo: 'SK하이닉스' }, defaultSize: { w: 5, h: 5 } },
   // Data panels
-  { type: 'live-tv',   title: '📺 경제 방송',   desc: 'Bloomberg/CNBC/YTN 라이브', defaultSize: { w: 5, h: 6 } },
-  { type: 'webcam',    title: '📡 지역 웹캠',    desc: '위기 지역 자동 전환 웹캠', defaultSize: { w: 4, h: 5 } },
-  { type: 'briefing',  title: '🧠 멘탯 브리핑', desc: 'AI 의미 추출 브리핑', defaultSize: { w: 4, h: 8 } },
-  { type: 'market',    title: '📊 시장 현황',   desc: '주요 지수 스냅샷', defaultSize: { w: 3, h: 6 } },
-  { type: 'themes',    title: '🎯 활성 테마',   desc: 'AI 투자 테마 발견', defaultSize: { w: 4, h: 5 } },
-  { type: 'signals',   title: '⚡ 신호 피드',   desc: '실시간 위협 신호', defaultSize: { w: 3, h: 6 } },
-  { type: 'blackswan', title: '🌡️ 블랙스완',    desc: '테일 리스크 지수', defaultSize: { w: 3, h: 5 } },
-  { type: 'econ-calendar', title: '📅 경제 캘린더', desc: 'FOMC/BOK/BOJ 일정', defaultSize: { w: 3, h: 5 } },
+  { type: 'live-tv',      title: '📺 경제 방송',   desc: 'Bloomberg/CNBC/YTN 라이브', defaultSize: { w: 5, h: 6 } },
+  { type: 'webcam',       title: '📡 지역 웹캠',    desc: '위기 지역 자동 전환 웹캠', defaultSize: { w: 4, h: 5 } },
+  { type: 'briefing',     title: '🧠 멘탯 브리핑', desc: 'AI 의미 추출 브리핑', defaultSize: { w: 4, h: 8 } },
+  { type: 'market',       title: '📊 시장 현황',   desc: '주요 지수 스냅샷', defaultSize: { w: 3, h: 6 } },
+  { type: 'themes',       title: '🎯 활성 테마',   desc: 'AI 투자 테마 발견 (Groq)', defaultSize: { w: 4, h: 5 } },
+  { type: 'signals',      title: '⚡ 신호 피드',   desc: '실시간 위협 신호', defaultSize: { w: 3, h: 6 } },
+  { type: 'blackswan',    title: '🌡️ 블랙스완',    desc: '테일 리스크 지수', defaultSize: { w: 3, h: 5 } },
+  { type: 'econ-calendar',title: '📅 경제 캘린더', desc: 'FOMC/BOK/BOJ 일정', defaultSize: { w: 3, h: 5 } },
+  { type: 'credit-stress',title: '💳 신용 스트레스', desc: 'IG/HY 스프레드 게이지', defaultSize: { w: 3, h: 5 } },
+  { type: 'global-macro', title: '🌐 글로벌 매크로', desc: 'DXY·수익률 곡선·실질금리', defaultSize: { w: 3, h: 7 } },
+  { type: 'actions',      title: '⚡ 행동 제안',    desc: '팔란티어 Action 레이어 — 구조화된 투자 행동', defaultSize: { w: 4, h: 6 } },
 ];
 
 interface Props { onClose: () => void }
@@ -50,7 +53,7 @@ export function PanelCatalog({ onClose }: Props) {
     onClose();
   }
 
-  void panels; // suppress unused warning
+
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>

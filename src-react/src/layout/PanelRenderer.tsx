@@ -17,6 +17,7 @@ import { ScreenerPanel }       from '@/panels/ScreenerPanel';
 import { NewsFeedPanel }       from '@/panels/NewsFeedPanel';
 import { FearGreedPanel }      from '@/panels/FearGreedPanel';
 import { ScenarioPanel }       from '@/panels/ScenarioPanel';
+import { VaRPanel }            from '@/panels/VaRPanel';
 
 interface Props { panel: PanelDef }
 
@@ -39,6 +40,7 @@ export function PanelRenderer({ panel }: Props) {
     case 'news':           return <NewsFeedPanel />;
     case 'fear-greed':     return <FearGreedPanel />;
     case 'scenario':       return <ScenarioPanel />;
+    case 'var':            return <VaRPanel />;
     case 'chart': {
       const symbol = (panel.config?.symbol as string) ?? '^KS11';
       const nameKo = (panel.config?.nameKo as string) ?? symbol;

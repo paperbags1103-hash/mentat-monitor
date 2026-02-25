@@ -85,8 +85,13 @@ interface AppState extends KoreaMarket {
   fetchAll: () => Promise<void>;
 }
 
-async function safeFetch<T>(url: string): Promise<T | null> {
+// Tauri desktop: no Vite proxy → call sidecar directly on port 46123
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const API_BASE = isTauri ? 'http://localhost:46123' : '';
+
+async function safeFetch<T>(path: string): Promise<T | null> {
   try {
+    const url = `${API_BASE}${path}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
     if (!res.ok) return null;
     return res.json() as Promise<T>;

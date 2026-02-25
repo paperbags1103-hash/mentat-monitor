@@ -32,6 +32,7 @@ import {
   PopulationExposurePanel,
   InvestmentsPanel,
   MentatInsightPanel,
+  KoreaMarketPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { PositiveNewsFeedPanel } from '@/components/PositiveNewsFeedPanel';
@@ -571,6 +572,11 @@ export class PanelLayoutManager implements AppModule {
     const mentatInsightPanel = new MentatInsightPanel();
     this.ctx.panels['mentat-insight'] = mentatInsightPanel;
     mentatInsightPanel.start();
+
+    // Mentat Monitor: Korean market data panel
+    const koreaMarketPanel = new KoreaMarketPanel();
+    this.ctx.panels['korea-market'] = koreaMarketPanel;
+    koreaMarketPanel.start();
 
     // Global Giving panel (all variants)
     this.ctx.panels['giving'] = new GivingPanel();

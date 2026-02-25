@@ -7,6 +7,7 @@
 
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
+import { toRuntimeUrl } from '@/services/runtime';
 
 // ─── Types (mirrored from api/insight-briefing.js) ─────────────────────────────
 
@@ -137,7 +138,7 @@ export class MentatInsightPanel extends Panel {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      const res = await fetch('/api/insight-briefing', { signal: controller.signal });
+      const res = await fetch(toRuntimeUrl('/api/insight-briefing'), { signal: controller.signal });
       clearTimeout(timer);
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

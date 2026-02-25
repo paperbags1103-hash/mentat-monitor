@@ -40,3 +40,4 @@ export * from './PopulationExposurePanel';
 export * from './InvestmentsPanel';
 export * from './UnifiedSettings';
 export { MentatInsightPanel } from './MentatInsightPanel';
+export { KoreaMarketPanel } from './KoreaMarketPanel';

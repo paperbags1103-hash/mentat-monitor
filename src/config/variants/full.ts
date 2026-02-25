@@ -49,6 +49,7 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
   'mentat-insight': { name: '🧠 멘탯 인사이트', enabled: true, priority: 1 },
+  'korea-market': { name: '🇰🇷 한국 시장', enabled: true, priority: 1 },
 };
 
 // Map layers for geopolitical view

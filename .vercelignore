@@ -1,0 +1,18 @@
+# Rust/Tauri
+src-tauri/target/
+src-tauri/.cargo/
+
+# Node modules (Vercel installs itself)
+node_modules/
+src-react/node_modules/
+
+# Build artifacts we don't want to re-upload
+src-react/dist/
+
+# Dev/test files
+**/*.test.*
+**/*.spec.*
+
+# Misc
+.DS_Store
+*.log

@@ -102,7 +102,15 @@ export function LiveFeed() {
         {tab === 'all' && (
           <>
             {inferences.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-muted text-xs">인퍼런스 없음</div>
+              <div className="flex flex-col items-center justify-center h-32 text-center gap-2">
+                {isLoading
+                  ? <div className="text-xs text-muted animate-pulse">🔄 분석 중...</div>
+                  : <>
+                    <div className="text-xs text-muted">📡 실시간 신호 수집 중</div>
+                    <div className="text-xs text-muted/50">데이터 로드 후 인퍼런스가 표시됩니다</div>
+                  </>
+                }
+              </div>
             ) : (
               inferences.map(inf => <InferenceCard key={inf.ruleId} inf={inf} />)
             )}

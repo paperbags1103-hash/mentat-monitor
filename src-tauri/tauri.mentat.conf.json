@@ -1,0 +1,8 @@
+{
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
+  }
+}

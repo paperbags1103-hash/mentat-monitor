@@ -1,7 +1,7 @@
 {
   "name": "mentat-monitor",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
@@ -52,7 +52,7 @@
     "build:signal": "VITE_VARIANT=signal tsc && VITE_VARIANT=signal vite build",
     "mentat:dev": "cd src-react && npm install && npm run dev",
     "mentat:build": "cd src-react && npm install && npm run build",
-    "desktop:build:mentat": "npm run version:sync && cd src-react && npm run build && cd .. && VITE_DESKTOP_RUNTIME=1 tauri build"
+    "desktop:build:mentat": "npm run version:sync && cd src-react && npm run build && cd .. && VITE_DESKTOP_RUNTIME=1 tauri build --config src-tauri/tauri.mentat.conf.json"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",

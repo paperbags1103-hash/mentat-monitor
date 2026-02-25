@@ -91,7 +91,12 @@ function useCandleChart(ref: React.RefObject<HTMLDivElement | null>, bars: OHLCB
 }
 
 export function StockDetailPanel({ config }: { config?: StockConfig }) {
-  const { symbol = 'AAPL', nameKo = 'AAPL', exchange = '' } = config ?? {};
+  const selectedSymbol = useStore(s => s.selectedSymbol);
+  const selectedName   = useStore(s => s.selectedSymbolName);
+  // config takes precedence; fall back to globally selected symbol
+  const symbol   = config?.symbol   ?? selectedSymbol ?? 'AAPL';
+  const nameKo   = config?.nameKo   ?? selectedName   ?? symbol;
+  const exchange = config?.exchange  ?? '';
   const fetchChart = useStore(s => s.fetchChart);
   const activeThemes = useStore(s => s.activeThemes);
 

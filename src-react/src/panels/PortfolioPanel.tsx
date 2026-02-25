@@ -105,12 +105,12 @@ function AddForm({ onClose }: { onClose: () => void }) {
 
 // ── Holding row ────────────────────────────────────────────────────────────
 
-function HoldingRow({ h, onRemove }: { h: HoldingWithPnL; onRemove: () => void }) {
+function HoldingRow({ h, onRemove, onSelect }: { h: HoldingWithPnL; onRemove: () => void; onSelect?: () => void }) {
   const up = h.pnlPct != null && h.pnlPct >= 0;
   const fmt = (n: number, dec = 0) => n.toLocaleString('ko-KR', { maximumFractionDigits: dec });
 
   return (
-    <div className="flex items-start gap-2 py-2 border-b border-border/40 last:border-0 group">
+    <div onClick={onSelect} className={`flex items-start gap-2 py-2 border-b border-border/40 last:border-0 group ${onSelect ? 'cursor-pointer hover:bg-surface/60 rounded px-1 transition-colors' : ''}`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-1.5">
           <span className="text-xs font-bold text-primary">{h.nameKo}</span>
@@ -146,7 +146,7 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithPnL; onRemove: () => void }
 
 export function PortfolioPanel() {
   const { getHoldingsWithPnL, getSummary, fetchPrices, isLoading, lastFetch, removeHolding } = usePortfolioStore();
-  const { usdkrw } = useStore();
+  const { usdkrw, selectSymbol } = useStore();
   const [showAdd, setShowAdd] = useState(false);
 
   // Sync USD/KRW from main store
@@ -230,7 +230,7 @@ export function PortfolioPanel() {
           {/* Holdings list */}
           <div className="flex-1 overflow-y-auto px-3 py-2">
             {holdings.map(h => (
-              <HoldingRow key={h.id} h={h} onRemove={() => removeHolding(h.id)} />
+              <HoldingRow key={h.id} h={h} onRemove={() => removeHolding(h.id)} onSelect={() => selectSymbol(h.symbol, h.nameKo)} />
             ))}
           </div>
         </>

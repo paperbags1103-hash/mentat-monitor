@@ -13,7 +13,7 @@ export function PanelWrapper({ id, title, children }: Props) {
 
   return (
     <div
-      className="flex flex-col h-full bg-panel border border-border rounded-lg overflow-hidden"
+      className="flex flex-col h-full bg-panel border border-border rounded overflow-hidden"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >

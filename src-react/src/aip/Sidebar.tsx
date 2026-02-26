@@ -30,23 +30,21 @@ interface Props {
   riskScore: number;
 }
 
-function RiskDot({ score }: { score: number }) {
-  const color = score >= 70 ? 'bg-risk-critical' : score >= 40 ? 'bg-risk-elevated' : 'bg-risk-safe';
-  const pulse = score >= 60;
-  return <div className={`w-2 h-2 rounded-full ${color} ${pulse ? 'animate-pulse' : ''}`} />;
-}
-
 export function Sidebar({ activeView, onViewChange, riskScore }: Props) {
   return (
     <div className="w-14 bg-surface border-r border-border flex flex-col items-center py-2 shrink-0">
       {/* Logo */}
-      <div className="w-9 h-9 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center mb-3 cursor-pointer" title="Mentat Monitor">
+      <div className="w-9 h-9 rounded bg-accent/20 border border-accent/30 flex items-center justify-center mb-3 cursor-pointer" title="Mentat Monitor">
         <span className="text-sm">🧠</span>
       </div>
 
       {/* Risk dot */}
-      <div className="mb-3" title={`위협 지수: ${riskScore}`}>
-        <RiskDot score={riskScore} />
+      <div className="mb-3 flex flex-col items-center" title={`위협 지수: ${riskScore}`}>
+        <div className="inline-flex items-center gap-1">
+          <span className="text-blue-400 text-xs">●</span>
+          <span className="text-xs text-blue-400 font-mono tracking-widest">ACTIVE</span>
+        </div>
+        <span className="text-[10px] text-muted font-mono">{riskScore}</span>
       </div>
 
       {/* Nav */}

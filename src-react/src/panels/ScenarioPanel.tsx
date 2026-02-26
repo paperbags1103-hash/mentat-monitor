@@ -196,7 +196,7 @@ export function ScenarioPanel() {
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {/* Header */}
-        <div className={`border rounded-lg p-3 mb-3 ${SEV_CLS[selected.severity]}`}>
+        <div className={`border rounded p-3 mb-3 ${SEV_CLS[selected.severity]}`}>
           <div className="flex items-start gap-2 mb-1.5">
             <span className="text-2xl">{selected.emoji}</span>
             <div>

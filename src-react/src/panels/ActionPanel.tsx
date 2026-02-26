@@ -69,7 +69,7 @@ function deriveActions(inferences: Inference[]): ActionCard[] {
 function ActionCardView({ card }: { card: ActionCard }) {
   const meta = ACTION_META[card.type];
   return (
-    <div className={`rounded-lg border p-3 mb-2 ${meta.cls}`}>
+    <div className={`rounded border p-3 mb-2 ${meta.cls}`}>
       <div className="flex items-start gap-2 mb-1.5">
         <span className="text-base leading-none mt-0.5">{meta.emoji}</span>
         <div className="flex-1 min-w-0">

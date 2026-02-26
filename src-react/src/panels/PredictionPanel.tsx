@@ -129,7 +129,7 @@ export function PredictionPanel() {
           <div className="flex flex-col gap-2">
             {filtered.map(m => (
               <a key={m.id} href={m.url} target="_blank" rel="noopener noreferrer"
-                className="block bg-surface border border-border rounded-lg p-2.5 hover:border-accent/40 transition-all cursor-pointer">
+                className="block bg-surface border border-border rounded p-2.5 hover:border-accent/40 transition-all cursor-pointer">
                 <div className="flex items-start gap-2">
                   <span className="text-[10px] mt-0.5 px-1.5 py-0.5 rounded-full border shrink-0"
                     style={{

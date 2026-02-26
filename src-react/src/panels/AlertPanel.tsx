@@ -183,7 +183,7 @@ function AddAlertForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <form className="bg-panel border border-border rounded-xl w-full max-w-sm shadow-2xl p-5"
+      <form className="bg-panel border border-border rounded-lg w-full max-w-sm shadow-2xl p-5"
         onClick={e => e.stopPropagation()} onSubmit={submit}>
         <h3 className="text-sm font-bold text-primary mb-4">알림 추가</h3>
 
@@ -311,7 +311,7 @@ export function AlertPanel() {
           </div>
         ) : (
           alerts.map(alert => (
-            <div key={alert.id} className={`border rounded-lg p-2.5 mb-2 transition-colors ${STATUS_CLS[alert.status]}`}>
+            <div key={alert.id} className={`border rounded p-2.5 mb-2 transition-colors ${STATUS_CLS[alert.status]}`}>
               <div className="flex items-start gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">

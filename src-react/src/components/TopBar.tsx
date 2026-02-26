@@ -35,7 +35,7 @@ export function TopBar({ onAddPanel, onResetLayout, extraActions }: Props) {
     <header className="h-11 flex items-center gap-4 px-4 bg-surface border-b border-border shrink-0 overflow-x-auto">
       {/* Logo */}
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-accent font-bold text-base tracking-tight">🧠 MENTAT</span>
+        <span className="text-accent font-bold text-base tracking-widest font-mono">MENTAT MONITOR</span>
         <span className="text-muted text-xs hidden md:inline">금융 온톨로지</span>
       </div>
 
@@ -44,9 +44,12 @@ export function TopBar({ onAddPanel, onResetLayout, extraActions }: Props) {
       {/* Risk score */}
       <div className="flex items-baseline gap-1.5 shrink-0">
         <span className="text-muted text-xs">위협</span>
-        <span className={`text-xl font-bold tabular-nums ${riskCls}`}>{globalRiskScore}</span>
+        <span className={`text-xl font-bold tabular-nums font-mono ${riskCls}`}>{globalRiskScore}</span>
         <span className={`text-xs font-semibold ${riskCls}`}>{riskLabel}</span>
-        {isLoading && <span className="w-3 h-3 border border-accent border-t-transparent rounded-full animate-spin ml-1" />}
+        <span className="inline-flex items-center gap-1 ml-1">
+          <span className="text-blue-400 text-xs">●</span>
+          <span className="text-xs text-blue-400 font-mono tracking-widest">{isLoading ? 'LIVE' : 'ACTIVE'}</span>
+        </span>
       </div>
 
       <div className="h-4 w-px bg-border shrink-0" />

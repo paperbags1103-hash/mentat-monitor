@@ -403,7 +403,7 @@ function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, se
 
       {/* 이벤트 필터 패널 — events 켜진 경우만 */}
       {layers.events && (
-        <div className="bg-black/80 backdrop-blur-sm border border-pink-500/20 rounded-lg p-2 mt-1 flex flex-col gap-2">
+        <div className="bg-black/80 backdrop-blur-sm border border-pink-500/20 rounded p-2 mt-1 flex flex-col gap-2">
           {/* 카테고리 토글 */}
           <div>
             <p className="text-[10px] text-gray-500 mb-1 font-semibold">카테고리</p>
@@ -500,7 +500,7 @@ function SelectedPanel({ hotspot, onClose }: { hotspot: ScoredHotspot; onClose: 
 
   return (
     <DraggablePanel className="absolute bottom-14 right-3 z-[1000] w-72" >
-    <div className="bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl relative"
+    <div className="bg-black/90 backdrop-blur-md border rounded-lg overflow-hidden shadow-2xl relative"
       style={{ borderColor: color + '55' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: color + '33', background: color + '15' }}>
@@ -614,7 +614,7 @@ function EventPanel({ event, onClose }: { event: GeoEvent; onClose: () => void }
 
   return (
     <DraggablePanel className="absolute top-16 right-3 z-[1000] w-72">
-    <div className="bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl relative"
+    <div className="bg-black/90 backdrop-blur-md border rounded-lg overflow-hidden shadow-2xl relative"
       style={{ borderColor: meta.color + '55' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b"
@@ -648,7 +648,7 @@ function EventPanel({ event, onClose }: { event: GeoEvent; onClose: () => void }
         )}
 
         {event.investmentImpactKo && (
-          <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-2.5">
+          <div className="bg-green-500/5 border border-green-500/20 rounded p-2.5">
             <p className="text-[10px] text-green-400 font-semibold mb-1">💹 투자 영향</p>
             <p className="text-xs text-gray-300 leading-relaxed">{event.investmentImpactKo}</p>
           </div>
@@ -1007,7 +1007,7 @@ export function WorldMapView() {
         const color = NK_TYPE_COLOR[ev.type] ?? '#6b7280';
         return (
           <DraggablePanel className="absolute top-16 left-64 z-[1000] w-72">
-            <div className="bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl relative"
+            <div className="bg-black/90 backdrop-blur-md border rounded-lg overflow-hidden shadow-2xl relative"
               style={{ borderColor: color + '55' }}>
               <div className="flex items-center justify-between px-3 py-2 border-b"
                 style={{ borderColor: color + '33', background: color + '15' }}>
@@ -1035,7 +1035,7 @@ export function WorldMapView() {
       })()}
 
       {/* 범례 */}
-      <div className="absolute bottom-10 left-3 z-[1000] text-xs space-y-1 bg-black/80 backdrop-blur-sm rounded-lg p-2.5 border border-white/10">
+      <div className="absolute bottom-10 left-3 z-[1000] text-xs space-y-1 bg-black/80 backdrop-blur-sm rounded p-2.5 border border-white/10">
         <div className="text-gray-400 font-semibold mb-2">위협 지수</div>
         {[['#ef4444', '위험 (>70)'], ['#f97316', '경계 (45-70)'], ['#eab308', '주의 (25-45)'], ['#22c55e', '안전 (<25)']] .map(([c, l]) => (
           <div key={l as string} className="flex items-center gap-1.5">

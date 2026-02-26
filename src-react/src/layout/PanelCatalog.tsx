@@ -67,7 +67,7 @@ export function PanelCatalog({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-panel border border-border rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl"
+      <div className="bg-panel border border-border rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl"
         onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -82,7 +82,7 @@ export function PanelCatalog({ onClose }: Props) {
             placeholder="패널 검색..."
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-accent"
+            className="w-full bg-surface border border-border rounded px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-accent"
           />
         </div>
         {/* Grid */}

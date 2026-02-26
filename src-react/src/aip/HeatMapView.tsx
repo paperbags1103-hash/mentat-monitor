@@ -110,7 +110,7 @@ export function HeatMapView() {
               {rgs.map(r => (
                 <div
                   key={r.id}
-                  className={`rounded-lg border p-3 transition-all cursor-default ${BG_COLOR(r.score)}`}
+                  className={`rounded border p-3 transition-all cursor-default ${BG_COLOR(r.score)}`}
                 >
                   <div className="flex items-baseline justify-between mb-1">
                     <span className="text-xs font-bold text-primary">{r.nameKo}</span>

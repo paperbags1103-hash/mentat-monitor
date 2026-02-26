@@ -17,6 +17,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useStore } from '@/store';
 import { Sidebar }      from './Sidebar';
 const WorldMapView = lazy(() => import('./WorldMapView').then(m => ({ default: m.WorldMapView })));
+import type { GeoEvent } from './WorldMapView';
 import { HeatMapView }  from './HeatMapView';
 import { ChartView }    from './ChartView';
 import { LiveNews }     from './LiveNews';
@@ -26,6 +27,7 @@ import { PanelGrid }    from '@/layout/PanelGrid';
 import { PanelCatalog } from '@/layout/PanelCatalog';
 import { useLayoutStore } from '@/store';
 import { PortfolioPanel } from '@/panels/PortfolioPanel';
+import WatchlistPanelWrapper from '@/panels/WatchlistPanelWrapper';
 
 export type MainViewType = 'map' | 'heatmap' | 'charts' | 'grid' | 'portfolio';
 
@@ -115,6 +117,7 @@ interface Props {
 export function AIPLayout({ onSwitchToGrid }: Props) {
   const { fetchAll, globalRiskScore } = useStore();
   const [mainView, setMainView] = useState<MainViewType>('map');
+  const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
 
   useEffect(() => {
     void fetchAll();
@@ -139,7 +142,7 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Main view */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            {mainView === 'map'       && <Suspense fallback={<div className="flex items-center justify-center h-full text-muted">지도 로딩 중...</div>}><WorldMapView /></Suspense>}
+            {mainView === 'map'       && <Suspense fallback={<div className="flex items-center justify-center h-full text-muted">지도 로딩 중...</div>}><WorldMapView onGeoEventsChange={setGeoEvents} /></Suspense>}
             {mainView === 'heatmap'   && <HeatMapView />}
             {mainView === 'charts'    && <ChartView />}
             {mainView === 'portfolio' && <PortfolioPanel />}
@@ -152,8 +155,16 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
 
         {/* Live feed + News — right panel */}
         <div className="w-72 shrink-0 min-h-0 overflow-hidden flex flex-col">
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden border-b border-border">
             <LiveFeed />
+          </div>
+          <div className="h-[34%] min-h-0 overflow-hidden border-b border-border bg-appbase">
+            <div className="h-8 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
+              📡 관심종목 레이더
+            </div>
+            <div className="h-[calc(100%-2rem)]">
+              <WatchlistPanelWrapper geoEvents={geoEvents} />
+            </div>
           </div>
           <LiveNews />
         </div>

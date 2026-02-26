@@ -4,7 +4,7 @@
  * RSS 뉴스 → Groq AI 한국어 투자 요약
  *
  * 1. Reuters/연합뉴스 RSS 최신 헤드라인 fetch
- * 2. Groq llama-3.3-70b-versatile로 한국어 투자 시사점 요약
+ * 2. Groq llama-3.1-8b-instant로 한국어 투자 시사점 요약
  * 3. 섹터 태그 + 관련 티커 + 중요도 점수 반환
  *
  * Cache: 10분
@@ -124,12 +124,12 @@ ${headlineText}
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
-      max_tokens: 1500,
+      max_tokens: 800,
     }),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(4000),
   });
 
   if (!res.ok) throw new Error(`Groq API ${res.status}`);

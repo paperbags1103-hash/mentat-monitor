@@ -412,7 +412,7 @@ ${riskContext || '주요 위협 없음'}`;
       method: 'POST',
       headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: [
           {
             role: 'system',
@@ -521,10 +521,10 @@ export default async function handler(req) {
 
   const [bsRes, vipRes, mktRes, calRes, macroRes] = await Promise.allSettled([
     fetchJson(`${base}/api/blackswan`),
-    fetchJson(`${base}/api/vip-aircraft`, 5000),
-    fetchJson(`${base}/api/korea-market`, 5000),
-    fetchJson(`${base}/api/economic-calendar`, 5000),
-    fetchJson(`${base}/api/global-macro`, 5000),
+    fetchJson(`${base}/api/vip-aircraft`, 3000),
+    fetchJson(`${base}/api/korea-market`, 4000),
+    fetchJson(`${base}/api/economic-calendar`, 4000),
+    fetchJson(`${base}/api/global-macro`, 4000),
   ]);
 
   const bsData    = bsRes.status    === 'fulfilled' ? bsRes.value    : (staleWarnings.push('블랙스완 수집 실패'), null);

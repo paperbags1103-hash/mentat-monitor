@@ -35,6 +35,13 @@ export interface InsightBriefing {
   riskLabel: string;
   narrativeKo: string;
   narrativeMethod: 'llm' | 'template';
+  // 투자 기회 분석 (Groq 생성)
+  opportunityKo?: string;
+  outlookShort?: string;
+  outlookMid?: string;
+  outlookLong?: string;
+  riskOn?: string[];
+  riskOff?: string[];
   topInferences: Inference[];
   marketOutlook: {
     kospiSentiment: Sentiment;

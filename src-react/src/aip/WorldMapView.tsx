@@ -11,8 +11,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   MapContainer, TileLayer, CircleMarker, Circle,
-  Popup, Tooltip, ZoomControl, Polyline, useMap,
+  Popup, Tooltip, ZoomControl, Polyline, useMap, Marker,
 } from 'react-leaflet';
+import { apiFetch } from '@/store';
 import L from 'leaflet';
 import type { PathOptions, StyleFunction } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -199,15 +200,137 @@ const SHIPPING_ROUTES = [
   { id: 'south-china',   name: '남중국해',    points: [[22.3, 114.2], [1.3, 103.8], [15.0, 108.0]] as [number,number][] },
 ];
 
-// ─── VIP 항공기 ───────────────────────────────────────────────────────────────
-const VIP_AIRCRAFT = [
-  { id: 'a1', lat: 51.5074,  lng: -0.1278,  label: 'VIP-01 (런던 상공)',   callsign: 'VIP001' },
-  { id: 'a2', lat: 35.6762,  lng: 139.6503, label: 'VIP-02 (도쿄 상공)',   callsign: 'VIP002' },
-  { id: 'a3', lat: 40.7128,  lng: -74.0060, label: 'VIP-03 (뉴욕 상공)',   callsign: 'VIP003' },
-  { id: 'a4', lat: 48.8566,  lng: 2.3522,   label: 'VIP-04 (파리 상공)',   callsign: 'VIP004' },
-  { id: 'a5', lat: 25.2048,  lng: 55.2708,  label: 'VIP-05 (두바이 상공)', callsign: 'VIP005' },
-  { id: 'a6', lat: 37.5665,  lng: 126.9780, label: 'VIP-06 (서울 상공)',   callsign: 'VIP006' },
-];
+// ─── VIP 항공기 타입 ──────────────────────────────────────────────────────────
+interface VipAircraft {
+  icao24: string;
+  callsign: string | null;
+  label: string;
+  country: string;
+  category: string;
+  lat: number;
+  lng: number;
+  altBaro: number | null;
+  onGround: boolean;
+  velocity: number | null;
+  heading: number | null;
+  isHighAlert: boolean;
+  isKnownVip: boolean;
+  investmentSignalKo: string | null;
+}
+
+interface VipAircraftResponse {
+  aircraft: VipAircraft[];
+  stats: { total: number; airborne: number; alertScore: number };
+  alerts: { label: string; message: string }[];
+  error?: string;
+}
+
+// 카테고리별 색상
+const AIRCRAFT_CAT_COLOR: Record<string, string> = {
+  head_of_state:    '#f59e0b',
+  military_command: '#ef4444',
+  intelligence:     '#8b5cf6',
+  government:       '#3b82f6',
+  tech_ceo:         '#22c55e',
+  investor:         '#06b6d4',
+  unknown:          '#6b7280',
+};
+
+function makeAircraftIcon(heading: number | null, color: string, isHighAlert: boolean) {
+  const rot = heading ?? 0;
+  const glow = isHighAlert ? `drop-shadow(0 0 6px ${color})` : `drop-shadow(0 0 2px ${color})`;
+  return L.divIcon({
+    html: `<div style="transform:rotate(${rot}deg);font-size:18px;filter:${glow};line-height:1;">✈</div>`,
+    className: '',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+// VIP 항공기 상세 패널
+function VipAircraftPanel({ ac, onClose }: { ac: VipAircraft; onClose: () => void }) {
+  const color = AIRCRAFT_CAT_COLOR[ac.category] ?? '#6b7280';
+  const cat = {
+    head_of_state: '국가 원수',
+    military_command: '군 지휘부',
+    intelligence: '정보기관',
+    government: '정부 기관',
+    tech_ceo: '테크 CEO',
+    investor: '투자자',
+    unknown: '미상',
+  }[ac.category] ?? ac.category;
+
+  const altFt = ac.altBaro ? Math.round(ac.altBaro * 3.28084) : null;
+  const spdKts = ac.velocity ? Math.round(ac.velocity * 1.94384) : null;
+
+  return (
+    <DraggablePanel className="absolute bottom-14 left-3 z-[1000] w-72">
+      <div className="bg-black/90 backdrop-blur-md border rounded-lg overflow-hidden shadow-2xl"
+        style={{ borderColor: color + '66' }}>
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-3 py-2 border-b"
+          style={{ borderColor: color + '33', background: color + '18' }}>
+          <div className="flex items-center gap-2">
+            <span style={{ color, fontSize: '16px' }}>✈</span>
+            <div>
+              <div className="text-xs font-bold font-mono" style={{ color }}>{ac.label}</div>
+              <div className="text-[10px] text-gray-400">{cat} · {ac.country}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white text-xs ml-2">✕</button>
+        </div>
+
+        {/* 비행 정보 */}
+        <div className="px-3 py-2 grid grid-cols-3 gap-2 border-b border-white/5 text-center">
+          <div>
+            <div className="text-[10px] text-gray-500">상태</div>
+            <div className={`text-xs font-mono font-bold ${ac.onGround ? 'text-gray-400' : 'text-green-400'}`}>
+              {ac.onGround ? '지상' : '비행 중'}
+            </div>
+          </div>
+          {altFt && (
+            <div>
+              <div className="text-[10px] text-gray-500">고도</div>
+              <div className="text-xs font-mono text-primary">{altFt.toLocaleString()}ft</div>
+            </div>
+          )}
+          {spdKts && (
+            <div>
+              <div className="text-[10px] text-gray-500">속도</div>
+              <div className="text-xs font-mono text-primary">{spdKts}kts</div>
+            </div>
+          )}
+          {ac.callsign && (
+            <div>
+              <div className="text-[10px] text-gray-500">콜사인</div>
+              <div className="text-xs font-mono text-primary">{ac.callsign}</div>
+            </div>
+          )}
+        </div>
+
+        {/* 투자 인텔리전스 */}
+        {ac.investmentSignalKo && !ac.onGround && (
+          <div className="px-3 py-2.5">
+            <div className="text-[10px] text-gray-500 mb-1">💡 투자 인텔리전스</div>
+            <p className="text-xs leading-relaxed" style={{ color: isHighAlertCategory(ac.category) ? '#fca5a5' : '#93c5fd' }}>
+              {ac.investmentSignalKo}
+            </p>
+          </div>
+        )}
+        {ac.onGround && (
+          <div className="px-3 py-2 text-[10px] text-gray-600 italic">현재 지상 대기 중. 이륙 시 신호 감지.</div>
+        )}
+
+        {/* ICAO */}
+        <div className="px-3 pb-2 text-[10px] text-gray-700 font-mono">ICAO: {ac.icao24}</div>
+      </div>
+    </DraggablePanel>
+  );
+}
+
+function isHighAlertCategory(cat: string) {
+  return ['military_command', 'head_of_state'].includes(cat);
+}
 
 // ─── 헬퍼 함수 ───────────────────────────────────────────────────────────────
 function scoreHotspot(
@@ -724,6 +847,22 @@ export function WorldMapView() {
     return () => clearInterval(id);
   }, []);
 
+  // VIP 항공기 실시간 데이터
+  const [liveAircraft, setLiveAircraft] = useState<VipAircraft[]>([]);
+  const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!layers.aircraft) return; // 레이어 꺼져 있으면 fetch 안 함
+    const load = () => {
+      apiFetch<VipAircraftResponse>('/api/vip-aircraft')
+        .then(d => { if (d && Array.isArray(d.aircraft)) setLiveAircraft(d.aircraft); })
+        .catch(() => { /* graceful */ });
+    };
+    load();
+    const id = setInterval(load, 2 * 60_000); // 2분마다 갱신
+    return () => clearInterval(id);
+  }, [layers.aircraft]);
+
   function toggleLayer(key: keyof LayerState) {
     setLayers(prev => ({ ...prev, [key]: !prev[key] }));
   }
@@ -945,22 +1084,30 @@ export function WorldMapView() {
           );
         })}
 
-        {/* ── VIP 항공기 ── */}
-        {layers.aircraft && VIP_AIRCRAFT.map(ac => (
-          <CircleMarker key={ac.id}
-            center={[ac.lat, ac.lng]}
-            radius={6}
-            pathOptions={{ color: '#3b82f6', fillColor: '#60a5fa', fillOpacity: 0.9, weight: 1 }}
-          >
-            <Popup>
-              <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: '6px', fontFamily: 'monospace' }}>
-                <div style={{ fontWeight: 'bold', color: '#60a5fa', fontSize: '12px' }}>✈ {ac.callsign}</div>
-                <div style={{ fontSize: '11px', marginTop: '3px', color: '#94a3b8' }}>{ac.label}</div>
-                <div style={{ fontSize: '10px', color: '#475569', marginTop: '4px' }}>ADSBExchange 연동 예정</div>
-              </div>
-            </Popup>
-          </CircleMarker>
-        ))}
+        {/* ── VIP 항공기 (실시간 OpenSky Network) ── */}
+        {layers.aircraft && liveAircraft.map(ac => {
+          const color = AIRCRAFT_CAT_COLOR[ac.category] ?? '#6b7280';
+          const icon = makeAircraftIcon(ac.heading, color, ac.isHighAlert);
+          return (
+            <Marker
+              key={ac.icao24}
+              position={[ac.lat, ac.lng]}
+              icon={icon}
+              eventHandlers={{ click: () => setSelectedAircraftId(ac.icao24) }}
+            >
+              <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '5px 8px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '11px' }}>
+                  <span style={{ color }}>✈</span> {ac.label}
+                  {!ac.onGround && <span style={{ color: '#4ade80', marginLeft: '6px' }}>비행 중</span>}
+                </div>
+              </Tooltip>
+            </Marker>
+          );
+        })}
+        {layers.aircraft && liveAircraft.length === 0 && (
+          // 데이터 없을 때 안내 (레이어 ON이지만 비행 중 VIP 없음)
+          <></>
+        )}
 
         {/* ── 해운 항로 ── */}
         {layers.shipping && SHIPPING_ROUTES.map(route => (
@@ -999,6 +1146,13 @@ export function WorldMapView() {
           onClose={() => setSelectedEventId(null)}
         />
       )}
+
+      {/* VIP 항공기 상세 패널 */}
+      {selectedAircraftId && (() => {
+        const ac = liveAircraft.find(a => a.icao24 === selectedAircraftId);
+        if (!ac) return null;
+        return <VipAircraftPanel ac={ac} onClose={() => setSelectedAircraftId(null)} />;
+      })()}
 
       {/* NK 도발 세부 패널 */}
       {selectedNkId && (() => {

@@ -46,7 +46,7 @@ async function fetchRssFrom(sources) {
       const res = await fetch(url, { signal: AbortSignal.timeout(8000), headers: RSS_HEADERS, redirect: 'follow' });
       if (!res.ok) continue;
       const xml = await res.text();
-      const items = [...xml.matchAll(/<item>[\s\S]*?<\/item>/g)];
+      const items = [...xml.matchAll(/<item(?:\s[^>]*)?>[\s\S]*?<\/item>/g)];
       for (const item of items.slice(0, 12)) {
         const title = item[0].match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1]
           ?? item[0].match(/<title>(.*?)<\/title>/)?.[1] ?? '';

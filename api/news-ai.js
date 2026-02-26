@@ -32,7 +32,7 @@ const RSS_SOURCES_FALLBACK = [
 // ─── 간단 XML 파서 (edge runtime) ─────────────────────────────────────────────
 function parseRSSItems(xml, sourceLabel) {
   const items = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  const itemRegex = /<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/g;
   let match;
   while ((match = itemRegex.exec(xml)) !== null && items.length < 6) {
     const block = match[1];

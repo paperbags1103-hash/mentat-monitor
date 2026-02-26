@@ -19,6 +19,8 @@ import type { PathOptions, StyleFunction } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore } from '@/store';
 import type { Inference } from '@/store';
+import { findMatchingTickers } from '@/data/watchlist-map';
+import { useWatchlistStore } from '@/store/watchlist';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 interface Hotspot {
@@ -781,7 +783,7 @@ const NK_EVENTS: NKEvent[] = [
 ];
 
 // ─── 지리 이벤트 (뉴스 기반) ─────────────────────────────────────────────────
-interface GeoEvent {
+export interface GeoEvent {
   id: string;
   lat: number;
   lng: number;
@@ -950,6 +952,7 @@ function LayerControl({
   aircraftTracked,
   aircraftAirborne,
   convergenceCount,
+  relevantCount,
 }: {
   layers: LayerState;
   onToggle: (key: keyof LayerState) => void;
@@ -962,6 +965,7 @@ function LayerControl({
   aircraftTracked?: number;
   aircraftAirborne?: number;
   convergenceCount: number;
+  relevantCount: number;
 }) {
   const btns: { key: keyof LayerState; label: string; active: string }[] = [
     { key: 'threats',  label: '🎯 위협 핀',      active: 'text-red-400 border-red-500/50 bg-red-500/20' },
@@ -982,6 +986,11 @@ function LayerControl({
 
   return (
     <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-1.5">
+      {relevantCount > 0 && (
+        <div className="text-xs px-2.5 py-1 rounded border border-yellow-400/40 bg-yellow-400/15 text-yellow-300 font-semibold backdrop-blur-sm">
+          ⭐ 관심종목 {relevantCount}건
+        </div>
+      )}
       {/* 레이어 토글 */}
       {btns.map(b => (
         <div key={b.key} className="flex gap-1">
@@ -1469,8 +1478,13 @@ function ConvergenceZonePanel({ zone, onClose }: { zone: ConvergenceZone; onClos
 }
 
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
-export function WorldMapView() {
+interface WorldMapViewProps {
+  onGeoEventsChange?: (events: GeoEvent[]) => void;
+}
+
+export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
   const { briefing, globalRiskScore } = useStore();
+  const { tickers } = useWatchlistStore();
   const inferences = (briefing?.topInferences ?? []) as Inference[];
 
   // 레이어 토글
@@ -1535,6 +1549,10 @@ export function WorldMapView() {
     const id = setInterval(load, 20 * 60_000); // 20분마다 갱신
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    onGeoEventsChange?.(geoEvents);
+  }, [geoEvents, onGeoEventsChange]);
 
   // VIP 항공기 실시간 데이터
   const [liveAircraft, setLiveAircraft] = useState<VipAircraft[]>([]);
@@ -1605,6 +1623,21 @@ export function WorldMapView() {
 
   const selectedHotspot = scored.find(h => h.id === selectedId) ?? null;
   const selectedInv = selectedId ? INVESTMENT_DATA[selectedId] : null;
+  const filteredGeoEvents = useMemo(
+    () => geoEvents.filter(ev => {
+      if (!activeCategories.has(ev.category)) return false;
+      if (severityFilter === 'critical' && ev.severity !== 'critical') return false;
+      if (severityFilter === 'high' && ev.severity !== 'critical' && ev.severity !== 'high') return false;
+      return true;
+    }),
+    [geoEvents, activeCategories, severityFilter],
+  );
+  const watchlistRelevantCount = useMemo(
+    () => geoEvents.reduce((count, ev) => (
+      findMatchingTickers(ev.titleKo, ev.region, tickers).length > 0 ? count + 1 : count
+    ), 0),
+    [geoEvents, tickers],
+  );
 
   return (
     <div className="relative w-full h-full">
@@ -1709,47 +1742,60 @@ export function WorldMapView() {
         ))}
 
         {/* ── 뉴스 이벤트 핀 ── */}
-        {layers.events && geoEvents
-          .filter(ev => {
-            if (!activeCategories.has(ev.category)) return false;
-            if (severityFilter === 'critical' && ev.severity !== 'critical') return false;
-            if (severityFilter === 'high' && ev.severity !== 'critical' && ev.severity !== 'high') return false;
-            return true;
-          })
-          .map(ev => {
+        {layers.events && filteredGeoEvents.map(ev => {
           const meta = CATEGORY_META[ev.category] ?? CATEGORY_META.politics;
           const radius = SEV_RADIUS[ev.severity] ?? 7;
           const isSelected = selectedEventId === ev.id;
+          const matchedTickers = findMatchingTickers(ev.titleKo, ev.region, tickers);
           return (
-            <CircleMarker key={ev.id}
-              center={[ev.lat, ev.lng]}
-              radius={radius}
-              pathOptions={{
-                color: meta.color,
-                fillColor: isSelected ? '#ffffff' : meta.color,
-                fillOpacity: isSelected ? 0.95 : 0.75,
-                weight: isSelected ? 3 : 1.5,
-                dashArray: ev.category === 'conflict' || ev.category === 'terrorism' ? undefined : '4 3',
-              }}
-              eventHandlers={{
-                click: () => {
-                  setSelectedEventId(prev => prev === ev.id ? null : ev.id);
-                  setSelectedId(null);
-                },
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${meta.color}44`, fontFamily: 'system-ui', minWidth: '160px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '14px' }}>{meta.icon}</span>
-                    <span style={{ fontWeight: 700, fontSize: '12px' }}>{ev.region}</span>
+            <React.Fragment key={ev.id}>
+              {matchedTickers.length > 0 && (
+                <CircleMarker
+                  center={[ev.lat, ev.lng]}
+                  radius={radius + 6}
+                  pathOptions={{
+                    color: '#fbbf24',
+                    fillColor: '#fbbf24',
+                    fillOpacity: 0.12,
+                    opacity: 0.8,
+                    weight: 1.5,
+                    dashArray: '2 4',
+                  }}
+                />
+              )}
+              <CircleMarker
+                center={[ev.lat, ev.lng]}
+                radius={radius}
+                pathOptions={{
+                  color: meta.color,
+                  fillColor: isSelected ? '#ffffff' : meta.color,
+                  fillOpacity: isSelected ? 0.95 : 0.75,
+                  weight: isSelected ? 3 : 1.5,
+                  dashArray: ev.category === 'conflict' || ev.category === 'terrorism' ? undefined : '4 3',
+                }}
+                eventHandlers={{
+                  click: () => {
+                    setSelectedEventId(prev => prev === ev.id ? null : ev.id);
+                    setSelectedId(null);
+                  },
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                  <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${meta.color}44`, fontFamily: 'system-ui', minWidth: '160px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '14px' }}>{meta.icon}</span>
+                      <span style={{ fontWeight: 700, fontSize: '12px' }}>{ev.region}</span>
+                      {matchedTickers.length > 0 && (
+                        <span style={{ marginLeft: 'auto', color: '#fbbf24', fontWeight: 700, fontSize: '11px' }}>⭐ {matchedTickers.length}</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '11px', color: meta.color, fontWeight: 600, marginBottom: '2px' }}>{meta.labelKo}</div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', lineHeight: 1.4 }}>{ev.titleKo}</div>
+                    <div style={{ marginTop: '4px', fontSize: '10px', color: '#475569' }}>클릭 → 세부정보</div>
                   </div>
-                  <div style={{ fontSize: '11px', color: meta.color, fontWeight: 600, marginBottom: '2px' }}>{meta.labelKo}</div>
-                  <div style={{ fontSize: '10px', color: '#94a3b8', lineHeight: 1.4 }}>{ev.titleKo}</div>
-                  <div style={{ marginTop: '4px', fontSize: '10px', color: '#475569' }}>클릭 → 세부정보</div>
-                </div>
-              </Tooltip>
-            </CircleMarker>
+                </Tooltip>
+              </CircleMarker>
+            </React.Fragment>
           );
         })}
 
@@ -1976,6 +2022,7 @@ export function WorldMapView() {
         aircraftTracked={liveAircraft.length}
         aircraftAirborne={liveAircraft.filter(a => !a.onGround).length}
         convergenceCount={convergenceZones.length}
+        relevantCount={watchlistRelevantCount}
       />
 
       {/* 선택된 핫스팟 상세 패널 */}

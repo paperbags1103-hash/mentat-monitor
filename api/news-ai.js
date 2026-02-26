@@ -18,15 +18,15 @@ const caches = new Map(); // key → { data, ts }
 
 // ─── RSS 소스 (primary + fallback) ────────────────────────────────────────────
 const RSS_SOURCES_PRIMARY = [
+  { url: 'https://www.aljazeera.com/xml/rss/all.xml',          label: 'AlJazeera' },
+  { url: 'https://rss.dw.com/rdf/rss-en-all',                  label: 'DW' },
   { url: 'https://feeds.bbci.co.uk/news/business/rss.xml',    label: 'BBC 비즈' },
-  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml',       label: 'BBC 월드' },
-  { url: 'https://feeds.bbci.co.uk/news/technology/rss.xml',  label: 'BBC 테크' },
 ];
 
 const RSS_SOURCES_FALLBACK = [
-  { url: 'https://www.theguardian.com/business/rss',           label: 'Guardian 비즈' },
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml',       label: 'BBC 월드' },
+  { url: 'https://feeds.bbci.co.uk/news/technology/rss.xml',  label: 'BBC 테크' },
   { url: 'https://www.theguardian.com/world/rss',              label: 'Guardian 월드' },
-  { url: 'https://www.aljazeera.com/xml/rss/all.xml',          label: 'AlJazeera' },
 ];
 
 // ─── 간단 XML 파서 (edge runtime) ─────────────────────────────────────────────
@@ -60,6 +60,7 @@ async function fetchRSS({ url, label }) {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
+      redirect: 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; MentatMonitor/1.0)',
         'Accept': 'application/rss+xml, application/xml, text/xml, */*',

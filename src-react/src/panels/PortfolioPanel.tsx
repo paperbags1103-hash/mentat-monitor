@@ -7,8 +7,8 @@
  * - 🌍 지정학리스크: 보유종목 × 지정학 위협 노출도
  */
 import { useState, useEffect, useMemo } from 'react';
-import { usePortfolioStore, type HoldingWithPnL } from '@/store/portfolio';
-import { useStore } from '@/store';
+import { usePortfolioStore, type HoldingWithPnL, type Holding } from '@/store/portfolio';
+import { useStore, apiFetch } from '@/store';
 
 // ─── 섹터 매핑 ─────────────────────────────────────────────────────────────
 const SECTOR_MAP: Record<string, { sector: string; color: string }> = {
@@ -354,44 +354,99 @@ function GeoRiskTab({ holdings }: { holdings: HoldingWithPnL[] }) {
   );
 }
 
-// ─── 보유종목 탭 (기존) ────────────────────────────────────────────────────────
-function AddForm({ onClose }: { onClose: () => void }) {
-  const addHolding = usePortfolioStore(s => s.addHolding);
-  const QUICK_SYMBOLS = [
-    { symbol: '005930.KS', nameKo: '삼성전자',   currency: 'KRW' as const },
-    { symbol: '000660.KS', nameKo: 'SK하이닉스', currency: 'KRW' as const },
-    { symbol: '035420.KS', nameKo: 'NAVER',      currency: 'KRW' as const },
-    { symbol: '051910.KS', nameKo: 'LG화학',     currency: 'KRW' as const },
-    { symbol: '006400.KS', nameKo: '삼성SDI',    currency: 'KRW' as const },
-    { symbol: 'NVDA',      nameKo: '엔비디아',   currency: 'USD' as const },
-    { symbol: 'TSLA',      nameKo: '테슬라',     currency: 'USD' as const },
-    { symbol: 'AAPL',      nameKo: '애플',       currency: 'USD' as const },
-    { symbol: 'MSFT',      nameKo: '마이크로소프트', currency: 'USD' as const },
-    { symbol: 'BTC-KRW',   nameKo: '비트코인',   currency: 'KRW' as const },
-  ];
-  const [symbol, setSymbol]   = useState('');
-  const [nameKo, setNameKo]   = useState('');
-  const [qty, setQty]         = useState('');
-  const [cost, setCost]       = useState('');
-  const [currency, setCurrency] = useState<'KRW' | 'USD'>('KRW');
-  const [note, setNote]       = useState('');
+// ─── 현재가 자동 조회 훅 ──────────────────────────────────────────────────────
+function useCurrentPrice(symbol: string) {
+  const [price, setPrice] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!symbol.trim()) { setPrice(null); return; }
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const data = await apiFetch<{ meta?: { regularMarketPrice?: number } }>(
+          `/api/chart-data?symbol=${encodeURIComponent(symbol)}&period=1mo`
+        );
+        setPrice(data?.meta?.regularMarketPrice ?? null);
+      } catch {
+        setPrice(null);
+      } finally {
+        setLoading(false);
+      }
+    }, 700);
+    return () => { clearTimeout(timer); setLoading(false); };
+  }, [symbol]);
+
+  return { price, loading };
+}
+
+// ─── 공용 종목 폼 ─────────────────────────────────────────────────────────────
+const QUICK_SYMBOLS = [
+  { symbol: '005930.KS', nameKo: '삼성전자',       currency: 'KRW' as const },
+  { symbol: '000660.KS', nameKo: 'SK하이닉스',     currency: 'KRW' as const },
+  { symbol: '035420.KS', nameKo: 'NAVER',          currency: 'KRW' as const },
+  { symbol: '012450.KS', nameKo: '한화에어로',     currency: 'KRW' as const },
+  { symbol: '006400.KS', nameKo: '삼성SDI',        currency: 'KRW' as const },
+  { symbol: 'NVDA',      nameKo: '엔비디아',       currency: 'USD' as const },
+  { symbol: 'TSLA',      nameKo: '테슬라',         currency: 'USD' as const },
+  { symbol: 'AAPL',      nameKo: '애플',           currency: 'USD' as const },
+  { symbol: 'MSFT',      nameKo: '마이크로소프트', currency: 'USD' as const },
+  { symbol: 'BTC-USD',   nameKo: '비트코인',       currency: 'USD' as const },
+];
+
+interface HoldingFormProps {
+  title: string;
+  submitLabel: string;
+  initial?: Partial<Holding>;
+  onSubmit: (values: Omit<Holding, 'id' | 'addedAt'>) => void;
+  onClose: () => void;
+}
+
+function HoldingForm({ title, submitLabel, initial = {}, onSubmit, onClose }: HoldingFormProps) {
+  const [symbol,   setSymbol]   = useState(initial.symbol   ?? '');
+  const [nameKo,   setNameKo]   = useState(initial.nameKo   ?? '');
+  const [qty,      setQty]      = useState(initial.quantity  != null ? String(initial.quantity)  : '');
+  const [cost,     setCost]     = useState(initial.avgCost   != null ? String(initial.avgCost)   : '');
+  const [currency, setCurrency] = useState<'KRW' | 'USD'>(initial.currency ?? 'KRW');
+  const [note,     setNote]     = useState(initial.note ?? '');
+  const [costEdited, setCostEdited] = useState(initial.avgCost != null); // 수동 수정 여부
+
+  const { price: fetchedPrice, loading: priceLoading } = useCurrentPrice(symbol);
+
+  // 현재가 자동 채우기 (수동으로 수정한 경우엔 덮어쓰지 않음)
+  useEffect(() => {
+    if (!costEdited && fetchedPrice != null) {
+      setCost(String(fetchedPrice));
+    }
+  }, [fetchedPrice, costEdited]);
 
   function fillQuick(q: typeof QUICK_SYMBOLS[number]) {
-    setSymbol(q.symbol); setNameKo(q.nameKo); setCurrency(q.currency);
+    setSymbol(q.symbol);
+    setNameKo(q.nameKo);
+    setCurrency(q.currency);
+    setCostEdited(false); // 새 종목 선택 시 자동채우기 다시 활성화
+    setCost('');
   }
 
-  function submit(e: React.FormEvent) {
+  function handleCostChange(v: string) {
+    setCost(v);
+    setCostEdited(true);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!symbol || !nameKo || !qty || !cost) return;
-    addHolding({ symbol, nameKo, quantity: parseFloat(qty), avgCost: parseFloat(cost), currency, note });
+    onSubmit({ symbol, nameKo, quantity: parseFloat(qty), avgCost: parseFloat(cost), currency, note });
     onClose();
   }
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <form className="bg-panel border border-border rounded-xl w-full max-w-md shadow-2xl p-5"
-        onClick={e => e.stopPropagation()} onSubmit={submit}>
-        <h3 className="text-sm font-bold text-primary mb-4">보유 종목 추가</h3>
+        onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
+        <h3 className="text-sm font-bold text-primary mb-4">{title}</h3>
+
+        {/* 빠른 선택 */}
         <div className="flex flex-wrap gap-1 mb-4">
           {QUICK_SYMBOLS.map(q => (
             <button key={q.symbol} type="button" onClick={() => fillQuick(q)}
@@ -400,10 +455,12 @@ function AddForm({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
+
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="text-xs text-muted block mb-1">종목코드 *</label>
-            <input value={symbol} onChange={e => setSymbol(e.target.value)} placeholder="005930.KS"
+            <input value={symbol} onChange={e => { setSymbol(e.target.value); setCostEdited(false); setCost(''); }}
+              placeholder="005930.KS"
               className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-primary focus:border-accent focus:outline-none" />
           </div>
           <div>
@@ -417,11 +474,19 @@ function AddForm({ onClose }: { onClose: () => void }) {
               className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-primary focus:border-accent focus:outline-none" />
           </div>
           <div>
-            <label className="text-xs text-muted block mb-1">평균단가 *</label>
-            <input type="number" value={cost} onChange={e => setCost(e.target.value)} placeholder="75000"
+            <label className="text-xs text-muted block mb-1">
+              평균단가 *
+              {priceLoading && <span className="ml-1 text-accent-light animate-pulse">조회 중...</span>}
+              {!priceLoading && fetchedPrice != null && !costEdited && (
+                <span className="ml-1 text-risk-safe text-[10px]">현재가 자동입력</span>
+              )}
+            </label>
+            <input type="number" value={cost} onChange={e => handleCostChange(e.target.value)}
+              placeholder={priceLoading ? '조회 중...' : '75000'}
               className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-primary focus:border-accent focus:outline-none" />
           </div>
         </div>
+
         <div className="flex gap-3 mb-3">
           <label className="text-xs text-muted">통화</label>
           {(['KRW', 'USD'] as const).map(c => (
@@ -431,18 +496,38 @@ function AddForm({ onClose }: { onClose: () => void }) {
             </label>
           ))}
         </div>
+
         <input value={note} onChange={e => setNote(e.target.value)} placeholder="메모 (선택)"
           className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-primary focus:border-accent focus:outline-none mb-4" />
+
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={onClose} className="text-xs px-3 py-1.5 text-muted hover:text-primary">취소</button>
-          <button type="submit" className="text-xs px-4 py-1.5 bg-accent text-white rounded hover:bg-accent/80 font-semibold">추가</button>
+          <button type="submit" className="text-xs px-4 py-1.5 bg-accent text-white rounded hover:bg-accent/80 font-semibold">{submitLabel}</button>
         </div>
       </form>
     </div>
   );
 }
 
-function HoldingRow({ h, onRemove, onSelect }: { h: HoldingWithPnL; onRemove: () => void; onSelect?: () => void }) {
+// ─── 보유종목 탭 ────────────────────────────────────────────────────────────────
+function AddForm({ onClose }: { onClose: () => void }) {
+  const addHolding = usePortfolioStore(s => s.addHolding);
+  return (
+    <HoldingForm title="보유 종목 추가" submitLabel="추가"
+      onSubmit={vals => addHolding(vals)} onClose={onClose} />
+  );
+}
+
+function EditForm({ holding, onClose }: { holding: Holding; onClose: () => void }) {
+  const updateHolding = usePortfolioStore(s => s.updateHolding);
+  return (
+    <HoldingForm title={`${holding.nameKo} 수정`} submitLabel="저장"
+      initial={holding}
+      onSubmit={vals => updateHolding(holding.id, vals)} onClose={onClose} />
+  );
+}
+
+function HoldingRow({ h, onRemove, onSelect, onEdit }: { h: HoldingWithPnL; onRemove: () => void; onSelect?: () => void; onEdit?: () => void }) {
   const up = h.pnlPct != null && h.pnlPct >= 0;
   const fmt = (n: number, dec = 0) => n.toLocaleString('ko-KR', { maximumFractionDigits: dec });
   const sec = getSector(h.symbol);
@@ -476,7 +561,10 @@ function HoldingRow({ h, onRemove, onSelect }: { h: HoldingWithPnL; onRemove: ()
           </div>
         )}
       </div>
-      <button onClick={e => { e.stopPropagation(); onRemove(); }} className="text-muted hover:text-risk-critical text-xs opacity-0 group-hover:opacity-100 transition-opacity shrink-0">✕</button>
+      <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <button onClick={e => { e.stopPropagation(); onEdit?.(); }} className="text-muted hover:text-accent-light text-xs" title="수정">✎</button>
+        <button onClick={e => { e.stopPropagation(); onRemove(); }} className="text-muted hover:text-risk-critical text-xs" title="삭제">✕</button>
+      </div>
     </div>
   );
 }
@@ -485,10 +573,12 @@ function HoldingRow({ h, onRemove, onSelect }: { h: HoldingWithPnL; onRemove: ()
 type Tab = 'holdings' | 'sector' | 'geo';
 
 export function PortfolioPanel() {
-  const { getHoldingsWithPnL, getSummary, fetchPrices, isLoading, lastFetch, removeHolding } = usePortfolioStore();
+  const { getHoldingsWithPnL, getSummary, fetchPrices, isLoading, lastFetch, removeHolding, holdings: rawHoldings } = usePortfolioStore();
   const { usdkrw, selectSymbol } = useStore();
-  const [showAdd, setShowAdd] = useState(false);
-  const [tab, setTab]         = useState<Tab>('holdings');
+  const [showAdd, setShowAdd]     = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tab, setTab]             = useState<Tab>('holdings');
+  const editingHolding = editingId ? rawHoldings.find(h => h.id === editingId) ?? null : null;
 
   useEffect(() => {
     if (usdkrw?.rate) usePortfolioStore.setState({ usdkrwRate: usdkrw.rate });
@@ -584,6 +674,7 @@ export function PortfolioPanel() {
                 {holdings.map(h => (
                   <HoldingRow key={h.id} h={h}
                     onRemove={() => removeHolding?.(h.id)}
+                    onEdit={() => setEditingId(h.id)}
                     onSelect={typeof selectSymbol === 'function' ? () => selectSymbol(h.symbol, h.nameKo) : undefined}
                   />
                 ))}
@@ -596,6 +687,7 @@ export function PortfolioPanel() {
       )}
 
       {showAdd && <AddForm onClose={() => setShowAdd(false)} />}
+      {editingHolding && <EditForm holding={editingHolding} onClose={() => setEditingId(null)} />}
     </div>
   );
 }

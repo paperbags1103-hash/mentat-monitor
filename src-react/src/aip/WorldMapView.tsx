@@ -8,7 +8,7 @@
  * - 공급망 무역 루트
  * - VIP 항공기 레이어
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   MapContainer, TileLayer, CircleMarker, Circle,
   Tooltip, ZoomControl, Polyline, useMap, Marker,
@@ -27,6 +27,11 @@ interface Hotspot {
   lng: number;
   nameKo: string;
   entityIds: string[];
+}
+
+interface ScoredHotspot extends Hotspot {
+  score: number;
+  matchedInferences: Inference[];
 }
 
 interface HotspotInvestmentData {
@@ -52,6 +57,27 @@ interface ShippingChokepoint {
   impactKo: string;
   koreanStocks: { ticker: string; nameKo: string; reason: string }[];
   linkedRegions: string[];
+}
+
+interface ConvergenceEvent {
+  id: string;
+  layer: 'geo' | 'aircraft' | 'shipping' | 'hotspot' | 'nk';
+  label: string;
+  signal?: string;
+  desc?: string;
+  lat: number;
+  lng: number;
+  severity?: string;
+}
+
+interface ConvergenceZone {
+  id: string;
+  lat: number;  // centroid lat
+  lng: number;  // centroid lng
+  events: ConvergenceEvent[];
+  layerCount: number;
+  maxSeverity: 'critical' | 'high' | 'medium';
+  regionLabel: string;
 }
 
 const SHIPPING_CHOKEPOINTS: ShippingChokepoint[] = [
@@ -706,6 +732,7 @@ interface LayerState {
   threats: boolean;
   overlay: boolean;
   arcs: boolean;
+  convergence: boolean;
   aircraft: boolean;
   shipping: boolean;
   events: boolean;
@@ -800,6 +827,114 @@ const SEV_RADIUS: Record<GeoEvent['severity'], number> = {
   critical: 12, high: 9, medium: 7, low: 5,
 };
 
+const GRID_DEG = 8; // 8° grid ≈ 800km radius for convergence
+
+function detectConvergenceZones(
+  geoEvents: GeoEvent[],
+  aircraft: VipAircraft[],
+  hotspots: ScoredHotspot[],
+): ConvergenceZone[] {
+  const grid: Map<string, ConvergenceEvent[]> = new Map();
+
+  const addToGrid = (ev: ConvergenceEvent) => {
+    const cellKey = `${Math.floor(ev.lat / GRID_DEG)}_${Math.floor(ev.lng / GRID_DEG)}`;
+    if (!grid.has(cellKey)) grid.set(cellKey, []);
+    grid.get(cellKey)!.push(ev);
+  };
+
+  // Layer 1: geo-events (critical + high only to reduce noise)
+  geoEvents
+    .filter(ev => ev.severity === 'critical' || ev.severity === 'high')
+    .forEach(ev => addToGrid({
+      id: `geo-${ev.id}`,
+      layer: 'geo',
+      label: ev.region,
+      signal: ev.titleKo,
+      lat: ev.lat,
+      lng: ev.lng,
+      severity: ev.severity,
+    }));
+
+  // Layer 2: VIP aircraft (airborne only)
+  aircraft
+    .filter(ac => !ac.onGround && ac.isHighAlert)
+    .forEach(ac => addToGrid({
+      id: `air-${ac.icao24}`,
+      layer: 'aircraft',
+      label: ac.label,
+      signal: ac.investmentSignalKo || undefined,
+      lat: ac.lat,
+      lng: ac.lng,
+      severity: ac.category === 'military_command' ? 'critical' : 'high',
+    }));
+
+  // Layer 3: shipping chokepoints (high/critical stress only)
+  SHIPPING_CHOKEPOINTS.forEach(cp => {
+    // Use a simple proxy: if there are geo-events nearby, it's stressed
+    const nearbyGeo = geoEvents.filter(ev =>
+      Math.abs(ev.lat - cp.lat) < 12 && Math.abs(ev.lng - cp.lng) < 15 &&
+      (ev.severity === 'critical' || ev.severity === 'high')
+    );
+    if (nearbyGeo.length > 0) {
+      addToGrid({
+        id: `ship-${cp.id}`,
+        layer: 'shipping',
+        label: cp.nameKo,
+        signal: cp.impactKo,
+        lat: cp.lat,
+        lng: cp.lng,
+        severity: nearbyGeo.some(e => e.severity === 'critical') ? 'critical' : 'high',
+      });
+    }
+  });
+
+  // Layer 4: hotspots (score >= 50)
+  hotspots
+    .filter(h => h.score >= 50)
+    .forEach(h => addToGrid({
+      id: `hot-${h.id}`,
+      layer: 'hotspot',
+      label: h.nameKo,
+      signal: `위험도 ${Math.round(h.score)}/100`,
+      lat: h.lat,
+      lng: h.lng,
+      severity: h.score >= 70 ? 'critical' : 'high',
+    }));
+
+  const zones: ConvergenceZone[] = [];
+
+  grid.forEach((events, cellKey) => {
+    // Count distinct layers
+    const layers = new Set(events.map(e => e.layer));
+    if (layers.size < 2) return; // Need at least 2 different layers
+
+    // Compute centroid
+    const centLat = events.reduce((s, e) => s + e.lat, 0) / events.length;
+    const centLng = events.reduce((s, e) => s + e.lng, 0) / events.length;
+
+    // Max severity
+    const hasCritical = events.some(e => e.severity === 'critical');
+    const hasHigh = events.some(e => e.severity === 'high');
+
+    // Region label: use the first geo or hotspot event's region name
+    const labelEvent = events.find(e => e.layer === 'geo' || e.layer === 'hotspot');
+    const regionLabel = labelEvent?.label ?? `${cellKey.replace('_', '°N, ')}°E`;
+
+    zones.push({
+      id: `conv-${cellKey}`,
+      lat: centLat,
+      lng: centLng,
+      events,
+      layerCount: layers.size,
+      maxSeverity: hasCritical ? 'critical' : hasHigh ? 'high' : 'medium',
+      regionLabel,
+    });
+  });
+
+  // Sort by layerCount desc
+  return zones.sort((a, b) => b.layerCount - a.layerCount);
+}
+
 type CategoryKey = GeoEvent['category'];
 type SeverityFilter = 'all' | 'high' | 'critical';
 
@@ -814,6 +949,7 @@ function LayerControl({
   showFleet,
   aircraftTracked,
   aircraftAirborne,
+  convergenceCount,
 }: {
   layers: LayerState;
   onToggle: (key: keyof LayerState) => void;
@@ -825,6 +961,7 @@ function LayerControl({
   showFleet?: boolean;
   aircraftTracked?: number;
   aircraftAirborne?: number;
+  convergenceCount: number;
 }) {
   const btns: { key: keyof LayerState; label: string; active: string }[] = [
     { key: 'threats',  label: '🎯 위협 핀',      active: 'text-red-400 border-red-500/50 bg-red-500/20' },
@@ -868,6 +1005,40 @@ function LayerControl({
           )}
         </div>
       ))}
+      <div className="flex gap-1">
+        <button
+          onClick={() => onToggle('convergence' as keyof LayerState)}
+          title="수렴 구역 (다층 시그널)"
+          style={{
+            background: layers.convergence ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${layers.convergence ? '#6366f1' : 'rgba(255,255,255,0.1)'}`,
+            color: layers.convergence ? '#818cf8' : '#94a3b8',
+            borderRadius: 6,
+            padding: '5px 8px',
+            cursor: 'pointer',
+            fontSize: 14,
+            position: 'relative',
+            width: '100%',
+          }}
+        >
+          ⚡
+          {convergenceCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -4, right: -4,
+              background: '#ef4444', color: 'white', borderRadius: '50%',
+              width: 14, height: 14, fontSize: 9, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {convergenceCount}
+            </span>
+          )}
+        </button>
+      </div>
+      {layers.convergence && convergenceCount > 0 && (
+        <div style={{ fontSize: 9, color: '#818cf8', marginTop: 2 }}>
+          {convergenceCount}개 감지
+        </div>
+      )}
       {layers.aircraft && (aircraftTracked ?? 0) > 0 && (
         <div className="text-[11px] text-blue-200/80 bg-blue-500/10 border border-blue-500/25 rounded px-2 py-1">
           ✈ {aircraftAirborne ?? 0} airborne / {aircraftTracked ?? 0} tracked
@@ -1021,11 +1192,6 @@ function ShippingChokePanel({ chokepoint, stress, onClose }: {
 }
 
 // ─── 선택된 핫스팟 상세 패널 ──────────────────────────────────────────────────
-interface ScoredHotspot extends Hotspot {
-  score: number;
-  matchedInferences: Inference[];
-}
-
 function SelectedPanel({ hotspot, onClose }: { hotspot: ScoredHotspot; onClose: () => void }) {
   const inv = INVESTMENT_DATA[hotspot.id];
   const color = scoreToColor(hotspot.score);
@@ -1191,6 +1357,117 @@ function EventPanel({ event, onClose }: { event: GeoEvent; onClose: () => void }
   );
 }
 
+function ConvergenceZonePanel({ zone, onClose }: { zone: ConvergenceZone; onClose: () => void }) {
+  const [synthesis, setSynthesis] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const LAYER_META: Record<string, { icon: string; nameKo: string; color: string }> = {
+    geo: { icon: '📰', nameKo: '뉴스 이벤트', color: '#ef4444' },
+    aircraft: { icon: '✈️', nameKo: 'VIP 항공기', color: '#f59e0b' },
+    shipping: { icon: '⚓', nameKo: '해운 병목', color: '#0ea5e9' },
+    hotspot: { icon: '🌐', nameKo: '지정학 핫스팟', color: '#a855f7' },
+    nk: { icon: '☢️', nameKo: '북한 동향', color: '#6b7280' },
+  };
+
+  const severityColor = zone.maxSeverity === 'critical' ? '#ef4444' : zone.maxSeverity === 'high' ? '#f59e0b' : '#22c55e';
+
+  async function requestAnalysis() {
+    setLoading(true);
+    try {
+      const resp = await fetch('/api/convergence-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('mentat-api-keys-v1')
+            ? { 'x-groq-key': JSON.parse(localStorage.getItem('mentat-api-keys-v1') || '{}').groq || '' }
+            : {}),
+        },
+        body: JSON.stringify({ events: zone.events, region: zone.regionLabel }),
+      });
+      const data = await resp.json();
+      setSynthesis(data.synthesis);
+    } catch (e) { setSynthesis(null); }
+    setLoading(false);
+  }
+
+  return (
+    <DraggablePanel className="absolute top-16 left-3 z-[1000] w-[360px]">
+      <div style={{ border: '1px solid #1e293b', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#020617', borderBottom: '1px solid #1e293b' }}>
+          <span style={{ fontSize: 16 }}>⚡</span>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>수렴 구역 — {zone.regionLabel}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: severityColor, fontWeight: 700 }}>{zone.layerCount}개 레이어 수렴</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16 }}>×</button>
+        </div>
+        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12, color: '#e2e8f0', background: '#0f172a', maxHeight: 400, overflowY: 'auto' }}>
+
+          {/* Layer breakdown */}
+          <div>
+            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>수렴 시그널</div>
+            {zone.events.map((ev) => {
+              const meta = LAYER_META[ev.layer] ?? LAYER_META.geo;
+              return (
+                <div key={ev.id} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #1e293b' }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>{meta.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 10, color: meta.color, fontWeight: 600 }}>{meta.nameKo}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>{ev.label}</div>
+                    {ev.signal && <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.4, marginTop: 2 }}>{ev.signal.slice(0, 80)}{ev.signal.length > 80 ? '...' : ''}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* AI Analysis */}
+          {!synthesis && (
+            <button
+              onClick={requestAnalysis}
+              disabled={loading}
+              style={{
+                background: loading ? '#1e293b' : 'rgba(99,102,241,0.15)',
+                border: '1px solid rgba(99,102,241,0.4)',
+                color: loading ? '#64748b' : '#818cf8',
+                borderRadius: 6, padding: '7px 12px', cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: 12, fontWeight: 600,
+              }}
+            >
+              {loading ? '🧠 AI 분석 중...' : '🧠 AI 수렴 분석 요청'}
+            </button>
+          )}
+
+          {synthesis && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 6, padding: '8px 10px' }}>
+                <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4 }}>🧠 종합 판단</div>
+                <div style={{ lineHeight: 1.6, color: '#e2e8f0' }}>{synthesis.summary}</div>
+              </div>
+              {synthesis.actionKo && (
+                <div style={{ background: '#052e1622', border: '1px solid #22c55e33', borderRadius: 6, padding: '8px 10px' }}>
+                  <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 4 }}>💹 투자 시사점</div>
+                  <div style={{ color: '#d1fae5', lineHeight: 1.5 }}>{synthesis.actionKo}</div>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: synthesis.riskMode === 'ON' ? '#052e1622' : '#4c0519aa', color: synthesis.riskMode === 'ON' ? '#22c55e' : '#f87171', border: `1px solid ${synthesis.riskMode === 'ON' ? '#22c55e44' : '#ef444444'}`, fontWeight: 700 }}>
+                  {synthesis.riskMode === 'ON' ? '📈 Risk-On' : '🛡️ Risk-Off'}
+                </span>
+                {synthesis.affectedTickersKR?.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {synthesis.affectedTickersKR.map((t: string) => (
+                      <span key={t} style={{ fontSize: 10, padding: '2px 5px', borderRadius: 3, background: '#1e3a5f', color: '#60a5fa', fontFamily: 'monospace' }}>{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </DraggablePanel>
+  );
+}
+
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export function WorldMapView() {
   const { briefing, globalRiskScore } = useStore();
@@ -1201,6 +1478,7 @@ export function WorldMapView() {
     threats: true,
     overlay: true,
     arcs: true,
+    convergence: false,
     aircraft: false,
     shipping: false,
     events: true,
@@ -1213,6 +1491,7 @@ export function WorldMapView() {
 
   // 선택된 핫스팟
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedConvergenceId, setSelectedConvergenceId] = useState<string | null>(null);
 
   // 뉴스 기반 지리 이벤트
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
@@ -1306,6 +1585,11 @@ export function WorldMapView() {
       inf.affectedEntityIds?.some(id => h.entityIds.includes(id))
     ),
   }));
+
+  const convergenceZones = useMemo(
+    () => detectConvergenceZones(geoEvents, liveAircraft, scored),
+    [geoEvents, liveAircraft, scored]
+  );
 
   // GeoJSON 국가별 리스크 점수 맵 (ISO_A2 → score)
   const isoScoreMap: Record<string, number> = {};
@@ -1516,6 +1800,58 @@ export function WorldMapView() {
           );
         })}
 
+        {/* ── 수렴 구역 (Signal Convergence Zones) ── */}
+        {layers.convergence && convergenceZones.map(zone => {
+          const severityColor = zone.maxSeverity === 'critical' ? '#ef4444' : zone.maxSeverity === 'high' ? '#f59e0b' : '#a78bfa';
+          const isSelected = selectedConvergenceId === zone.id;
+          const outerRadius = zone.layerCount >= 3 ? 40 : 30;
+          return (
+            <React.Fragment key={zone.id}>
+              {/* Outer pulse ring */}
+              <CircleMarker
+                center={[zone.lat, zone.lng]}
+                radius={outerRadius}
+                pathOptions={{
+                  color: severityColor,
+                  fillColor: severityColor,
+                  fillOpacity: 0.06,
+                  weight: 1.5,
+                  opacity: 0.5,
+                  dashArray: '4 4',
+                }}
+                eventHandlers={{ click: () => setSelectedConvergenceId(prev => prev === zone.id ? null : zone.id) }}
+              />
+              {/* Inner marker */}
+              <CircleMarker
+                center={[zone.lat, zone.lng]}
+                radius={isSelected ? 16 : 13}
+                pathOptions={{
+                  color: severityColor,
+                  fillColor: isSelected ? '#ffffff' : severityColor,
+                  fillOpacity: isSelected ? 0.9 : 0.7,
+                  weight: isSelected ? 3 : 2,
+                }}
+                eventHandlers={{ click: () => setSelectedConvergenceId(prev => prev === zone.id ? null : zone.id) }}
+              >
+                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                  <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${severityColor}55`, fontFamily: 'system-ui', minWidth: '160px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14 }}>⚡</span>
+                      <span style={{ fontWeight: 700, fontSize: 12 }}>{zone.regionLabel}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: severityColor, fontWeight: 700 }}>{zone.layerCount}개 레이어</span>
+                    </div>
+                    {zone.events.slice(0, 2).map(ev => (
+                      <div key={ev.id} style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>· [{ev.layer === 'geo' ? '📰' : ev.layer === 'aircraft' ? '✈️' : ev.layer === 'shipping' ? '⚓' : '🌐'}] {ev.label}</div>
+                    ))}
+                    {zone.events.length > 2 && <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>+{zone.events.length - 2}개 더...</div>}
+                    <div style={{ marginTop: 4, fontSize: 10, color: '#475569' }}>클릭 → AI 수렴 분석</div>
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            </React.Fragment>
+          );
+        })}
+
         {/* ── VIP 항공기 이동 궤적 ── */}
         {layers.aircraft && Object.entries(aircraftTrails).map(([icao24, trail]) => {
           if (trail.length < 2) return null;
@@ -1639,6 +1975,7 @@ export function WorldMapView() {
         showFleet={showFleetOverview}
         aircraftTracked={liveAircraft.length}
         aircraftAirborne={liveAircraft.filter(a => !a.onGround).length}
+        convergenceCount={convergenceZones.length}
       />
 
       {/* 선택된 핫스팟 상세 패널 */}
@@ -1660,6 +1997,13 @@ export function WorldMapView() {
         if (!cp) return null;
         const stress = getChokepointStress(cp, geoEvents);
         return <ShippingChokePanel chokepoint={cp} stress={stress} onClose={() => setSelectedChokeId(null)} />;
+      })()}
+
+      {/* ── 수렴 구역 분석 패널 ── */}
+      {layers.convergence && selectedConvergenceId && (() => {
+        const zone = convergenceZones.find(z => z.id === selectedConvergenceId);
+        if (!zone) return null;
+        return <ConvergenceZonePanel zone={zone} onClose={() => setSelectedConvergenceId(null)} />;
       })()}
 
       {/* VIP 항공기 상세 패널 */}

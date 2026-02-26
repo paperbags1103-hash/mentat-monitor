@@ -227,17 +227,28 @@ interface VipAircraftResponse {
 
 // 주요 VIP 항공기 홈베이스 (비행 미감지 시 위치 표시용)
 const VIP_HOME_BASES = [
-  { icao24: 'ae0b6a', label: 'Air Force One',          lat: 38.8175, lng: -76.8640, flag: '🇺🇸', category: 'head_of_state' }, // Andrews AFB
-  { icao24: 'ae04c5', label: 'E-4B Nightwatch',        lat: 41.1030, lng: -95.9130, flag: '🇺🇸', category: 'military_command' }, // Offutt AFB
-  { icao24: 'ae0557', label: 'E-6B Mercury',            lat: 35.3490, lng: -97.4140, flag: '🇺🇸', category: 'military_command' }, // Tinker AFB
-  { icao24: '43c36e', label: 'UK PM Voyager',           lat: 51.4775, lng: -0.4614,  flag: '🇬🇧', category: 'head_of_state' }, // RAF Brize Norton
-  { icao24: '3c4591', label: 'French President',        lat: 48.7233, lng: 2.3794,   flag: '🇫🇷', category: 'head_of_state' }, // Villacoublay
-  { icao24: '3cd54c', label: 'German Chancellor',       lat: 50.0319, lng: 8.5706,   flag: '🇩🇪', category: 'head_of_state' }, // Frankfurt
-  { icao24: '84408a', label: 'Japanese PM',             lat: 35.5493, lng: 139.7798, flag: '🇯🇵', category: 'head_of_state' }, // Yokota AB
-  { icao24: 'c00001', label: 'Russian Presidential',    lat: 55.4103, lng: 37.9027,  flag: '🇷🇺', category: 'head_of_state' }, // Vnukovo
-  { icao24: '71be19', label: '한국 대통령 전용기',       lat: 37.4444, lng: 127.1278, flag: '🇰🇷', category: 'head_of_state' }, // 성남공항
-  { icao24: '76c63b', label: 'Israeli PM Aircraft',     lat: 31.9968, lng: 34.8936,  flag: '🇮🇱', category: 'head_of_state' }, // Ben Gurion
-  { icao24: '780af5', label: 'China Gov Transport',     lat: 40.0801, lng: 116.5846, flag: '🇨🇳', category: 'government' },    // Capital Airport
+  // 국가 원수
+  { icao24: 'ae0b6a', label: 'Air Force One',           lat: 38.8175, lng: -76.8640, flag: '🇺🇸', category: 'head_of_state',    person: '미국 대통령' },
+  { icao24: 'ae0685', label: 'Air Force Two (VP)',       lat: 38.8175, lng: -76.8640, flag: '🇺🇸', category: 'head_of_state',    person: '미국 부통령' },
+  { icao24: '43c36e', label: 'UK PM Voyager',            lat: 51.4775, lng: -0.4614,  flag: '🇬🇧', category: 'head_of_state',    person: '영국 총리' },
+  { icao24: '3c4591', label: 'French President',         lat: 48.7233, lng: 2.3794,   flag: '🇫🇷', category: 'head_of_state',    person: '프랑스 대통령' },
+  { icao24: '3cd54c', label: 'German Chancellor',        lat: 50.0319, lng: 8.5706,   flag: '🇩🇪', category: 'head_of_state',    person: '독일 총리' },
+  { icao24: '84408a', label: 'Japanese PM',              lat: 35.5493, lng: 139.7798, flag: '🇯🇵', category: 'head_of_state',    person: '일본 총리' },
+  { icao24: 'c00001', label: 'Russian Presidential',     lat: 55.4103, lng: 37.9027,  flag: '🇷🇺', category: 'head_of_state',    person: '러시아 대통령' },
+  { icao24: '71be19', label: '대통령 전용기',             lat: 37.4444, lng: 127.1278, flag: '🇰🇷', category: 'head_of_state',    person: '한국 대통령' },
+  { icao24: '76c63b', label: 'Israeli PM Aircraft',      lat: 31.9968, lng: 34.8936,  flag: '🇮🇱', category: 'head_of_state',    person: '이스라엘 총리' },
+  { icao24: '780af5', label: 'China Gov Transport',      lat: 40.0801, lng: 116.5846, flag: '🇨🇳', category: 'government',        person: '중국 정부' },
+  // 군 지휘부
+  { icao24: 'ae04c5', label: 'E-4B Nightwatch',          lat: 41.1030, lng: -95.9130, flag: '🇺🇸', category: 'military_command', person: '미 핵전쟁 지휘소' },
+  { icao24: 'ae0557', label: 'E-6B Mercury',              lat: 35.3490, lng: -97.4140, flag: '🇺🇸', category: 'military_command', person: '미 핵잠수함 통신' },
+  { icao24: 'ae020b', label: 'RC-135 Rivet Joint',        lat: 35.3490, lng: -97.4140, flag: '🇺🇸', category: 'intelligence',     person: '미 신호정보 수집' },
+  { icao24: '45d3ab', label: 'NATO E-3A AWACS',           lat: 50.8280, lng: 5.4525,   flag: '🌐', category: 'military_command',  person: 'NATO 조기경보기' },
+  // 테크 CEO
+  { icao24: 'a6395a', label: 'Elon Musk (N628TS)',        lat: 33.9222, lng: -118.3310,flag: '🚀', category: 'tech_ceo',          person: 'Elon Musk (Tesla/SpaceX/X)' },
+  { icao24: 'a835af', label: 'Elon Musk (N72X)',          lat: 30.1975, lng: -97.6664, flag: '🚀', category: 'tech_ceo',          person: 'Elon Musk 보조기 (Austin TX)' },
+  { icao24: 'a4b5cb', label: 'Bill Gates',                lat: 47.5296, lng: -122.3016,flag: '💻', category: 'investor',          person: 'Bill Gates (Cascade Inv.)' },
+  // 미 정부 재무
+  { icao24: 'ae4823', label: 'US Treasury Transport',     lat: 38.8175, lng: -76.8640, flag: '🇺🇸', category: 'government',       person: '미 재무부 수송기' },
 ];
 
 // 카테고리별 색상
@@ -345,6 +356,108 @@ function VipAircraftPanel({ ac, onClose }: { ac: VipAircraft; onClose: () => voi
 
 function isHighAlertCategory(cat: string) {
   return ['military_command', 'head_of_state'].includes(cat);
+}
+
+// 플릿 오버뷰 패널 — 추적 중인 전체 항공기 목록 + 현재 상태
+function FleetOverviewPanel({
+  liveAircraft,
+  onSelect,
+  onClose,
+}: {
+  liveAircraft: VipAircraft[];
+  onSelect: (id: string) => void;
+  onClose: () => void;
+}) {
+  const CAT_LABEL: Record<string, string> = {
+    head_of_state: '국가 원수',
+    military_command: '군 지휘부',
+    intelligence: '정보기관',
+    government: '정부 기관',
+    tech_ceo: '테크 CEO',
+    investor: '투자자',
+  };
+
+  const groups = [
+    { key: 'head_of_state',    label: '👑 국가 원수' },
+    { key: 'military_command', label: '⚔️ 군 지휘부' },
+    { key: 'tech_ceo',         label: '💡 테크 CEO' },
+    { key: 'government',       label: '🏛️ 정부 기관' },
+    { key: 'investor',         label: '💰 투자자' },
+    { key: 'intelligence',     label: '🔎 정보기관' },
+  ];
+
+  return (
+    <DraggablePanel className="absolute top-16 left-16 z-[1000] w-72">
+      <div className="bg-black/92 backdrop-blur-md border border-white/10 rounded-lg overflow-hidden shadow-2xl">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-white/5">
+          <div className="flex items-center gap-2">
+            <span className="text-blue-400">✈</span>
+            <span className="text-xs font-bold font-mono text-white">VIP FLEET TRACKER</span>
+            <span className="text-[10px] text-gray-500 font-mono">/{VIP_HOME_BASES.length}기 추적</span>
+          </div>
+          <button onClick={onClose} className="text-gray-600 hover:text-white text-xs">✕</button>
+        </div>
+
+        <div className="overflow-y-auto max-h-96">
+          {groups.map(group => {
+            const bases = VIP_HOME_BASES.filter(b => b.category === group.key);
+            if (bases.length === 0) return null;
+            return (
+              <div key={group.key}>
+                <div className="px-3 py-1 text-[10px] text-gray-600 uppercase tracking-widest bg-white/3 border-b border-white/5">
+                  {group.label}
+                </div>
+                {bases.map(base => {
+                  const live = liveAircraft.find(a => a.icao24 === base.icao24);
+                  const isAirborne = live && !live.onGround;
+                  const color = AIRCRAFT_CAT_COLOR[base.category] ?? '#6b7280';
+                  return (
+                    <button
+                      key={base.icao24}
+                      onClick={() => { if (live) onSelect(base.icao24); }}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 border-b border-white/5 last:border-0 text-left transition-colors ${
+                        live ? 'hover:bg-white/8 cursor-pointer' : 'cursor-default opacity-60'
+                      }`}
+                    >
+                      {/* 상태 점 */}
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${
+                        isAirborne ? 'animate-pulse' : ''
+                      }`} style={{ background: isAirborne ? color : '#374151' }} />
+                      {/* 국기 + 이름 */}
+                      <span className="text-xs shrink-0">{base.flag}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-200 truncate leading-tight">{base.person ?? base.label}</div>
+                        <div className="text-[10px] text-gray-600 truncate">{base.label}</div>
+                      </div>
+                      {/* 상태 배지 */}
+                      <span className={`text-[10px] font-mono shrink-0 ${
+                        isAirborne ? 'text-green-400' :
+                        live ? 'text-gray-500' :
+                        'text-gray-700'
+                      }`}>
+                        {isAirborne ? '✈ 비행' : live ? '지상' : '미감지'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 푸터 */}
+        <div className="px-3 py-1.5 border-t border-white/5 flex items-center justify-between">
+          <span className="text-[10px] text-gray-700">OpenSky Network · 2분 갱신</span>
+          <span className="text-[10px] font-mono" style={{ color: liveAircraft.filter(a => !a.onGround).length > 0 ? '#4ade80' : '#6b7280' }}>
+            {liveAircraft.filter(a => !a.onGround).length > 0
+              ? `✈ ${liveAircraft.filter(a => !a.onGround).length}기 비행 중`
+              : '현재 비행 없음'}
+          </span>
+        </div>
+      </div>
+    </DraggablePanel>
+  );
 }
 
 // ─── 헬퍼 함수 ───────────────────────────────────────────────────────────────
@@ -502,13 +615,15 @@ const SEV_RADIUS: Record<GeoEvent['severity'], number> = {
 type CategoryKey = GeoEvent['category'];
 type SeverityFilter = 'all' | 'high' | 'critical';
 
-function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, severityFilter, onSeverityChange }: {
+function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, severityFilter, onSeverityChange, onFleetToggle, showFleet }: {
   layers: LayerState;
   onToggle: (key: keyof LayerState) => void;
   activeCategories: Set<CategoryKey>;
   onToggleCategory: (cat: CategoryKey) => void;
   severityFilter: SeverityFilter;
   onSeverityChange: (f: SeverityFilter) => void;
+  onFleetToggle?: () => void;
+  showFleet?: boolean;
 }) {
   const btns: { key: keyof LayerState; label: string; active: string }[] = [
     { key: 'threats',  label: '🎯 위협 핀',      active: 'text-red-400 border-red-500/50 bg-red-500/20' },
@@ -531,12 +646,26 @@ function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, se
     <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-1.5">
       {/* 레이어 토글 */}
       {btns.map(b => (
-        <button key={b.key} onClick={() => onToggle(b.key)}
-          className={`text-xs px-2.5 py-1 rounded border font-semibold transition-all backdrop-blur-sm ${
-            layers[b.key] ? b.active : 'text-gray-500 border-gray-700 bg-black/60 hover:text-gray-300'
-          }`}>
-          {b.label}
-        </button>
+        <div key={b.key} className="flex gap-1">
+          <button onClick={() => onToggle(b.key)}
+            className={`flex-1 text-xs px-2.5 py-1 rounded border font-semibold transition-all backdrop-blur-sm ${
+              layers[b.key] ? b.active : 'text-gray-500 border-gray-700 bg-black/60 hover:text-gray-300'
+            }`}>
+            {b.label}
+          </button>
+          {/* 항공기 레이어 활성화 시 플릿 오버뷰 버튼 */}
+          {b.key === 'aircraft' && layers.aircraft && onFleetToggle && (
+            <button
+              onClick={onFleetToggle}
+              title="전체 추적 목록"
+              className={`text-xs px-2 py-1 rounded border transition-all backdrop-blur-sm ${
+                showFleet
+                  ? 'text-blue-300 border-blue-400/60 bg-blue-500/20'
+                  : 'text-gray-500 border-gray-700 bg-black/60 hover:text-gray-300'
+              }`}
+            >📋</button>
+          )}
+        </div>
       ))}
 
       {/* 이벤트 필터 패널 — events 켜진 경우만 */}
@@ -865,6 +994,7 @@ export function WorldMapView() {
   // VIP 항공기 실시간 데이터
   const [liveAircraft, setLiveAircraft] = useState<VipAircraft[]>([]);
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
+  const [showFleetOverview, setShowFleetOverview] = useState(false);
 
   useEffect(() => {
     if (!layers.aircraft) return; // 레이어 꺼져 있으면 fetch 안 함
@@ -1164,6 +1294,8 @@ export function WorldMapView() {
         onToggleCategory={toggleCategory}
         severityFilter={severityFilter}
         onSeverityChange={setSeverityFilter}
+        onFleetToggle={() => setShowFleetOverview(s => !s)}
+        showFleet={showFleetOverview}
       />
 
       {/* 선택된 핫스팟 상세 패널 */}
@@ -1185,6 +1317,15 @@ export function WorldMapView() {
         if (!ac) return null;
         return <VipAircraftPanel ac={ac} onClose={() => setSelectedAircraftId(null)} />;
       })()}
+
+      {/* VIP 플릿 오버뷰 패널 */}
+      {layers.aircraft && showFleetOverview && (
+        <FleetOverviewPanel
+          liveAircraft={liveAircraft}
+          onSelect={(id) => { setSelectedAircraftId(id); setShowFleetOverview(false); }}
+          onClose={() => setShowFleetOverview(false)}
+        />
+      )}
 
       {/* NK 도발 세부 패널 */}
       {selectedNkId && (() => {

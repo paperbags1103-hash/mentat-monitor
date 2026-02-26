@@ -195,6 +195,55 @@ function buildFallbackEvents() {
   ];
 }
 
+// ─── NASA EONET 자연재해 fetch ────────────────────────────────────────────────
+const EONET_CATEGORY_MAP = {
+  volcanoes:    { category: 'disaster', severity: 'high',   titleSuffix: '화산 활동' },
+  severeStorms: { category: 'disaster', severity: 'high',   titleSuffix: '강풍·폭풍' },
+  wildfires:    { category: 'disaster', severity: 'medium', titleSuffix: '산불' },
+  earthquakes:  { category: 'disaster', severity: 'high',   titleSuffix: '지진' },
+  floods:       { category: 'disaster', severity: 'medium', titleSuffix: '홍수' },
+  landslides:   { category: 'disaster', severity: 'medium', titleSuffix: '산사태' },
+  seaLakeIce:   { category: 'disaster', severity: 'low',    titleSuffix: '해빙' },
+  drought:      { category: 'disaster', severity: 'low',    titleSuffix: '가뭄' },
+};
+
+async function fetchEonetEvents() {
+  try {
+    const res = await fetch(
+      'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=14&limit=30',
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const events = [];
+    for (const ev of (data.events ?? [])) {
+      const geo = ev.geometry?.[0];
+      if (!geo || geo.type !== 'Point') continue;
+      const [lng, lat] = geo.coordinates;
+      const catId = ev.categories?.[0]?.id ?? '';
+      const meta = EONET_CATEGORY_MAP[catId];
+      if (!meta) continue;
+      events.push({
+        id: `eonet_${ev.id}`,
+        lat,
+        lng,
+        region: ev.title,
+        category: meta.category,
+        severity: meta.severity,
+        titleKo: `${meta.titleSuffix}: ${ev.title}`,
+        summaryKo: `NASA EONET 감지 — ${ev.categories?.[0]?.title ?? catId}. ${ev.title}.`,
+        tags: [catId, 'eonet', '자연재해'],
+        investmentImpactKo: catId === 'earthquakes' ? '건설·보험주 관련 모니터링'
+          : catId === 'volcanoes' ? '항공편 결항, 농산물 공급 영향 가능'
+          : catId === 'wildfires' ? '목재·농산물·탄소크레딧 영향'
+          : null,
+        updatedAt: Date.now(),
+      });
+    }
+    return events;
+  } catch { return []; }
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 export default async function handler(req) {
   const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
@@ -213,8 +262,22 @@ export default async function handler(req) {
   const overrideKey = req.headers?.get?.('x-groq-key') ?? '';
   const groqKey = process.env.GROQ_API_KEY || overrideKey;
 
-  const headlines = await fetchRssHeadlines();
-  const events = await extractGeoEvents(headlines, groqKey);
+  const [headlines, eonetEvents] = await Promise.all([
+    fetchRssHeadlines(),
+    fetchEonetEvents(),
+  ]);
+  const groqEvents = await extractGeoEvents(headlines, groqKey);
+
+  // EONET 이벤트 merge — 근접 중복 제거 (같은 카테고리, 200km 이내)
+  const allEvents = [...groqEvents];
+  for (const eo of eonetEvents) {
+    const dup = allEvents.some(e =>
+      e.category === eo.category &&
+      Math.abs(e.lat - eo.lat) < 2 && Math.abs(e.lng - eo.lng) < 2
+    );
+    if (!dup) allEvents.push(eo);
+  }
+  const events = allEvents.slice(0, 25); // 최대 25개
 
   cache = events;
   cacheTs = Date.now();

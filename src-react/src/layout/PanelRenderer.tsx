@@ -20,6 +20,7 @@ import { ScenarioPanel }       from '@/panels/ScenarioPanel';
 import { VaRPanel }            from '@/panels/VaRPanel';
 import { SettingsPanel }       from '@/panels/SettingsPanel';
 import { StockDetailPanel }    from '@/panels/StockDetailPanel';
+import { PredictionPanel }     from '@/panels/PredictionPanel';
 
 interface Props { panel: PanelDef }
 
@@ -44,6 +45,7 @@ export function PanelRenderer({ panel }: Props) {
     case 'scenario':       return <ScenarioPanel />;
     case 'var':            return <VaRPanel />;
     case 'settings':       return <SettingsPanel />;
+    case 'prediction':     return <PredictionPanel />;
     case 'stock': {
       const cfg = {
         symbol:   (panel.config?.symbol   as string) ?? 'AAPL',

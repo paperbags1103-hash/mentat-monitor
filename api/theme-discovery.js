@@ -1,7 +1,7 @@
 /**
  * /api/theme-discovery
  *
- * AI-driven investment theme discovery via Groq (llama-3.3-70b-versatile).
+ * AI-driven investment theme discovery via Groq (llama-3.1-8b-instant).
  * Pulls recent signals/inferences from the insight-briefing, runs
  * cross-asset correlation analysis, and generates 4-6 investable narrative themes.
  *
@@ -15,7 +15,7 @@ const CACHE_TTL = 30 * 60_000;
 let cache = null;
 let cacheTs = 0;
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 
 // ── Static theme seeds (fallback when Groq unavailable) ────────────────────
 // 2026 기준 — 현재 시장 핵심 테마

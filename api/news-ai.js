@@ -14,8 +14,7 @@ import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 export const config = { runtime: 'edge' };
 
 const CACHE_TTL_MS = 10 * 60_000;
-let cache = null;
-let cacheTs = 0;
+const caches = new Map(); // key → { data, ts }
 
 // ─── RSS 소스 ─────────────────────────────────────────────────────────────────
 const RSS_SOURCES = [
@@ -70,14 +69,18 @@ async function fetchRSS(url) {
 }
 
 // ─── Groq 요약 ────────────────────────────────────────────────────────────────
-async function summarizeWithGroq(headlines, apiKey) {
+async function summarizeWithGroq(headlines, apiKey, portfolioTickers = []) {
   const headlineText = headlines
     .map((h, i) => `${i + 1}. [${h.source}] ${h.title}`)
     .join('\n');
 
+  const portfolioHint = portfolioTickers.length > 0
+    ? `\n사용자 보유 종목: ${portfolioTickers.join(', ')}.\n이 종목들과 관련된 뉴스를 최우선 선별하고, koreanTickers에 해당 종목명을 반드시 포함하세요.\n`
+    : '';
+
   const prompt = `당신은 한국 개인 투자자를 위한 글로벌 금융 뉴스 분석가입니다.
 다음 영문 뉴스 헤드라인을 분석하여, 한국 주식/ETF 투자에 중요한 순서로 5개를 선별해 JSON으로 반환하세요.
-
+${portfolioHint}
 헤드라인:
 ${headlineText}
 
@@ -150,10 +153,19 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
 
+  // 포트폴리오 파라미터
+  const url = new URL(req.url);
+  const portfolioParam = url.searchParams.get('portfolio') || '';
+  const portfolioTickers = portfolioParam
+    ? portfolioParam.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+  const cacheKey = portfolioTickers.length > 0 ? `portfolio:${portfolioParam}` : 'default';
+
   // 캐시 확인
   const now = Date.now();
-  if (cache && now - cacheTs < CACHE_TTL_MS) {
-    return new Response(JSON.stringify(cache), {
+  const cached = caches.get(cacheKey);
+  if (cached && now - cached.ts < CACHE_TTL_MS) {
+    return new Response(JSON.stringify(cached.data), {
       headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT', ...corsHeaders },
     });
   }
@@ -176,7 +188,7 @@ export default async function handler(req) {
     let result;
     if (groqKey && unique.length > 0) {
       try {
-        result = await summarizeWithGroq(unique.slice(0, 12), groqKey);
+        result = await summarizeWithGroq(unique.slice(0, 12), groqKey, portfolioTickers);
       } catch (e) {
         console.error('Groq error:', e.message);
         result = buildFallback(unique);
@@ -190,10 +202,10 @@ export default async function handler(req) {
       generatedAt: now,
       rawCount: unique.length,
       hasAI: !!groqKey && !result.fallback,
+      portfolioMode: portfolioTickers.length > 0,
     };
 
-    cache = payload;
-    cacheTs = now;
+    caches.set(cacheKey, { data: payload, ts: now });
 
     return new Response(JSON.stringify(payload), {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600', 'X-Cache': 'MISS', ...corsHeaders },

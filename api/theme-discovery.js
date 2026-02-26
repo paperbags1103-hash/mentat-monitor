@@ -17,55 +17,56 @@ let cacheTs = 0;
 
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-// ── Static theme seeds (enriched dynamically) ──────────────────────────────
+// ── Static theme seeds (fallback when Groq unavailable) ────────────────────
+// 2026 기준 — 현재 시장 핵심 테마
 const THEME_SEEDS = [
   {
-    id: 'ai_infra_bottleneck',
-    nameKo: 'AI 인프라 병목',
-    keywords: ['반도체', 'AI', '데이터센터', '전력', 'HBM', '엔비디아', 'TSM'],
-    relatedAssets: ['삼성전자', 'SK하이닉스', 'NVDA', 'TSM', 'TSLA'],
+    id: 'defense_supercycle',
+    nameKo: '방산 슈퍼사이클',
+    keywords: ['방산', 'NATO', '재무장', '한화에어로스페이스', 'LIG넥스원', '폴란드', '수출'],
+    relatedAssets: ['한화에어로스페이스', 'LIG넥스원', '현대로템', 'HD현대중공업', 'LMT', 'RTX'],
   },
   {
-    id: 'us_credit_stress',
-    nameKo: '미국 신용 스트레스',
-    keywords: ['HY 스프레드', '리파이낸싱', '정크본드', '연준', '금리'],
-    relatedAssets: ['HYG', 'LQD', '미국 국채', '달러'],
+    id: 'ai_agent_infra',
+    nameKo: 'AI 에이전트 인프라',
+    keywords: ['AI 에이전트', 'MCP', 'LLM', 'HBM', '데이터센터', '엔비디아', 'SK하이닉스'],
+    relatedAssets: ['SK하이닉스', '삼성전자', 'NVDA', 'MSFT', 'TIGER AI반도체'],
   },
   {
-    id: 'china_stimulus_trade',
-    nameKo: '중국 경기부양 트레이드',
-    keywords: ['중국 경기부양', '위안화', 'FXI', '원자재', '구리'],
-    relatedAssets: ['포스코홀딩스', 'FXI', '구리', '철광석'],
+    id: 'korea_valup_foreigners',
+    nameKo: '코스피 밸류업',
+    keywords: ['밸류업', '외국인 순매수', '코스피', '탄핵', '정치리스크 해소', '저PBR'],
+    relatedAssets: ['KODEX 200', '삼성전자', '현대차', 'KB금융', '신한지주'],
   },
   {
-    id: 'safe_haven_rotation',
-    nameKo: '안전자산 로테이션',
-    keywords: ['지정학', '달러강세', '금', '국채', '스위스 프랑'],
-    relatedAssets: ['금', 'TLT', 'USD', 'CHF', '달러'],
+    id: 'trump_tariff_hedge',
+    nameKo: '트럼프 관세 헤지',
+    keywords: ['관세', '트럼프', '무역전쟁', '달러강세', '환율', '수출 타격'],
+    relatedAssets: ['USD/KRW', '달러 ETF', 'KODEX 미국달러선물', '내수주'],
   },
   {
-    id: 'korea_export_cycle',
-    nameKo: '한국 수출 싸이클',
-    keywords: ['반도체 수출', '자동차', '조선', '환율', '미국 관세'],
-    relatedAssets: ['삼성전자', '현대차', 'HD현대중공업', 'USD/KRW'],
+    id: 'nuclear_ai_power',
+    nameKo: '원전·AI 전력 인프라',
+    keywords: ['원전', '데이터센터 전력', '전력망', 'SMR', '두산에너빌리티', 'LS ELECTRIC'],
+    relatedAssets: ['두산에너빌리티', 'LS ELECTRIC', '한전기술', 'CEG', 'VST'],
   },
   {
-    id: 'energy_transition',
-    nameKo: '에너지 전환 가속',
-    keywords: ['원전', '재생에너지', '탄소', 'LNG', '그린수소'],
-    relatedAssets: ['두산에너빌리티', 'ENPH', 'WTI', 'LNG'],
+    id: 'hbm4_memory_race',
+    nameKo: 'HBM4 메모리 경쟁',
+    keywords: ['HBM4', 'HBM3e', '고대역폭메모리', 'SK하이닉스', '삼성전자', '마이크론', 'AI반도체'],
+    relatedAssets: ['SK하이닉스', '삼성전자', 'MU', 'AMAT', 'LRCX'],
   },
   {
-    id: 'taiwan_strait_risk',
-    nameKo: '대만해협 리스크',
-    keywords: ['대만', '중국', '지정학', '반도체', '공급망'],
-    relatedAssets: ['TSM', 'AMAT', '삼성전자', '방산주'],
+    id: 'china_ai_rise',
+    nameKo: '중국 AI 굴기',
+    keywords: ['딥시크', 'DeepSeek', '중국AI', '알리바바AI', 'Tencent', '바이두', 'Kimi'],
+    relatedAssets: ['알리바바(9988.HK)', '텐센트(0700.HK)', 'BIDU', 'KWEB', '中芯国际(0981.HK)'],
   },
   {
-    id: 'em_currency_stress',
-    nameKo: '신흥국 통화 압박',
-    keywords: ['달러강세', '신흥국', 'EM', '원화', '환율'],
-    relatedAssets: ['USD/KRW', 'EEM', '한국 수출주'],
+    id: 'bitcoin_institutionalization',
+    nameKo: '비트코인 기관화',
+    keywords: ['비트코인', '현물ETF', '기관투자', '코인베이스', '마이크로스트래티지', '암호화폐'],
+    relatedAssets: ['COIN', 'MSTR', 'IBIT', 'FBTC', 'BTC'],
   },
 ];
 
@@ -83,11 +84,21 @@ async function discoverThemes(signals, inferences, marketSnapshot, overrideGroqK
 
   const mktStr = marketSnapshot ? JSON.stringify(marketSnapshot, null, 2) : '데이터 없음';
 
-  const prompt = `
-당신은 한국 기관투자자를 위한 금융 인텔리전스 분석가입니다.
-아래 데이터를 분석하여, 현재 시장에서 활성화된 투자 테마를 4~6개 발견해주세요.
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일`;
 
-## 현재 신호
+  const prompt = `
+당신은 한국 개인투자자를 위한 금융 인텔리전스 분석가입니다.
+오늘은 ${dateStr}입니다.
+
+## 2026년 현재 시장 배경
+- 방산 슈퍼사이클: 유럽 NATO 재무장, 한화에어로스페이스·LIG넥스원 수출 급증
+- AI 에이전트 인프라: LLM → AI 에이전트 전환, HBM4 경쟁, 전력 인프라 수요
+- 트럼프 관세: 반도체·자동차 관세 리스크, 달러 강세 압력
+- 한국 정치 리스크 해소 후 코스피 밸류업 + 외국인 복귀 흐름
+- 중국 AI 굴기(DeepSeek 이후), 비트코인 기관화 지속
+
+## 현재 실시간 신호
 ${signalSummary || '(신호 없음)'}
 
 ## AI 인퍼런스
@@ -97,6 +108,8 @@ ${inferenceSummary || '(인퍼런스 없음)'}
 ${mktStr}
 
 ## 지시사항
+위 데이터와 배경을 종합해, **지금 이 순간** 가장 강하게 작동 중인 투자 테마 4~6개를 발굴하세요.
+현재 시장 흐름에 실제로 맞는 테마만 선정하고, 트렌드가 지난 테마는 제외하세요.
 반드시 아래 JSON 배열만 출력하세요 (다른 텍스트 없이):
 [
   {
@@ -179,9 +192,24 @@ async function fetchMarketSnapshot() {
     const base = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:46123';
-    const res = await fetch(`${base}/api/korea-market`, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return null;
-    return res.json();
+    const [koreaRes, macroRes] = await Promise.allSettled([
+      fetch(`${base}/api/korea-market`, { signal: AbortSignal.timeout(4000) }),
+      fetch(`${base}/api/global-macro`, { signal: AbortSignal.timeout(4000) }),
+    ]);
+    const korea = koreaRes.status === 'fulfilled' && koreaRes.value.ok ? await koreaRes.value.json() : null;
+    const macro = macroRes.status === 'fulfilled' && macroRes.value.ok ? await macroRes.value.json() : null;
+
+    const fmtPct = (v) => v != null ? `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}%` : null;
+    return {
+      kospi:  korea?.kospi  ? `${fmtPct(korea.kospi.changePercent)}`  : null,
+      kosdaq: korea?.kosdaq ? `${fmtPct(korea.kosdaq.changePercent)}` : null,
+      usdkrw: korea?.usdkrw ? `${fmtPct(korea.usdkrw.changePercent)}` : null,
+      spx:    macro?.spx    ? `${fmtPct(macro.spx.changePct)}`   : null,
+      nasdaq: macro?.nasdaq ? `${fmtPct(macro.nasdaq.changePct)}` : null,
+      vix:    macro?.vix    ? `${macro.vix.price?.toFixed(1)}`   : null,
+      gold:   macro?.gold   ? `${fmtPct(macro.gold.changePct)}`  : null,
+      oil:    macro?.oil    ? `${fmtPct(macro.oil.changePct)}`   : null,
+    };
   } catch { return null; }
 }
 

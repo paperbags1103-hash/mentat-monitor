@@ -194,7 +194,7 @@ function SymbolPicker({ current, onSelect, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-panel border border-border rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]"
+      <div className="bg-panel border border-border rounded-lg w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]"
         onClick={e => e.stopPropagation()}>
 
         {/* 헤더 + 검색 */}

@@ -20,7 +20,7 @@ function ThemeCard({ theme }: { theme: ActiveTheme }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div
-      className="bg-surface border border-border rounded-lg p-3 hover:border-accent/50 transition-all cursor-pointer"
+      className="bg-surface border border-border rounded p-3 hover:border-accent/50 transition-all cursor-pointer"
       onClick={() => setExpanded(e => !e)}
     >
       <div className="flex items-start justify-between gap-2 mb-2">

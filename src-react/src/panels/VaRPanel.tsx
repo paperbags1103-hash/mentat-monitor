@@ -133,7 +133,7 @@ export function VaRPanel() {
       {/* VaR results */}
       <div className="grid grid-cols-2 gap-2 mb-4">
         {[var95, var99].map(v => (
-          <div key={v.confidence} className="bg-surface rounded-lg p-3 border border-border">
+          <div key={v.confidence} className="bg-surface rounded p-3 border border-border">
             <div className="text-xs text-muted mb-1">{v.confidence}% VaR ({v.horizon}일)</div>
             <div className={`text-lg font-bold tabular-nums ${riskColor}`}>
               -{v.varPct.toFixed(1)}%
@@ -167,7 +167,7 @@ export function VaRPanel() {
 
       {/* Geopolitical overlay */}
       {globalRiskScore >= 40 && (
-        <div className="mb-4 p-2.5 rounded-lg bg-risk-elevated/10 border border-risk-elevated/30">
+        <div className="mb-4 p-2.5 rounded bg-risk-elevated/10 border border-risk-elevated/30">
           <div className="text-xs font-bold text-risk-elevated mb-1">⚠️ 지정학 리스크 오버레이</div>
           <p className="text-xs text-secondary">
             현재 위협 지수 {globalRiskScore}로 {globalRiskScore >= 70 ? '위험' : '경계'} 수준.

@@ -20,11 +20,11 @@ function MiniTicker({ label, value, change, unit, highlight }: MiniTickerProps) 
   return (
     <div className="flex flex-col items-center px-3 py-1.5 border-r border-border/50 last:border-0 min-w-[80px]">
       <span className="text-xs text-muted uppercase tracking-wide whitespace-nowrap">{label}</span>
-      <span className={`text-xs font-bold tabular-nums ${hlCls || 'text-primary'} whitespace-nowrap`}>
+      <span className={`text-xs font-bold tabular-nums font-mono ${hlCls || 'text-primary'} whitespace-nowrap`}>
         {unit}{value}
       </span>
       {change != null && (
-        <span className={`text-xs tabular-nums ${upChg ? 'text-risk-safe' : dnChg ? 'text-risk-critical' : 'text-muted'}`}>
+        <span className={`text-xs tabular-nums font-mono ${upChg ? 'text-risk-safe' : dnChg ? 'text-risk-critical' : 'text-muted'}`}>
           {upChg ? '+' : ''}{change.toFixed(2)}%
         </span>
       )}

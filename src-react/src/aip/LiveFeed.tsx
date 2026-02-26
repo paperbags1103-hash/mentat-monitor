@@ -175,7 +175,7 @@ function CausalChainCard({ chain }: { chain: CausalChain }) {
 function ConvergenceCard({ conv }: { conv: SignalConvergence }) {
   const dir = DIR_CONFIG[conv.direction] ?? DIR_CONFIG.neutral;
   return (
-    <div className="border border-gray-700/60 rounded-lg p-2.5 mb-2 bg-gray-900/30">
+    <div className="border border-gray-700/60 rounded p-2.5 mb-2 bg-gray-900/30">
       <div className="flex items-start gap-1.5 mb-1.5">
         <span className="text-xs shrink-0">🌡️</span>
         <span className="text-xs font-bold flex-1 leading-tight">{conv.patternKo}</span>
@@ -234,8 +234,13 @@ function OntologyTab() {
             'text-gray-500 border-gray-700'
           }`}>{ctx.urgencyLevel === 'high' ? '🔴' : ctx.urgencyLevel === 'medium' ? '🟡' : '🟢'} {ctx.urgencyLevel === 'high' ? '주의' : ctx.urgencyLevel === 'medium' ? '모니터링' : '안정'}</span>
         )}
-        {genTime && <span className="text-xs text-gray-600 ml-auto">{genTime}</span>}
-        {loading && <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse shrink-0" />}
+        {genTime && <span className="text-xs text-gray-600 ml-auto font-mono">{genTime}</span>}
+        {loading && (
+          <span className="inline-flex items-center gap-1 shrink-0">
+            <span className="text-blue-400 text-xs">●</span>
+            <span className="text-xs text-blue-400 font-mono tracking-widest">ACTIVE</span>
+          </span>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-1">
@@ -301,8 +306,10 @@ export function LiveFeed() {
       <div className="px-3 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs font-bold text-primary uppercase tracking-widest">LIVE FEED</span>
-          {isLoading && <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />}
-          {!isLoading && <div className="w-2 h-2 bg-risk-safe rounded-full" />}
+          <span className="inline-flex items-center gap-1">
+            <span className="text-blue-400 text-xs">●</span>
+            <span className="text-xs text-blue-400 font-mono tracking-widest">{isLoading ? 'LIVE' : 'ACTIVE'}</span>
+          </span>
           {ts && <span className="text-xs text-muted ml-auto">{ts}</span>}
         </div>
         {/* Tabs */}
@@ -368,7 +375,7 @@ export function LiveFeed() {
               <div className="flex items-center justify-center h-32 text-muted text-xs">테마 발견 중…</div>
             ) : (
               activeThemes.map(t => (
-                <div key={t.id} className="border border-border rounded-lg p-2.5 mb-2">
+                <div key={t.id} className="border border-border rounded p-2.5 mb-2">
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-xs font-bold text-primary">{t.nameKo}</span>
                     <span className={`text-xs font-semibold ${

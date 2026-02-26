@@ -42,7 +42,7 @@ function KeyField({ label, name, value, onChange, link, desc, placeholder }: Key
   const [show, setShow] = useState(false);
   const hasValue = value.length > 0;
   return (
-    <div className="mb-4 p-3 bg-surface border border-border rounded-lg">
+    <div className="mb-4 p-3 bg-surface border border-border rounded">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-primary">{label}</span>
@@ -132,7 +132,7 @@ export function SettingsPanel() {
           placeholder="demo..."
         />
 
-        <div className="border border-border/50 rounded-lg p-3 mt-4 bg-surface/50">
+        <div className="border border-border/50 rounded p-3 mt-4 bg-surface/50">
           <div className="text-xs font-bold text-primary mb-2">🔑 키 없이도 작동하는 기능</div>
           <div className="space-y-1">
             {[
@@ -151,7 +151,7 @@ export function SettingsPanel() {
           </div>
         </div>
 
-        <div className="border border-accent/30 rounded-lg p-3 mt-3 bg-accent/5">
+        <div className="border border-accent/30 rounded p-3 mt-3 bg-accent/5">
           <div className="text-xs font-bold text-accent-light mb-2">⚡ API 키 있으면 추가되는 기능</div>
           <div className="space-y-1">
             {[

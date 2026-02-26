@@ -323,7 +323,7 @@ function GeoRiskTab({ holdings }: { holdings: HoldingWithPnL[] }) {
 
           {/* 확장 뷰 */}
           {expandedId === h.id && (
-            <div className="ml-4 mt-1 mb-2 px-2 py-2 bg-surface/60 rounded-lg border border-border/40 space-y-1.5">
+            <div className="ml-4 mt-1 mb-2 px-2 py-2 bg-surface/60 rounded border border-border/40 space-y-1.5">
               {h.matchedInferences.length > 0 && (
                 <div className="text-xs text-risk-elevated">⚠ 활성 위협: {h.matchedInferences.map(i => i.titleKo).join(', ')}</div>
               )}
@@ -442,7 +442,7 @@ function HoldingForm({ title, submitLabel, initial = {}, onSubmit, onClose }: Ho
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <form className="bg-panel border border-border rounded-xl w-full max-w-md shadow-2xl p-5"
+      <form className="bg-panel border border-border rounded-lg w-full max-w-md shadow-2xl p-5"
         onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
         <h3 className="text-sm font-bold text-primary mb-4">{title}</h3>
 

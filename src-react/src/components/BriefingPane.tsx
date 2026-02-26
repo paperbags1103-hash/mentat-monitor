@@ -141,19 +141,19 @@ export function BriefingPane() {
                 <div className="flex flex-col gap-2">
                   <p className="text-xs font-bold text-muted uppercase tracking-widest">투자 전망</p>
                   {outlookShort && (
-                    <div className="bg-surface/60 rounded-lg p-3 border border-border/60">
+                    <div className="bg-surface/60 rounded p-3 border border-border/60">
                       <p className="text-xs font-bold text-green-400 mb-1">📅 단기 (1개월)</p>
                       <p className="text-xs text-secondary leading-relaxed">{outlookShort}</p>
                     </div>
                   )}
                   {outlookMid && (
-                    <div className="bg-surface/60 rounded-lg p-3 border border-border/60">
+                    <div className="bg-surface/60 rounded p-3 border border-border/60">
                       <p className="text-xs font-bold text-yellow-400 mb-1">📆 중기 (3-6개월)</p>
                       <p className="text-xs text-secondary leading-relaxed">{outlookMid}</p>
                     </div>
                   )}
                   {outlookLong && (
-                    <div className="bg-surface/60 rounded-lg p-3 border border-border/60">
+                    <div className="bg-surface/60 rounded p-3 border border-border/60">
                       <p className="text-xs font-bold text-blue-400 mb-1">🔭 장기 (1년+)</p>
                       <p className="text-xs text-secondary leading-relaxed">{outlookLong}</p>
                     </div>
@@ -165,7 +165,7 @@ export function BriefingPane() {
               {((riskOn?.length ?? 0) > 0 || (riskOff?.length ?? 0) > 0) && (
                 <div className="grid grid-cols-2 gap-2">
                   {(riskOn?.length ?? 0) > 0 && (
-                    <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
+                    <div className="bg-green-500/5 border border-green-500/20 rounded p-3">
                       <p className="text-xs font-bold text-green-400 mb-2">📈 리스크 ON</p>
                       {riskOn!.map((item, i) => (
                         <p key={i} className="text-xs text-secondary mb-1">▸ {item}</p>
@@ -173,7 +173,7 @@ export function BriefingPane() {
                     </div>
                   )}
                   {(riskOff?.length ?? 0) > 0 && (
-                    <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
+                    <div className="bg-blue-500/5 border border-blue-500/20 rounded p-3">
                       <p className="text-xs font-bold text-blue-400 mb-2">🛡️ 리스크 OFF</p>
                       {riskOff!.map((item, i) => (
                         <p key={i} className="text-xs text-secondary mb-1">▸ {item}</p>

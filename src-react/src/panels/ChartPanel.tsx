@@ -118,11 +118,11 @@ export function ChartPanel({ symbol, nameKo }: Props) {
         <span className="text-[10px] text-muted leading-none">{symbol}</span>
         {lastPrice !== null && (
           <>
-            <span className="text-sm font-bold tabular-nums text-primary">
+            <span className="text-sm font-bold tabular-nums font-mono text-primary">
               {lastPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             {change !== null && (
-              <span className={`text-xs font-semibold ${up ? 'text-risk-safe' : 'text-risk-critical'}`}>
+              <span className={`text-xs font-semibold font-mono ${up ? 'text-risk-safe' : 'text-risk-critical'}`}>
                 {up ? '+' : ''}{change.toFixed(2)}%
               </span>
             )}

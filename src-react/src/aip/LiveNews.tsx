@@ -78,7 +78,12 @@ function RSSTab() {
           className="flex-1 text-xs bg-transparent border border-border text-muted rounded px-1 py-0.5 outline-none">
           {RSS_SOURCES.map((s, i) => <option key={i} value={i}>{s.label}</option>)}
         </select>
-        {loading && <span className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse shrink-0" />}
+        {loading && (
+          <span className="inline-flex items-center gap-1 shrink-0">
+            <span className="text-blue-400 text-xs">●</span>
+            <span className="text-xs text-blue-400 font-mono tracking-widest">LIVE</span>
+          </span>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {items.length === 0 ? (
@@ -179,7 +184,12 @@ function AITab() {
           {hasAI ? '🧠 AI' : '📰'}
         </span>
         {genTime && <span className="text-xs text-gray-600 ml-auto">{genTime}</span>}
-        {loading && <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse shrink-0" />}
+        {loading && (
+          <span className="inline-flex items-center gap-1 shrink-0">
+            <span className="text-blue-400 text-xs">●</span>
+            <span className="text-xs text-blue-400 font-mono tracking-widest">ACTIVE</span>
+          </span>
+        )}
       </div>
 
       {/* 아이템 목록 */}

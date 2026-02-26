@@ -42,17 +42,26 @@ function RSSTab() {
     setLoading(true);
     const src = RSS_SOURCES[idx];
     try {
-      const data = await apiFetch<{ items?: Array<{ title?: string; link?: string; pubDate?: string }> }>(
-        `/api/rss-proxy?url=${encodeURIComponent(src.url)}`
-      );
+      // rss-proxy는 raw XML 반환 → DOMParser로 파싱
+      const resp = await fetch(`/api/rss-proxy?url=${encodeURIComponent(src.url)}`);
+      const text = await resp.text();
       if (!mountedRef.current) return;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/xml');
+      const xmlItems = Array.from(doc.querySelectorAll('item'));
+
       setItems(
-        (data?.items ?? []).slice(0, 10).map(i => ({
-          title:   i.title ?? '',
-          link:    i.link ?? '#',
-          pubDate: i.pubDate ?? '',
-          source:  src.label,
-        }))
+        xmlItems.slice(0, 15).map(el => {
+          const title   = el.querySelector('title')?.textContent?.trim() ?? '';
+          const pubDate = el.querySelector('pubDate')?.textContent?.trim() ?? '';
+          // <link> 태그는 XML에서 직접 접근이 불안정 — 텍스트 노드로 처리
+          const linkEl  = el.getElementsByTagName('link')[0];
+          const link    = linkEl?.textContent?.trim()
+                       || el.querySelector('guid')?.textContent?.trim()
+                       || '#';
+          return { title, link, pubDate, source: src.label };
+        }).filter(i => i.title)
       );
     } catch { /* graceful */ }
     finally { if (mountedRef.current) setLoading(false); }

@@ -124,12 +124,12 @@ rules:
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
-      max_tokens: 2000,
+      max_tokens: 1200,
     }),
-    signal: AbortSignal.timeout(25000),
+    signal: AbortSignal.timeout(6000),
   });
 
   if (!res.ok) throw new Error(`Groq ${res.status}`);
@@ -196,9 +196,9 @@ export default async function handler(req) {
   try {
     // 병렬로 데이터 수집
     const [geoEventsRaw, marketRaw, macroRaw] = await Promise.all([
-      fetchJson(`${base}/api/geo-events`, 12000),
-      fetchJson(`${base}/api/korea-market`, 10000),
-      fetchJson(`${base}/api/global-macro`, 10000),
+      fetchJson(`${base}/api/geo-events`, 5000),
+      fetchJson(`${base}/api/korea-market`, 4000),
+      fetchJson(`${base}/api/global-macro`, 4000),
     ]);
 
     const geoEvents = geoEventsRaw?.events ?? geoEventsRaw ?? [];

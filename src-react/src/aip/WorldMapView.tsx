@@ -289,7 +289,49 @@ interface LayerState {
   aircraft: boolean;
   shipping: boolean;
   events: boolean;
+  semiconductors: boolean;
+  nkHistory: boolean;
 }
+
+// ─── 반도체 공급망 노드 ───────────────────────────────────────────────────────
+interface SemiNode { symbol: string; nameKo: string; role: string; lat: number; lng: number; }
+const SEMI_ROLE_COLOR: Record<string, string> = {
+  memory: '#3b82f6', fab: '#ef4444', equipment: '#22c55e', design: '#f59e0b', integrated: '#a855f7',
+};
+const SEMI_NODES: SemiNode[] = [
+  { symbol: '005930.KS', nameKo: '삼성전자',          role: 'memory',     lat: 37.27, lng: 127.05 },
+  { symbol: '000660.KS', nameKo: 'SK하이닉스',         role: 'memory',     lat: 37.41, lng: 127.25 },
+  { symbol: 'TSM',       nameKo: 'TSMC',              role: 'fab',        lat: 24.78, lng: 120.97 },
+  { symbol: 'ASML',      nameKo: 'ASML (EUV장비)',     role: 'equipment',  lat: 51.44, lng: 5.48   },
+  { symbol: 'NVDA',      nameKo: '엔비디아',            role: 'design',     lat: 37.37, lng: -121.97},
+  { symbol: 'INTC',      nameKo: '인텔',               role: 'integrated', lat: 45.52, lng: -122.97},
+  { symbol: 'AMD',       nameKo: 'AMD',               role: 'design',     lat: 37.33, lng: -121.92},
+  { symbol: 'AMAT',      nameKo: '어플라이드 머티리얼즈', role: 'equipment',  lat: 37.39, lng: -121.97},
+  { symbol: 'LRCX',      nameKo: '램 리서치',           role: 'equipment',  lat: 37.65, lng: -121.80},
+  { symbol: '6857.T',    nameKo: '어드밴테스트',         role: 'equipment',  lat: 35.69, lng: 139.69 },
+];
+
+// ─── 북한 도발 이력 ───────────────────────────────────────────────────────────
+type NKType = 'missile_test' | 'nuclear_test' | 'cyber' | 'maritime' | 'artillery' | 'rhetoric';
+interface NKEvent { id: string; date: string; type: NKType; title: string; desc: string; lat: number; lng: number; severity: number; }
+const NK_TYPE_COLOR: Record<NKType, string> = {
+  missile_test: '#ef4444', nuclear_test: '#7c3aed', cyber: '#f97316',
+  maritime: '#0ea5e9', artillery: '#84cc16', rhetoric: '#6b7280',
+};
+const NK_TYPE_KO: Record<NKType, string> = {
+  missile_test: '미사일', nuclear_test: '핵실험', cyber: '사이버',
+  maritime: '해상', artillery: '포격', rhetoric: '위협 발언',
+};
+const NK_EVENTS: NKEvent[] = [
+  { id: 'nk1', date: '2024-11-05', type: 'missile_test', title: 'ICBM 화성-19형 발사', desc: '역대 최장거리 ICBM. 비행시간 86분, 고도 7,000km 이상. 미 본토 전역 사정권 과시.', lat: 39.03, lng: 125.75, severity: 5 },
+  { id: 'nk2', date: '2024-09-10', type: 'rhetoric',     title: '대남 오물 풍선 살포', desc: '한국 대북 확성기 방송 대응, 오물·쓰레기 풍선 수백 개 살포.', lat: 37.9, lng: 126.5, severity: 2 },
+  { id: 'nk3', date: '2024-06-02', type: 'cyber',        title: 'GPS 전파 교란', desc: '서해 해역 및 인천공항 항공기 GPS 신호 교란. 항공 운항 차질.', lat: 37.46, lng: 126.44, severity: 3 },
+  { id: 'nk4', date: '2024-04-02', type: 'missile_test', title: '전략순항미사일 발사', desc: '서해상으로 전략순항미사일 다수 발사.', lat: 39.5, lng: 125.0, severity: 3 },
+  { id: 'nk5', date: '2023-11-21', type: 'missile_test', title: '군사정찰위성 1호 성공', desc: '군사정찰위성 만리경-1호 궤도 진입. 군사 ISR 능력 획득.', lat: 39.9, lng: 124.7, severity: 4 },
+  { id: 'nk6', date: '2023-03-16', type: 'missile_test', title: '화성-17 ICBM', desc: '최대사거리 ICBM 발사. 미 본토 전역 사정권 과시.', lat: 39.03, lng: 125.75, severity: 5 },
+  { id: 'nk7', date: '2022-10-04', type: 'missile_test', title: '중거리 미사일 일본 상공', desc: '화성-12가 일본 열도 상공 통과. 4,600km 비행.', lat: 39.5, lng: 128.0, severity: 5 },
+  { id: 'nk8', date: '2022-09-25', type: 'missile_test', title: '탄도미사일 6발 동시 발사', desc: '단거리 탄도미사일 6발 동해상 발사. 역대 최다 동시 발사.', lat: 39.2, lng: 127.1, severity: 4 },
+];
 
 // ─── 지리 이벤트 (뉴스 기반) ─────────────────────────────────────────────────
 interface GeoEvent {
@@ -336,7 +378,9 @@ function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, se
     { key: 'arcs',     label: '⚡ 영향선',       active: 'text-purple-400 border-purple-500/50 bg-purple-500/20' },
     { key: 'aircraft', label: '✈ VIP 항공기',    active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
     { key: 'shipping', label: '🚢 해운 항로',     active: 'text-cyan-400 border-cyan-500/50 bg-cyan-500/20' },
-    { key: 'events',   label: '📌 뉴스 이벤트',  active: 'text-pink-400 border-pink-500/50 bg-pink-500/20' },
+    { key: 'events',        label: '📌 뉴스 이벤트',  active: 'text-pink-400 border-pink-500/50 bg-pink-500/20' },
+    { key: 'semiconductors', label: '🔵 반도체 공급망', active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
+    { key: 'nkHistory',      label: '⚡ 북한 도발 이력', active: 'text-yellow-400 border-yellow-500/50 bg-yellow-500/20' },
   ];
 
   const sevOptions: { key: SeverityFilter; label: string }[] = [
@@ -628,7 +672,12 @@ export function WorldMapView() {
     aircraft: false,
     shipping: false,
     events: true,
+    semiconductors: false,
+    nkHistory: false,
   });
+
+  // NK 도발 선택 상태
+  const [selectedNkId, setSelectedNkId] = useState<string | null>(null);
 
   // 선택된 핫스팟
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -849,6 +898,53 @@ export function WorldMapView() {
           );
         })}
 
+        {/* ── 반도체 공급망 핀 ── */}
+        {layers.semiconductors && SEMI_NODES.map(node => {
+          const color = SEMI_ROLE_COLOR[node.role] ?? '#94a3b8';
+          return (
+            <CircleMarker key={node.symbol}
+              center={[node.lat, node.lng]}
+              radius={9}
+              pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: 2 }}
+            >
+              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${color}55`, fontFamily: 'system-ui' }}>
+                  <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: '3px' }}>{node.nameKo}</div>
+                  <div style={{ fontSize: '10px', color, fontWeight: 600 }}>{node.role.toUpperCase()}</div>
+                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>{node.symbol}</div>
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+        {/* ── 북한 도발 이력 핀 ── */}
+        {layers.nkHistory && NK_EVENTS.map(ev => {
+          const color = NK_TYPE_COLOR[ev.type] ?? '#6b7280';
+          const radius = ev.severity >= 5 ? 11 : ev.severity === 4 ? 9 : ev.severity === 3 ? 7 : 5;
+          return (
+            <CircleMarker key={ev.id}
+              center={[ev.lat, ev.lng]}
+              radius={radius}
+              pathOptions={{ color, fillColor: color, fillOpacity: 0.8, weight: 2, dashArray: '4 3' }}
+              eventHandlers={{
+                click: () => setSelectedNkId(prev => prev === ev.id ? null : ev.id),
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${color}55`, fontFamily: 'system-ui', minWidth: '140px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '10px', color, fontWeight: 700 }}>{NK_TYPE_KO[ev.type]}</span>
+                    <span style={{ fontSize: '10px', color: '#475569' }}>{ev.date}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 600 }}>{ev.title}</div>
+                  <div style={{ fontSize: '10px', color: '#475569', marginTop: '2px' }}>클릭 → 세부정보</div>
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
         {/* ── VIP 항공기 ── */}
         {layers.aircraft && VIP_AIRCRAFT.map(ac => (
           <CircleMarker key={ac.id}
@@ -903,6 +999,40 @@ export function WorldMapView() {
           onClose={() => setSelectedEventId(null)}
         />
       )}
+
+      {/* NK 도발 세부 패널 */}
+      {selectedNkId && (() => {
+        const ev = NK_EVENTS.find(e => e.id === selectedNkId);
+        if (!ev) return null;
+        const color = NK_TYPE_COLOR[ev.type] ?? '#6b7280';
+        return (
+          <DraggablePanel className="absolute top-16 left-64 z-[1000] w-72">
+            <div className="bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl relative"
+              style={{ borderColor: color + '55' }}>
+              <div className="flex items-center justify-between px-3 py-2 border-b"
+                style={{ borderColor: color + '33', background: color + '15' }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold" style={{ color }}>⚡ {NK_TYPE_KO[ev.type]}</span>
+                  <span className="text-xs text-gray-400">{ev.date}</span>
+                  <span className="text-[10px] px-1 py-0.5 rounded font-bold"
+                    style={{ background: color + '30', color }}>
+                    {'⭐'.repeat(Math.min(ev.severity, 5))}
+                  </span>
+                </div>
+                <button onClick={() => setSelectedNkId(null)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+              </div>
+              <div className="p-3 space-y-2">
+                <p className="text-sm font-bold text-white leading-tight">{ev.title}</p>
+                <p className="text-xs text-gray-300 leading-relaxed">{ev.desc}</p>
+                <div className="bg-yellow-500/5 border border-yellow-500/20 rounded p-2">
+                  <p className="text-[10px] text-yellow-400 font-semibold mb-1">📊 시장 반응 패턴</p>
+                  <p className="text-xs text-gray-400">미사일 발사 당일 코스피 평균 -0.8%. 방산주 +3~8%. 3일내 대부분 회복.</p>
+                </div>
+              </div>
+            </div>
+          </DraggablePanel>
+        );
+      })()}
 
       {/* 범례 */}
       <div className="absolute bottom-10 left-3 z-[1000] text-xs space-y-1 bg-black/80 backdrop-blur-sm rounded-lg p-2.5 border border-white/10">

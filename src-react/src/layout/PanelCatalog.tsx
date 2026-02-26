@@ -41,7 +41,8 @@ const CATALOG: CatalogItem[] = [
   { type: 'fear-greed', title: '😱 공포탐욕지수', desc: 'VIX·수익률곡선·신용으로 자체 계산 + CNN F&G', defaultSize: { w: 3, h: 6 } },
   { type: 'scenario',   title: '🎯 시나리오 시뮬',  desc: '대만해협/북한/연준/중국 시나리오 스트레스 테스트', defaultSize: { w: 5, h: 8 } },
   { type: 'var',        title: '📐 VaR 분석',       desc: '포트폴리오 Value at Risk + 스트레스 테스트', defaultSize: { w: 3, h: 7 } },
-  { type: 'settings',  title: '⚙ API 키 설정',     desc: 'Groq / FRED / Alpha Vantage 키 설정 (로컬 저장)', defaultSize: { w: 3, h: 8 } },
+  { type: 'settings',   title: '⚙ API 키 설정',      desc: 'Groq / FRED / Alpha Vantage 키 설정 (로컬 저장)', defaultSize: { w: 3, h: 8 } },
+  { type: 'prediction', title: '🎲 예측 시장',        desc: 'Polymarket — 지정학/경제 이벤트 확률 실시간 조회', defaultSize: { w: 3, h: 9 } },
   { type: 'stock',     title: '📊 종목 상세',       desc: '캔들차트 + OHLCV + 관련 테마 (config에 symbol 지정)', defaultSize: { w: 4, h: 9 } },
 ];
 

@@ -204,18 +204,23 @@ const SHIPPING_ROUTES = [
 interface VipAircraft {
   icao24: string;
   callsign: string | null;
-  label: string;
-  country: string;
-  category: string;
+  originCountry: string;
   lat: number;
   lng: number;
   altBaro: number | null;
   onGround: boolean;
   velocity: number | null;
   heading: number | null;
+  squawk: string | null;
+  isEmergencySquawk: boolean;
+  isMilCallsign: boolean;
+  label: string;
+  country: string;
+  category: string;
+  investmentSignalKo: string | null;
   isHighAlert: boolean;
   isKnownVip: boolean;
-  investmentSignalKo: string | null;
+  pathHistory?: { lat: number; lng: number; ts: number }[];
 }
 
 interface VipAircraftResponse {
@@ -255,12 +260,30 @@ const VIP_HOME_BASES = [
 const AIRCRAFT_CAT_COLOR: Record<string, string> = {
   head_of_state:    '#f59e0b',
   military_command: '#ef4444',
-  intelligence:     '#8b5cf6',
+  intelligence:     '#a855f7',
+  military:         '#f97316',
   government:       '#3b82f6',
-  tech_ceo:         '#22c55e',
-  investor:         '#06b6d4',
+  tech_ceo:         '#22d3ee',
+  investor:         '#84cc16',
   unknown:          '#6b7280',
 };
+
+const CATEGORY_KO: Record<string, string> = {
+  head_of_state: '국가 수반',
+  military_command: '군 지휘통제',
+  intelligence: '정보수집',
+  military: '군용기',
+  government: '정부',
+  tech_ceo: 'CEO 전용기',
+  investor: '투자자',
+  unknown: '미상',
+};
+
+function headingToCardinal(deg: number | null): string {
+  if (deg == null) return '—';
+  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
 
 function makeAircraftIcon(heading: number | null, color: string, isHighAlert: boolean) {
   const rot = heading ?? 0;
@@ -276,18 +299,10 @@ function makeAircraftIcon(heading: number | null, color: string, isHighAlert: bo
 // VIP 항공기 상세 패널
 function VipAircraftPanel({ ac, onClose }: { ac: VipAircraft; onClose: () => void }) {
   const color = AIRCRAFT_CAT_COLOR[ac.category] ?? '#6b7280';
-  const cat = {
-    head_of_state: '국가 원수',
-    military_command: '군 지휘부',
-    intelligence: '정보기관',
-    government: '정부 기관',
-    tech_ceo: '테크 CEO',
-    investor: '투자자',
-    unknown: '미상',
-  }[ac.category] ?? ac.category;
-
-  const altFt = ac.altBaro ? Math.round(ac.altBaro * 3.28084) : null;
-  const spdKts = ac.velocity ? Math.round(ac.velocity * 1.94384) : null;
+  const cat = CATEGORY_KO[ac.category] ?? ac.category;
+  const altFt = ac.altBaro != null ? Math.round(ac.altBaro * 3.28084) : null;
+  const spdKts = ac.velocity != null ? Math.round(ac.velocity * 1.94384) : null;
+  const headingDeg = ac.heading != null ? Math.round(ac.heading) : null;
 
   return (
     <DraggablePanel className="absolute bottom-14 left-3 z-[1000] w-72">
@@ -300,36 +315,48 @@ function VipAircraftPanel({ ac, onClose }: { ac: VipAircraft; onClose: () => voi
             <span style={{ color, fontSize: '16px' }}>✈</span>
             <div>
               <div className="text-xs font-bold font-mono" style={{ color }}>{ac.label}</div>
-              <div className="text-[10px] text-gray-400">{cat} · {ac.country}</div>
+              <div className="text-[10px] text-gray-400">{ac.country}</div>
             </div>
           </div>
+          <span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ color, borderColor: color + '66', background: color + '1f' }}>{cat}</span>
           <button onClick={onClose} className="text-gray-500 hover:text-white text-xs ml-2">✕</button>
         </div>
 
         {/* 비행 정보 */}
-        <div className="px-3 py-2 grid grid-cols-3 gap-2 border-b border-white/5 text-center">
+        <div className="px-3 py-2 grid grid-cols-4 gap-2 border-b border-white/5 text-center">
           <div>
             <div className="text-[10px] text-gray-500">상태</div>
             <div className={`text-xs font-mono font-bold ${ac.onGround ? 'text-gray-400' : 'text-green-400'}`}>
               {ac.onGround ? '지상' : '비행 중'}
             </div>
           </div>
-          {altFt && (
-            <div>
-              <div className="text-[10px] text-gray-500">고도</div>
-              <div className="text-xs font-mono text-primary">{altFt.toLocaleString()}ft</div>
+          <div>
+            <div className="text-[10px] text-gray-500">고도</div>
+            <div className="text-xs font-mono text-primary">{altFt != null ? `${altFt.toLocaleString()}ft` : '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-500">속도</div>
+            <div className="text-xs font-mono text-primary">{spdKts != null ? `${spdKts}kts` : '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-500">방향</div>
+            <div className="text-xs font-mono text-primary">
+              {headingDeg != null ? `${headingDeg}°` : '—'} {headingToCardinal(ac.heading)}
             </div>
-          )}
-          {spdKts && (
-            <div>
-              <div className="text-[10px] text-gray-500">속도</div>
-              <div className="text-xs font-mono text-primary">{spdKts}kts</div>
-            </div>
-          )}
+          </div>
+        </div>
+
+        <div className="px-3 py-2 grid grid-cols-2 gap-2 border-b border-white/5 text-center">
           {ac.callsign && (
             <div>
               <div className="text-[10px] text-gray-500">콜사인</div>
               <div className="text-xs font-mono text-primary">{ac.callsign}</div>
+            </div>
+          )}
+          {ac.pathHistory && ac.pathHistory.length > 0 && (
+            <div>
+              <div className="text-[10px] text-gray-500">서버 궤적</div>
+              <div className="text-xs font-mono text-primary">{ac.pathHistory.length}점</div>
             </div>
           )}
         </div>
@@ -627,7 +654,18 @@ const SEV_RADIUS: Record<GeoEvent['severity'], number> = {
 type CategoryKey = GeoEvent['category'];
 type SeverityFilter = 'all' | 'high' | 'critical';
 
-function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, severityFilter, onSeverityChange, onFleetToggle, showFleet }: {
+function LayerControl({
+  layers,
+  onToggle,
+  activeCategories,
+  onToggleCategory,
+  severityFilter,
+  onSeverityChange,
+  onFleetToggle,
+  showFleet,
+  aircraftTracked,
+  aircraftAirborne,
+}: {
   layers: LayerState;
   onToggle: (key: keyof LayerState) => void;
   activeCategories: Set<CategoryKey>;
@@ -636,6 +674,8 @@ function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, se
   onSeverityChange: (f: SeverityFilter) => void;
   onFleetToggle?: () => void;
   showFleet?: boolean;
+  aircraftTracked?: number;
+  aircraftAirborne?: number;
 }) {
   const btns: { key: keyof LayerState; label: string; active: string }[] = [
     { key: 'threats',  label: '🎯 위협 핀',      active: 'text-red-400 border-red-500/50 bg-red-500/20' },
@@ -679,6 +719,11 @@ function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, se
           )}
         </div>
       ))}
+      {layers.aircraft && (aircraftTracked ?? 0) > 0 && (
+        <div className="text-[11px] text-blue-200/80 bg-blue-500/10 border border-blue-500/25 rounded px-2 py-1">
+          ✈ {aircraftAirborne ?? 0} airborne / {aircraftTracked ?? 0} tracked
+        </div>
+      )}
 
       {/* 이벤트 필터 패널 — events 켜진 경우만 */}
       {layers.events && (
@@ -1005,6 +1050,7 @@ export function WorldMapView() {
 
   // VIP 항공기 실시간 데이터
   const [liveAircraft, setLiveAircraft] = useState<VipAircraft[]>([]);
+  const [aircraftTrails, setAircraftTrails] = useState<Record<string, [number, number][]>>({});
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [showFleetOverview, setShowFleetOverview] = useState(false);
   const [panTarget, setPanTarget] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
@@ -1013,7 +1059,25 @@ export function WorldMapView() {
     if (!layers.aircraft) return; // 레이어 꺼져 있으면 fetch 안 함
     const load = () => {
       apiFetch<VipAircraftResponse>('/api/vip-aircraft')
-        .then(d => { if (d && Array.isArray(d.aircraft)) setLiveAircraft(d.aircraft); })
+        .then(d => {
+          if (d && Array.isArray(d.aircraft)) {
+            setLiveAircraft(d.aircraft);
+            setAircraftTrails(prev => {
+              const next = { ...prev };
+              d.aircraft.forEach((ac: VipAircraft) => {
+                if (ac.onGround) return;
+                const trail = next[ac.icao24] ? [...next[ac.icao24]] : [];
+                const last = trail[trail.length - 1];
+                if (!last || Math.abs(last[0] - ac.lat) > 0.005 || Math.abs(last[1] - ac.lng) > 0.005) {
+                  trail.push([ac.lat, ac.lng]);
+                  if (trail.length > 30) trail.shift();
+                  next[ac.icao24] = trail;
+                }
+              });
+              return next;
+            });
+          }
+        })
         .catch(() => { /* graceful */ });
     };
     load();
@@ -1243,6 +1307,25 @@ export function WorldMapView() {
           );
         })}
 
+        {/* ── VIP 항공기 이동 궤적 ── */}
+        {layers.aircraft && Object.entries(aircraftTrails).map(([icao24, trail]) => {
+          if (trail.length < 2) return null;
+          const ac = liveAircraft.find(a => a.icao24 === icao24);
+          const color = AIRCRAFT_CAT_COLOR[ac?.category ?? 'unknown'] ?? '#6b7280';
+          return (
+            <Polyline
+              key={`trail-${icao24}`}
+              positions={trail}
+              pathOptions={{
+                color,
+                weight: 1.5,
+                opacity: 0.45,
+                dashArray: '3 4',
+              }}
+            />
+          );
+        })}
+
         {/* ── VIP 항공기 (실시간 OpenSky Network) ── */}
         {layers.aircraft && liveAircraft.map(ac => {
           const color = AIRCRAFT_CAT_COLOR[ac.category] ?? '#6b7280';
@@ -1310,6 +1393,8 @@ export function WorldMapView() {
         onSeverityChange={setSeverityFilter}
         onFleetToggle={() => setShowFleetOverview(s => !s)}
         showFleet={showFleetOverview}
+        aircraftTracked={liveAircraft.length}
+        aircraftAirborne={liveAircraft.filter(a => !a.onGround).length}
       />
 
       {/* 선택된 핫스팟 상세 패널 */}

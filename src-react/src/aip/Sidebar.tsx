@@ -12,11 +12,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { view: 'map',     icon: '🗺',  label: '세계 지도' },
-  { view: 'heatmap', icon: '🔥',  label: '리스크 히트맵' },
-  { view: 'charts',  icon: '📊',  label: '멀티 차트' },
-  { divider: true,   icon: '',    label: '' },
-  { view: 'grid',    icon: '⊞',   label: '그리드 대시보드' },
+  { view: 'map',       icon: '🗺',  label: '세계 지도' },
+  { view: 'heatmap',   icon: '🔥',  label: '리스크 히트맵' },
+  { view: 'charts',    icon: '📊',  label: '멀티 차트' },
+  { view: 'portfolio', icon: '💼',  label: '포트폴리오' },
+  { divider: true,     icon: '',    label: '' },
+  { view: 'grid',      icon: '⊞',   label: '그리드 대시보드' },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [

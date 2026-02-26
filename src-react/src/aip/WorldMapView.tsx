@@ -365,7 +365,7 @@ function FleetOverviewPanel({
   onClose,
 }: {
   liveAircraft: VipAircraft[];
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null, lat: number, lng: number) => void;
   onClose: () => void;
 }) {
   const CAT_LABEL: Record<string, string> = {
@@ -415,10 +415,12 @@ function FleetOverviewPanel({
                   return (
                     <button
                       key={base.icao24}
-                      onClick={() => { if (live) onSelect(base.icao24); }}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 border-b border-white/5 last:border-0 text-left transition-colors ${
-                        live ? 'hover:bg-white/8 cursor-pointer' : 'cursor-default opacity-60'
-                      }`}
+                      onClick={() => {
+                        const lat = live ? live.lat : base.lat;
+                        const lng = live ? live.lng : base.lng;
+                        onSelect(live ? base.icao24 : null, lat, lng);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 border-b border-white/5 last:border-0 text-left transition-colors hover:bg-white/8 cursor-pointer"
                     >
                       {/* 상태 점 */}
                       <div className={`w-2 h-2 rounded-full shrink-0 ${
@@ -490,6 +492,16 @@ function scoreToFill(score: number): string {
 
 function severityKo(s: string): string {
   return s === 'CRITICAL' ? '🔴 심각' : s === 'ELEVATED' ? '🟠 경계' : s === 'WATCH' ? '🟡 주의' : '🟢 모니터';
+}
+
+// ─── 지도 이동 컨트롤러 (MapContainer 내부에서 flyTo 실행) ───────────────────
+function MapPanController({ target }: { target: { lat: number; lng: number; zoom?: number } | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!target) return;
+    map.flyTo([target.lat, target.lng], target.zoom ?? 5, { duration: 1.2 });
+  }, [target, map]);
+  return null;
 }
 
 // ─── GeoJSON 리로더 (데이터 변경 시 레이어 갱신용) ───────────────────────────
@@ -995,6 +1007,7 @@ export function WorldMapView() {
   const [liveAircraft, setLiveAircraft] = useState<VipAircraft[]>([]);
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [showFleetOverview, setShowFleetOverview] = useState(false);
+  const [panTarget, setPanTarget] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
 
   useEffect(() => {
     if (!layers.aircraft) return; // 레이어 꺼져 있으면 fetch 안 함
@@ -1056,6 +1069,7 @@ export function WorldMapView() {
           noWrap={true}
         />
         <ZoomControl position="bottomright" />
+        <MapPanController target={panTarget} />
 
         {/* ── GeoJSON 국가 위험 오버레이 ── */}
         {layers.overlay && geoData && (
@@ -1322,7 +1336,11 @@ export function WorldMapView() {
       {layers.aircraft && showFleetOverview && (
         <FleetOverviewPanel
           liveAircraft={liveAircraft}
-          onSelect={(id) => { setSelectedAircraftId(id); setShowFleetOverview(false); }}
+          onSelect={(id, lat, lng) => {
+            if (id) setSelectedAircraftId(id);
+            setPanTarget({ lat, lng, zoom: 6 });
+            setShowFleetOverview(false);
+          }}
           onClose={() => setShowFleetOverview(false)}
         />
       )}

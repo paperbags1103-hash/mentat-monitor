@@ -225,6 +225,21 @@ interface VipAircraftResponse {
   error?: string;
 }
 
+// 주요 VIP 항공기 홈베이스 (비행 미감지 시 위치 표시용)
+const VIP_HOME_BASES = [
+  { icao24: 'ae0b6a', label: 'Air Force One',          lat: 38.8175, lng: -76.8640, flag: '🇺🇸', category: 'head_of_state' }, // Andrews AFB
+  { icao24: 'ae04c5', label: 'E-4B Nightwatch',        lat: 41.1030, lng: -95.9130, flag: '🇺🇸', category: 'military_command' }, // Offutt AFB
+  { icao24: 'ae0557', label: 'E-6B Mercury',            lat: 35.3490, lng: -97.4140, flag: '🇺🇸', category: 'military_command' }, // Tinker AFB
+  { icao24: '43c36e', label: 'UK PM Voyager',           lat: 51.4775, lng: -0.4614,  flag: '🇬🇧', category: 'head_of_state' }, // RAF Brize Norton
+  { icao24: '3c4591', label: 'French President',        lat: 48.7233, lng: 2.3794,   flag: '🇫🇷', category: 'head_of_state' }, // Villacoublay
+  { icao24: '3cd54c', label: 'German Chancellor',       lat: 50.0319, lng: 8.5706,   flag: '🇩🇪', category: 'head_of_state' }, // Frankfurt
+  { icao24: '84408a', label: 'Japanese PM',             lat: 35.5493, lng: 139.7798, flag: '🇯🇵', category: 'head_of_state' }, // Yokota AB
+  { icao24: 'c00001', label: 'Russian Presidential',    lat: 55.4103, lng: 37.9027,  flag: '🇷🇺', category: 'head_of_state' }, // Vnukovo
+  { icao24: '71be19', label: '한국 대통령 전용기',       lat: 37.4444, lng: 127.1278, flag: '🇰🇷', category: 'head_of_state' }, // 성남공항
+  { icao24: '76c63b', label: 'Israeli PM Aircraft',     lat: 31.9968, lng: 34.8936,  flag: '🇮🇱', category: 'head_of_state' }, // Ben Gurion
+  { icao24: '780af5', label: 'China Gov Transport',     lat: 40.0801, lng: 116.5846, flag: '🇨🇳', category: 'government' },    // Capital Airport
+];
+
 // 카테고리별 색상
 const AIRCRAFT_CAT_COLOR: Record<string, string> = {
   head_of_state:    '#f59e0b',
@@ -1104,10 +1119,27 @@ export function WorldMapView() {
             </Marker>
           );
         })}
-        {layers.aircraft && liveAircraft.length === 0 && (
-          // 데이터 없을 때 안내 (레이어 ON이지만 비행 중 VIP 없음)
-          <></>
-        )}
+        {/* VIP 홈베이스 마커 (비행 미감지 기체 = 지상 대기 표시) */}
+        {layers.aircraft && VIP_HOME_BASES.map(base => {
+          const isAirborne = liveAircraft.some(a => a.icao24 === base.icao24 && !a.onGround);
+          if (isAirborne) return null; // 비행 중이면 위의 Marker가 표시
+          const color = AIRCRAFT_CAT_COLOR[base.category] ?? '#6b7280';
+          return (
+            <CircleMarker
+              key={`base-${base.icao24}`}
+              center={[base.lat, base.lng]}
+              radius={5}
+              pathOptions={{ color, fillColor: color, fillOpacity: 0.25, weight: 1.5, dashArray: '3 2' }}
+            >
+              <Tooltip direction="top" offset={[0, -5]} opacity={0.9}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '11px' }}>
+                  <span>{base.flag}</span> {base.label}
+                  <span style={{ color: '#6b7280', marginLeft: '6px' }}>지상 대기</span>
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
 
         {/* ── 해운 항로 ── */}
         {layers.shipping && SHIPPING_ROUTES.map(route => (

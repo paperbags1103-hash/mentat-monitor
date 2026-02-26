@@ -27,7 +27,7 @@ import { PanelCatalog } from '@/layout/PanelCatalog';
 import { useLayoutStore } from '@/store';
 import { PortfolioPanel } from '@/panels/PortfolioPanel';
 import WatchlistPanelWrapper from '@/panels/WatchlistPanelWrapper';
-import ChatAgentPanel from '@/panels/ChatAgentPanel';
+import AutoBriefingPanel from '@/panels/AutoBriefingPanel';
 
 export type MainViewType = 'map' | 'heatmap' | 'charts' | 'grid' | 'portfolio';
 
@@ -115,15 +115,9 @@ interface Props {
 }
 
 export function AIPLayout({ onSwitchToGrid }: Props) {
-  const { fetchAll, globalRiskScore, kospi, usdkrw, vix } = useStore();
+  const { fetchAll, globalRiskScore } = useStore();
   const [mainView, setMainView] = useState<MainViewType>('map');
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
-
-  const marketSummary = {
-    kospi: kospi ? kospi.price.toFixed(2) : undefined,
-    usdkrw: usdkrw ? usdkrw.rate.toFixed(2) : undefined,
-    vix: vix ? vix.price.toFixed(2) : undefined,
-  };
 
   useEffect(() => {
     void fetchAll();
@@ -159,15 +153,15 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
           <BottomStrip />
         </div>
 
-        {/* Right panel — Chat Agent / Watchlist / Live News */}
+        {/* Right panel — Briefing / Watchlist / Live News */}
         <div className="w-72 shrink-0 min-h-0 overflow-hidden flex flex-col">
-          {/* AI Chat Agent — top (biggest section) */}
+          {/* Auto Briefing — top (biggest section) */}
           <div className="h-[50%] min-h-0 overflow-hidden border-b border-border bg-appbase flex flex-col">
             <div className="h-8 shrink-0 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
-              🤖 AI 브리핑 에이전트
+              📊 종합 브리핑
             </div>
             <div className="flex-1 min-h-0">
-              <ChatAgentPanel geoEvents={geoEvents} convergenceZones={[]} marketSummary={marketSummary} />
+              <AutoBriefingPanel />
             </div>
           </div>
           {/* Watchlist Radar — middle */}

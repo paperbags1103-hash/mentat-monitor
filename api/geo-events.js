@@ -15,14 +15,45 @@ let cache = null;
 let cacheTs = 0;
 
 const RSS_SOURCES_PRIMARY = [
-  'https://www.aljazeera.com/xml/rss/all.xml',
-  'https://rss.dw.com/rdf/rss-en-all',
+  { url: 'https://www.aljazeera.com/xml/rss/all.xml', label: 'AlJazeera' },
+  { url: 'https://rss.dw.com/rdf/rss-en-all', label: 'DW' },
+  { url: 'https://www.theguardian.com/world/rss', label: 'Guardian' },
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', label: 'BBC World' },
+  { url: 'https://feeds.reuters.com/reuters/worldNews', label: 'Reuters' },
 ];
 const RSS_SOURCES_FALLBACK = [
-  'https://feeds.bbci.co.uk/news/world/rss.xml',
-  'https://feeds.bbci.co.uk/news/business/rss.xml',
-  'https://www.theguardian.com/world/rss',
+  { url: 'https://feeds.bbci.co.uk/news/business/rss.xml', label: 'BBC Business' },
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', label: 'BBC World' },
+  { url: 'https://www.theguardian.com/world/rss', label: 'Guardian' },
 ];
+
+const FALLBACK_COORDS = {
+  iran: { lat: 32.4, lng: 53.7, region: '이란' },
+  israel: { lat: 31.0, lng: 35.2, region: '이스라엘' },
+  ukraine: { lat: 49.0, lng: 31.5, region: '우크라이나' },
+  russia: { lat: 61.5, lng: 105.3, region: '러시아' },
+  taiwan: { lat: 23.7, lng: 121.0, region: '대만' },
+  china: { lat: 35.9, lng: 104.2, region: '중국' },
+  'north korea': { lat: 40.3, lng: 127.5, region: '북한' },
+  korea: { lat: 36.5, lng: 127.9, region: '한국' },
+  gaza: { lat: 31.35, lng: 34.31, region: '가자지구' },
+  'middle east': { lat: 29.3, lng: 42.5, region: '중동' },
+  syria: { lat: 34.8, lng: 38.9, region: '시리아' },
+  lebanon: { lat: 33.8, lng: 35.9, region: '레바논' },
+  saudi: { lat: 23.9, lng: 45.1, region: '사우디아라비아' },
+  pakistan: { lat: 30.4, lng: 69.3, region: '파키스탄' },
+  india: { lat: 20.6, lng: 79.0, region: '인도' },
+  japan: { lat: 36.2, lng: 138.3, region: '일본' },
+  'united states': { lat: 37.1, lng: -95.7, region: '미국' },
+};
+
+function assignFallbackGeo(text) {
+  const lower = text.toLowerCase();
+  for (const [key, coords] of Object.entries(FALLBACK_COORDS)) {
+    if (lower.includes(key)) return coords;
+  }
+  return null;
+}
 
 // ─── 카테고리 메타데이터 ───────────────────────────────────────────────────────
 export const CATEGORY_META = {
@@ -41,8 +72,10 @@ async function fetchRssFrom(sources) {
     'User-Agent': 'Mozilla/5.0 (compatible; MentatMonitor/1.0; +https://signal-six-henna.vercel.app)',
     'Accept': 'application/rss+xml, application/xml, text/xml, */*',
   };
-  for (const url of sources) {
+  for (const src of sources) {
     try {
+      const url = typeof src === 'string' ? src : src.url;
+      const label = typeof src === 'string' ? '' : src.label ?? '';
       const res = await fetch(url, { signal: AbortSignal.timeout(8000), headers: RSS_HEADERS, redirect: 'follow' });
       if (!res.ok) continue;
       const xml = await res.text();
@@ -53,7 +86,7 @@ async function fetchRssFrom(sources) {
         const desc = item[0].match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1]
           ?? item[0].match(/<description>(.*?)<\/description>/)?.[1] ?? '';
         const link = item[0].match(/<link>(.*?)<\/link>/)?.[1] ?? '';
-        if (title) headlines.push({ title: title.trim(), desc: desc.replace(/<[^>]+>/g, '').trim().slice(0, 200), link });
+        if (title) headlines.push({ title: title.trim(), desc: desc.replace(/<[^>]+>/g, '').trim().slice(0, 200), link, source: label });
       }
     } catch { /* skip */ }
   }
@@ -122,11 +155,18 @@ async function extractGeoEvents(headlines, groqKey) {
     const match = jsonStr.match(/\[[\s\S]*\]/);
     if (!match) throw new Error('No JSON array');
     const events = JSON.parse(match[0]);
-    return events.map(e => ({
-      ...e,
-      id: e.id ?? `event_${Math.random().toString(36).slice(2)}`,
-      updatedAt: Date.now(),
-    }));
+    return events.map((e) => {
+      const hasLatLng = typeof e.lat === 'number' && typeof e.lng === 'number' && !(e.lat === 0 && e.lng === 0);
+      const fallback = hasLatLng ? null : assignFallbackGeo(`${e.titleKo ?? ''} ${e.titleEn ?? ''}`);
+      return {
+        ...e,
+        lat: hasLatLng ? e.lat : (fallback?.lat ?? 0),
+        lng: hasLatLng ? e.lng : (fallback?.lng ?? 0),
+        region: e.region || fallback?.region || '미상',
+        id: e.id ?? `event_${Math.random().toString(36).slice(2)}`,
+        updatedAt: Date.now(),
+      };
+    });
   } catch (err) {
     console.error('geo-events Groq failed:', err.message);
     return buildFallbackEvents();

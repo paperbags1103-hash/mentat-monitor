@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   MapContainer, TileLayer, CircleMarker, Circle,
-  Popup, Tooltip, ZoomControl, Polyline, useMap, Marker,
+  Tooltip, ZoomControl, Polyline, useMap, Marker,
 } from 'react-leaflet';
 import { apiFetch } from '@/store';
 import L from 'leaflet';
@@ -39,6 +39,132 @@ interface HotspotInvestmentData {
   arcsTo: [number, number][];
   isoCountries: string[];
 }
+
+interface ShippingChokepoint {
+  id: string;
+  nameKo: string;
+  nameEn: string;
+  lat: number;
+  lng: number;
+  dailyShips: number;
+  tradeShareKo: string;
+  riskFactors: string[];
+  impactKo: string;
+  koreanStocks: { ticker: string; nameKo: string; reason: string }[];
+  linkedRegions: string[];
+}
+
+const SHIPPING_CHOKEPOINTS: ShippingChokepoint[] = [
+  {
+    id: 'suez',
+    nameKo: '수에즈 운하',
+    nameEn: 'Suez Canal',
+    lat: 30.7, lng: 32.3,
+    dailyShips: 50,
+    tradeShareKo: '전세계 해상 물동량의 12%, 유럽-아시아 최단 항로',
+    riskFactors: ['후티 무장세력 공격', '중동 분쟁 확산', '운하 봉쇄'],
+    impactKo: '봉쇄 시 유럽-아시아 운항 14일 연장, 운임 30-50% 급등. 한국발 유럽행 컨테이너 직격탄.',
+    koreanStocks: [
+      { ticker: '011200', nameKo: 'HMM', reason: '운임 상승 수혜 — 컨테이너 해운' },
+      { ticker: '028670', nameKo: '팬오션', reason: '벌크선 운임 연동' },
+      { ticker: '180640', nameKo: '한진칼', reason: '항공화물 대체 수요' },
+    ],
+    linkedRegions: ['예멘', '홍해', '이집트', '이스라엘', '후티', '중동'],
+  },
+  {
+    id: 'hormuz',
+    nameKo: '호르무즈 해협',
+    nameEn: 'Strait of Hormuz',
+    lat: 26.5, lng: 56.3,
+    dailyShips: 21,
+    tradeShareKo: '전세계 석유 수출의 20%, LNG의 30%. 한국 원유수입 70%+ 통과',
+    riskFactors: ['이란 봉쇄 위협', '미-이란 긴장', '걸프 분쟁'],
+    impactKo: '봉쇄 또는 긴장 시 유가 즉각 급등. 한국 정유·화학주 단기 수혜, 중장기 경기 부담.',
+    koreanStocks: [
+      { ticker: '010950', nameKo: 'S-Oil', reason: '정유 마진 확대 수혜' },
+      { ticker: '096770', nameKo: 'SK이노베이션', reason: '원유 재고 평가이익' },
+      { ticker: '051910', nameKo: 'LG화학', reason: '화학 원료 가격 상승 연동' },
+    ],
+    linkedRegions: ['이란', '호르무즈', '걸프', '사우디', '아랍에미리트'],
+  },
+  {
+    id: 'malacca',
+    nameKo: '말라카 해협',
+    nameEn: 'Strait of Malacca',
+    lat: 2.5, lng: 101.5,
+    dailyShips: 84,
+    tradeShareKo: '전세계 해상 물동량 25%, 한국 에너지 수입의 핵심 통로',
+    riskFactors: ['해적', '지역 분쟁', '중국-미국 해상 갈등'],
+    impactKo: '세계 최대 해상 병목. 봉쇄 시 한국 전체 에너지 공급망 직격. 비상 시나리오급.',
+    koreanStocks: [
+      { ticker: '011200', nameKo: 'HMM', reason: '우회 항로 운임 급등' },
+      { ticker: '010950', nameKo: 'S-Oil', reason: '원유 공급 차질 → 유가 급등' },
+      { ticker: '034020', nameKo: '두산에너빌리티', reason: '에너지 안보 → 원전 수요' },
+    ],
+    linkedRegions: ['말라카', '싱가포르', '인도네시아', '말레이시아', '남중국해'],
+  },
+  {
+    id: 'taiwan_strait',
+    nameKo: '대만 해협',
+    nameEn: 'Taiwan Strait',
+    lat: 24.0, lng: 119.5,
+    dailyShips: 300,
+    tradeShareKo: '세계 반도체 생산의 60% 인근, 동아시아 핵심 항로',
+    riskFactors: ['중국-대만 군사 충돌', '미중 해군 대치', '봉쇄 훈련'],
+    impactKo: '분쟁 시 반도체 공급망 붕괴. TSMC 생산 차질 → 삼성/SK하이닉스 가격 급등. 방산주 폭등.',
+    koreanStocks: [
+      { ticker: '005930', nameKo: '삼성전자', reason: 'TSMC 차질 → 파운드리 수요 급증' },
+      { ticker: '000660', nameKo: 'SK하이닉스', reason: 'HBM 대체 수요' },
+      { ticker: '047810', nameKo: '한국항공우주', reason: '방산 수요 폭증' },
+    ],
+    linkedRegions: ['대만', '중국', '남중국해', '미중', '대만해협'],
+  },
+  {
+    id: 'bab_el_mandeb',
+    nameKo: '바브엘만데브',
+    nameEn: 'Bab-el-Mandeb',
+    lat: 12.5, lng: 43.3,
+    dailyShips: 25,
+    tradeShareKo: '홍해 남쪽 입구. 후티 공격 최전선 지점',
+    riskFactors: ['후티 미사일/드론 공격', '예멘 분쟁'],
+    impactKo: '후티 공격 시 수에즈 봉쇄와 동일 효과. 현재 진행형 위협.',
+    koreanStocks: [
+      { ticker: '011200', nameKo: 'HMM', reason: '우회 항로 → 운임 상승' },
+      { ticker: '180640', nameKo: '한진칼', reason: '항공화물 대체' },
+    ],
+    linkedRegions: ['예멘', '후티', '홍해', '아덴만', '소말리아'],
+  },
+  {
+    id: 'panama',
+    nameKo: '파나마 운하',
+    nameEn: 'Panama Canal',
+    lat: 9.0, lng: -79.5,
+    dailyShips: 40,
+    tradeShareKo: '태평양-대서양 연결. 미국 동부행 아시아 화물의 핵심',
+    riskFactors: ['가뭄 (수위 하락)', '운하 통과 제한', '기후변화'],
+    impactKo: '가뭄 시 통과 선박 수 감소 → 미국 동부행 운임 상승. 한국 자동차/전자 수출에 간접 영향.',
+    koreanStocks: [
+      { ticker: '011200', nameKo: 'HMM', reason: '우회 항로 운임 상승' },
+      { ticker: '005380', nameKo: '현대차', reason: '미국 수출 물류 비용 영향' },
+    ],
+    linkedRegions: ['파나마', '카리브해', '중미'],
+  },
+  {
+    id: 'south_china_sea',
+    nameKo: '남중국해',
+    nameEn: 'South China Sea',
+    lat: 13.0, lng: 114.0,
+    dailyShips: 450,
+    tradeShareKo: '전세계 해상 물동량 30%. 한국 수출 핵심 통과 지역',
+    riskFactors: ['중국 영유권 분쟁', '남중국해 군사화', '필리핀-중국 갈등'],
+    impactKo: '분쟁 격화 시 한국 수출 타격. 방산·에너지 섹터 수혜 동반.',
+    koreanStocks: [
+      { ticker: '047810', nameKo: '한국항공우주', reason: '지역 방산 수요' },
+      { ticker: '011200', nameKo: 'HMM', reason: '해상 물류 비용 변동' },
+    ],
+    linkedRegions: ['필리핀', '베트남', '남중국해', '중국해'],
+  },
+];
 
 // ─── 지정학 핫스팟 ────────────────────────────────────────────────────────────
 const HOTSPOTS: Hotspot[] = [
@@ -192,12 +318,16 @@ const ISO_TO_ENTITIES: Record<string, string[]> = {
   VN: ['region:east_asia'],
 };
 
-// ─── 해운 항로 ────────────────────────────────────────────────────────────────
-const SHIPPING_ROUTES = [
-  { id: 'asia-europe',   name: '아시아-유럽',  points: [[1.3, 103.8], [12.5, 44.0], [30, 32.5], [37, 15], [51.9, 4.4]] as [number,number][] },
-  { id: 'trans-pacific', name: '태평양 횡단', points: [[31.2, 121.4], [37.8, 144.9], [34.0, -118.2]] as [number,number][] },
-  { id: 'us-europe',     name: '대서양',      points: [[40.7, -74.0], [51.5, -8.0], [51.9, 4.4]] as [number,number][] },
-  { id: 'south-china',   name: '남중국해',    points: [[22.3, 114.2], [1.3, 103.8], [15.0, 108.0]] as [number,number][] },
+// Major trade routes as Polylines [start, end] coordinates
+const SHIPPING_ROUTES: [number, number][][] = [
+  // Europe-Asia via Suez
+  [[51.5, -0.1], [30.7, 32.3], [26.5, 56.3], [2.5, 101.5], [37.5, 126.9]],
+  // Trans-Pacific (Shanghai-LA)
+  [[31.2, 121.5], [13.0, 114.0], [24.0, 119.5], [33.0, -118.2]],
+  // Middle East-Korea via Hormuz-Malacca
+  [[26.5, 56.3], [2.5, 101.5], [37.5, 126.9]],
+  // Trans-Atlantic via Panama
+  [[37.5, 126.9], [9.0, -79.5], [40.7, -74.0]],
 ];
 
 // ─── VIP 항공기 타입 ──────────────────────────────────────────────────────────
@@ -638,6 +768,25 @@ interface GeoEvent {
   updatedAt: number;
 }
 
+function getChokepointStress(chokepoint: ShippingChokepoint, geoEvents: GeoEvent[]): 'critical' | 'high' | 'normal' {
+  const nearbyEvents = geoEvents.filter(ev => {
+    const regionMatch = chokepoint.linkedRegions.some(region =>
+      ev.titleKo?.includes(region) || ev.region?.includes(region)
+    );
+    const latDiff = Math.abs(ev.lat - chokepoint.lat);
+    const lngDiff = Math.abs(ev.lng - chokepoint.lng);
+    const geoClose = latDiff < 15 && lngDiff < 20;
+    return regionMatch || geoClose;
+  });
+
+  const criticalNearby = nearbyEvents.filter(ev => ev.severity === 'critical');
+  const highNearby = nearbyEvents.filter(ev => ev.severity === 'high');
+
+  if (criticalNearby.length > 0) return 'critical';
+  if (highNearby.length >= 2 || nearbyEvents.length >= 3) return 'high';
+  return 'normal';
+}
+
 const CATEGORY_META: Record<GeoEvent['category'], { icon: string; color: string; labelKo: string }> = {
   conflict:  { icon: '⚔️',  color: '#ef4444', labelKo: '분쟁·전쟁' },
   terrorism: { icon: '💣',  color: '#f97316', labelKo: '테러' },
@@ -682,7 +831,7 @@ function LayerControl({
     { key: 'overlay',  label: '🗺 국가 오버레이', active: 'text-amber-400 border-amber-500/50 bg-amber-500/20' },
     { key: 'arcs',     label: '⚡ 영향선',       active: 'text-purple-400 border-purple-500/50 bg-purple-500/20' },
     { key: 'aircraft', label: '✈ VIP 항공기',    active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
-    { key: 'shipping', label: '🚢 해운 항로',     active: 'text-cyan-400 border-cyan-500/50 bg-cyan-500/20' },
+    { key: 'shipping', label: '⚓ 해운 병목',     active: 'text-green-400 border-green-500/50 bg-green-500/20' },
     { key: 'events',        label: '📌 뉴스 이벤트',  active: 'text-pink-400 border-pink-500/50 bg-pink-500/20' },
     { key: 'semiconductors', label: '🔵 반도체 공급망', active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
     { key: 'nkHistory',      label: '⚡ 북한 도발 이력', active: 'text-yellow-400 border-yellow-500/50 bg-yellow-500/20' },
@@ -809,6 +958,65 @@ function DraggablePanel({ children, className, style }: {
     >
       {children}
     </div>
+  );
+}
+
+function ShippingChokePanel({ chokepoint, stress, onClose }: {
+  chokepoint: ShippingChokepoint;
+  stress: 'critical' | 'high' | 'normal';
+  onClose: () => void;
+}) {
+  const stressColor = stress === 'critical' ? '#ef4444' : stress === 'high' ? '#f59e0b' : '#22c55e';
+  const stressKo = stress === 'critical' ? '⚠️ CRITICAL' : stress === 'high' ? '🟡 주의' : '🟢 정상';
+
+  return (
+    <DraggablePanel className="absolute top-16 left-3 z-[1000] w-[340px]">
+      <div style={{ border: '1px solid #1e293b', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#020617', borderBottom: '1px solid #1e293b' }}>
+          <span>⚓</span>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>{chokepoint.nameKo}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: stressColor, fontWeight: 700 }}>{stressKo}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16, marginLeft: 4 }}>×</button>
+        </div>
+        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12, color: '#e2e8f0', background: '#0f172a' }}>
+          <div style={{ color: '#94a3b8', lineHeight: 1.5 }}>{chokepoint.tradeShareKo}</div>
+          <div style={{ background: '#1e293b', borderRadius: 6, padding: '8px 10px' }}>
+            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4 }}>일평균 통과 선박</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#f1f5f9' }}>
+              {chokepoint.dailyShips.toLocaleString()}<span style={{ fontSize: 11, color: '#64748b', marginLeft: 4 }}>척/일</span>
+            </div>
+          </div>
+          {chokepoint.riskFactors.length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4 }}>위험 요인</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {chokepoint.riskFactors.map(f => (
+                  <span key={f} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#7f1d1d22', border: '1px solid #ef444444', color: '#fca5a5' }}>{f}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ background: '#052e1622', border: '1px solid #22c55e33', borderRadius: 6, padding: '8px 10px' }}>
+            <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 4 }}>💹 봉쇄 시 투자 영향</div>
+            <div style={{ color: '#d1fae5', lineHeight: 1.5, fontSize: 11 }}>{chokepoint.impactKo}</div>
+          </div>
+          {chokepoint.koreanStocks.length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>🇰🇷 관련 한국 종목</div>
+              {chokepoint.koreanStocks.map(s => (
+                <div key={s.ticker} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', borderBottom: '1px solid #1e293b' }}>
+                  <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#60a5fa', minWidth: 52, background: '#1e3a5f', padding: '1px 4px', borderRadius: 3 }}>{s.ticker}</span>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#f1f5f9' }}>{s.nameKo}</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.4 }}>{s.reason}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </DraggablePanel>
   );
 }
 
@@ -1009,6 +1217,7 @@ export function WorldMapView() {
   // 뉴스 기반 지리 이벤트
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedChokeId, setSelectedChokeId] = useState<string | null>(null);
 
   // 이벤트 필터
   const ALL_CATEGORIES = new Set<CategoryKey>(Object.keys(CATEGORY_META) as CategoryKey[]);
@@ -1368,19 +1577,54 @@ export function WorldMapView() {
           );
         })}
 
-        {/* ── 해운 항로 ── */}
-        {layers.shipping && SHIPPING_ROUTES.map(route => (
-          <Polyline key={route.id}
-            positions={route.points}
-            pathOptions={{ color: '#06b6d4', weight: 1.5, opacity: 0.55, dashArray: '6 4' }}
-          >
-            <Popup>
-              <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '6px 8px', borderRadius: '6px', fontFamily: 'monospace' }}>
-                <div style={{ fontSize: '12px', color: '#22d3ee' }}>🚢 {route.name}</div>
-              </div>
-            </Popup>
-          </Polyline>
+        {/* ── 주요 해상 무역 항로 ── */}
+        {layers.shipping && SHIPPING_ROUTES.map((route, i) => (
+          <Polyline
+            key={`route-${i}`}
+            positions={route}
+            pathOptions={{
+              color: '#0ea5e9',
+              weight: 1,
+              opacity: 0.25,
+              dashArray: '6 8',
+            }}
+          />
         ))}
+
+        {/* ── 해운 병목 항로 ── */}
+        {layers.shipping && SHIPPING_CHOKEPOINTS.map(cp => {
+          const stress = getChokepointStress(cp, geoEvents);
+          const color = stress === 'critical' ? '#ef4444' : stress === 'high' ? '#f59e0b' : '#22c55e';
+          const radius = stress === 'critical' ? 14 : stress === 'high' ? 11 : 9;
+          const isSelected = selectedChokeId === cp.id;
+          return (
+            <CircleMarker
+              key={cp.id}
+              center={[cp.lat, cp.lng]}
+              radius={radius}
+              pathOptions={{
+                color,
+                fillColor: isSelected ? '#ffffff' : color,
+                fillOpacity: isSelected ? 0.95 : 0.75,
+                weight: isSelected ? 3 : stress === 'critical' ? 2.5 : 1.5,
+              }}
+              eventHandlers={{
+                click: () => setSelectedChokeId(prev => prev === cp.id ? null : cp.id),
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${color}55`, fontFamily: 'system-ui', minWidth: '150px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontSize: 14 }}>⚓</span>
+                    <span style={{ fontWeight: 700, fontSize: 12 }}>{cp.nameKo}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color, fontWeight: 600 }}>일 {cp.dailyShips}척 통과</div>
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>클릭 → 투자 시사점</div>
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
       </MapContainer>
 
       {/* 레이어 컨트롤 */}
@@ -1409,6 +1653,14 @@ export function WorldMapView() {
           onClose={() => setSelectedEventId(null)}
         />
       )}
+
+      {/* ── 선택된 해운 병목 패널 ── */}
+      {layers.shipping && selectedChokeId && (() => {
+        const cp = SHIPPING_CHOKEPOINTS.find(c => c.id === selectedChokeId);
+        if (!cp) return null;
+        const stress = getChokepointStress(cp, geoEvents);
+        return <ShippingChokePanel chokepoint={cp} stress={stress} onClose={() => setSelectedChokeId(null)} />;
+      })()}
 
       {/* VIP 항공기 상세 패널 */}
       {selectedAircraftId && (() => {

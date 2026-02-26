@@ -8,12 +8,17 @@ interface Channel {
 }
 
 const CHANNELS: Channel[] = [
-  { id: 'bloomberg', nameKo: 'Bloomberg TV', youtubeId: 'dp8PhLsUcFE', lang: 'EN' },
-  { id: 'cnbc',      nameKo: 'CNBC',         youtubeId: '2ZXF58lhNug', lang: 'EN' },
-  { id: 'kbs',       nameKo: 'KBS 뉴스',     youtubeId: 'uGBCINbYZYI', lang: 'KO' },
-  { id: 'ytn',       nameKo: 'YTN',          youtubeId: 'vdboOJ7ALEY', lang: 'KO' },
-  { id: 'mk',        nameKo: '매일경제TV',   youtubeId: 'Xg8Ks0_cF5U', lang: 'KO' },
-  { id: 'mbc',       nameKo: 'MBC 뉴스',     youtubeId: '3rga2G4z7cE', lang: 'KO' },
+  { id: 'bloomberg',  nameKo: 'Bloomberg',  youtubeId: 'dp8PhLsUcFE', lang: 'EN' },
+  { id: 'skynews',    nameKo: 'SkyNews',    youtubeId: '9Auq9mYxFEE', lang: 'EN' },
+  { id: 'euronews',   nameKo: 'Euronews',   youtubeId: 'MqCUgwAEBmA', lang: 'EN' },
+  { id: 'dw',         nameKo: 'DW',         youtubeId: 'IDiDtFaCPrU', lang: 'EN' },
+  { id: 'cnbc',       nameKo: 'CNBC',       youtubeId: '2ZXF58lhNug', lang: 'EN' },
+  { id: 'france24',   nameKo: 'France24',   youtubeId: 'h3MuIUNCCLI', lang: 'EN' },
+  { id: 'alarabiya',  nameKo: 'AlArabiya',  youtubeId: 'vSmLJOmfkV8', lang: 'AR' },
+  { id: 'aljazeera',  nameKo: 'AlJazeera',  youtubeId: 'h3MuIUNCCLI', lang: 'EN' },
+  { id: 'arirang',    nameKo: 'Arirang TV', youtubeId: '2pSIpFJrMXM', lang: 'EN' },
+  { id: 'nhk',        nameKo: 'NHK World',  youtubeId: 'pRQGSzfBisI', lang: 'EN' },
+  { id: 'wion',       nameKo: 'WION',       youtubeId: '9Auq9mYxFEE', lang: 'EN' },
 ];
 
 export function LiveTVPanel() {

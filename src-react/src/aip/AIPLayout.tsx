@@ -20,8 +20,7 @@ const WorldMapView = lazy(() => import('./WorldMapView').then(m => ({ default: m
 import type { GeoEvent } from './WorldMapView';
 import { HeatMapView }  from './HeatMapView';
 import { ChartView }    from './ChartView';
-import { LiveNews }     from './LiveNews';
-import { LiveFeed }     from './LiveFeed';
+import { LiveTVPanel }  from '@/panels/LiveTVPanel';
 import { BottomStrip }  from './BottomStrip';
 import { PanelGrid }    from '@/layout/PanelGrid';
 import { PanelCatalog } from '@/layout/PanelCatalog';
@@ -160,28 +159,35 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
           <BottomStrip />
         </div>
 
-        {/* Live feed + News — right panel */}
+        {/* Right panel — Chat Agent / Watchlist / Live News */}
         <div className="w-72 shrink-0 min-h-0 overflow-hidden flex flex-col">
-          <div className="flex-1 min-h-0 overflow-hidden border-b border-border">
-            <LiveFeed />
-          </div>
-          <div className="h-[36%] min-h-0 overflow-hidden border-b border-border bg-appbase">
-            <div className="h-8 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
+          {/* AI Chat Agent — top (biggest section) */}
+          <div className="h-[50%] min-h-0 overflow-hidden border-b border-border bg-appbase flex flex-col">
+            <div className="h-8 shrink-0 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
               🤖 AI 브리핑 에이전트
             </div>
-            <div className="h-[calc(100%-2rem)]">
+            <div className="flex-1 min-h-0">
               <ChatAgentPanel geoEvents={geoEvents} convergenceZones={[]} marketSummary={marketSummary} />
             </div>
           </div>
-          <div className="h-[34%] min-h-0 overflow-hidden border-b border-border bg-appbase">
-            <div className="h-8 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
+          {/* Watchlist Radar — middle */}
+          <div className="h-[22%] min-h-0 overflow-hidden border-b border-border bg-appbase flex flex-col">
+            <div className="h-8 shrink-0 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
               📡 관심종목 레이더
             </div>
-            <div className="h-[calc(100%-2rem)]">
+            <div className="flex-1 min-h-0 overflow-auto">
               <WatchlistPanelWrapper geoEvents={geoEvents} />
             </div>
           </div>
-          <LiveNews />
+          {/* Live News TV — bottom */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div className="h-8 shrink-0 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
+              📺 LIVE NEWS
+            </div>
+            <div className="flex-1 min-h-0">
+              <LiveTVPanel />
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -113,6 +113,9 @@ export function ChartPanel({ symbol, nameKo }: Props) {
     <div className="flex flex-col h-full">
       {/* Header strip */}
       <div className="flex items-center gap-2 px-3 py-1.5 shrink-0 border-b border-border/50">
+        {/* Name label */}
+        <span className="text-xs font-bold text-accent-light leading-none">{nameKo}</span>
+        <span className="text-[10px] text-muted leading-none">{symbol}</span>
         {lastPrice !== null && (
           <>
             <span className="text-sm font-bold tabular-nums text-primary">

@@ -32,11 +32,25 @@ function ThemeCard({ theme }: { theme: ActiveTheme }) {
       </div>
       <StrengthBar value={theme.strength} />
 
-      {(theme.koreanStocks ?? []).length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {(theme.koreanStocks ?? []).slice(0, 4).map(s => (
-            <span key={s} className="text-xs bg-accent/10 text-accent-light px-1.5 py-0.5 rounded border border-accent/20">{s}</span>
-          ))}
+      {/* 종목 뱃지 — 한국 + 미국 */}
+      {((theme.koreanStocks ?? []).length > 0 || (theme.usStocks ?? []).length > 0) && (
+        <div className="mt-2 flex flex-col gap-1">
+          {(theme.koreanStocks ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              <span className="text-[10px] text-muted self-center mr-0.5">🇰🇷</span>
+              {(theme.koreanStocks ?? []).slice(0, 4).map(s => (
+                <span key={s} className="text-xs bg-accent/10 text-accent-light px-1.5 py-0.5 rounded border border-accent/20">{s}</span>
+              ))}
+            </div>
+          )}
+          {(theme.usStocks ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              <span className="text-[10px] text-muted self-center mr-0.5">🇺🇸</span>
+              {(theme.usStocks ?? []).slice(0, 4).map(s => (
+                <span key={s} className="text-xs bg-blue-500/10 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/25 font-mono">{s}</span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

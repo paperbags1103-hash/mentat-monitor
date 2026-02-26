@@ -129,7 +129,7 @@ export function ScreenerPanel() {
             const owned = ownedSymbols.has(c.symbol);
             return (
               <div key={i}
-                onClick={() => selectSymbol(c.symbol, c.nameKo)}
+                onClick={() => typeof selectSymbol === 'function' && selectSymbol(c.symbol, c.nameKo)}
                 className={`py-2 border-b border-border/40 last:border-0 cursor-pointer hover:bg-surface/60 rounded px-1 transition-colors ${owned ? 'opacity-50' : ''} ${selectedSym === c.symbol ? 'bg-accent/10 border-accent/30' : ''}`}>
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">

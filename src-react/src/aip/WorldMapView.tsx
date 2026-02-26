@@ -11,8 +11,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   MapContainer, TileLayer, CircleMarker, Circle,
-  Popup, ZoomControl, Polyline, GeoJSON, useMap,
+  Popup, ZoomControl, Polyline, useMap,
 } from 'react-leaflet';
+import L from 'leaflet';
 import type { PathOptions, StyleFunction } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore } from '@/store';
@@ -228,12 +229,18 @@ function GeoJsonLayer({ data, scoreMap }: { data: any; scoreMap: Record<string, 
     if (!data || !map) return;
     if (layerRef.current) {
       layerRef.current.remove();
+      layerRef.current = null;
     }
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const L = require('leaflet');
-    layerRef.current = L.geoJSON(data, { style: styleFunc, interactive: false });
-    layerRef.current.addTo(map);
-    return () => { layerRef.current?.remove(); };
+    try {
+      layerRef.current = L.geoJSON(data, { style: styleFunc, interactive: false });
+      layerRef.current.addTo(map);
+    } catch (e) {
+      console.warn('[GeoJsonLayer] GeoJSON 레이어 추가 실패:', e);
+    }
+    return () => {
+      try { layerRef.current?.remove(); } catch { /* ignore */ }
+      layerRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, scoreMap]);
 

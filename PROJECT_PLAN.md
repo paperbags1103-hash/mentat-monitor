@@ -1,281 +1,200 @@
-# Signal — 프로젝트 플랜
+# Mentat Monitor — 프로젝트 플랜 (2026-02-26 기준 최신)
 
-> 지정학/OSINT 신호를 실시간으로 수집해서 투자 임팩트로 자동 번역해주는 오픈소스 인텔리전스 플랫폼
+> **금융 온톨로지의 민주화** — 골드만삭스급 의미 추출을 개인 한국 투자자에게
 
----
-
-## 1. 컨셉 검토 및 조정
-
-### ✅ 강점 (유지)
-- World Monitor의 기존 인프라(36+ 레이어, 150+ RSS, 3D 글로브, Tauri 앱)를 그대로 활용 — 엄청난 시간 절약
-- Finance Monitor 변형이 이미 존재 (92개 거래소, 19 금융센터, 13 중앙은행) → 좋은 출발점
-- 로컬 LLM(Ollama) 지원 → 프라이버시 민감한 한국 투자자에게 어필
-- AGPL v3 → 포크 시 동일 라이선스 유지 필수, 상업적 SaaS 불가 (이건 "무료 오픈소스" 컨셉과 정합)
-
-### ⚠️ 과도한 것 (스코프 축소 권고)
-
-| 기능 | 문제 | 권고 |
-|------|------|------|
-| Google Popular Times (펜타곤 피자 지수) | Google Places API 유료 + 정부청사 데이터 정확도 낮음 | **Phase 3 이후로 연기**, 대신 Google Trends 키워드만 추적 |
-| 위성 이미지 항구/주차장 밀도 | Sentinel-2 무료이나 해상도 10m로 주차장 분석 불가, 상용은 월 수백만원 | **제거** — 비용 대비 가치 부족 |
-| AIS 선박 신호 소실 패턴 | MarineTraffic API 유료, 무료 대안(AISHub) 커버리지 제한 | **Phase 2로 연기**, AISHub 무료 피드로 프로토타입만 |
-| VIP 이동추적 전체 | 흥미롭지만 테일넘버 DB 유지보수 부담 + 프라이버시 논란 | **Phase 2**, 공개 군용기/정부기만 추적 (민간인 제외) |
-| AI 시나리오 분석 | LLM 환각 리스크 → 투자 조언으로 오해 시 법적 리스크 | **Phase 3**, "참고용" 면책 강조 |
-
-### 🔴 빠진 것 (추가 권고)
-
-| 기능 | 이유 | 우선순위 |
-|------|------|----------|
-| **경제 캘린더 통합** | FOMC, BOK, ECB 등 금리 결정 일정 — 투자자 필수 | Phase 1 필수 |
-| **SNS 감성 분석** | X(Twitter) 핀포인트 키워드 실시간 감성 (Fear & Greed 대용) | Phase 2 |
-| **제재/관세 트래커** | OFAC 제재 리스트 변경, 관세 발표 자동 감지 | Phase 1 |
-| **원자재 가격 피드** | WTI, 금, 구리, 천연가스 — 지정학 이벤트의 즉각적 프록시 | Phase 1 필수 |
-| **Fear & Greed Index 클론** | VIX + 풋콜비율 + 안전자산 흐름으로 자체 계산 | Phase 2 |
+Investing.com + Bloomberg Terminal을 쓸 이유가 없어지는, 의미 추출이 붙은 개인 금융 인텔리전스 플랫폼.
 
 ---
 
-## 2. MVP 범위 정의 (3개월, 1인~2인 기준)
+## 🔗 핵심 링크
 
-### Phase 1: 기반 구축 (Week 1-6)
-
-**목표:** World Monitor 포크 → Signal 브랜드 → 한국 투자자용 기본 대시보드
-
-| 주차 | 작업 | 산출물 |
-|------|------|--------|
-| W1-2 | 포크 + 브랜딩 + 빌드 파이프라인 정리 | Signal 이름, 로고, CI/CD (GitHub Actions), Tauri 빌드 확인 |
-| W1-2 | 한국어 로케일 추가 (i18n 번들) | ko.json, UI 전체 한국어화 |
-| W3-4 | **한국 뉴스 RSS 피드 30개+** 추가 | 연합뉴스, YTN, 한겨레, 조선일보, 매일경제, 한국은행, 금감원 등 |
-| W3-4 | **경제 캘린더 레이어** | investing.com 스크래핑 또는 FMP API (무료 티어) |
-| W5-6 | **한국 시장 데이터 레이어** | 코스피/코스닥 (KRX OPEN API), 원달러 환율, 김치 프리미엄 |
-| W5-6 | **원자재 가격 피드** | WTI, 금, 구리 (Yahoo Finance API 무료) |
-| W5-6 | **북한 도발 타임라인** | 38 North RSS + CSIS Beyond Parallel + 수동 JSON DB |
-
-**Phase 1 핵심 지표:** 한국어로 된 뉴스 + 시장 데이터 + 경제 캘린더가 3D 글로브 위에 표시
-
-### Phase 2: 신호 수집 강화 (Week 7-10)
-
-| 주차 | 작업 | 산출물 |
-|------|------|--------|
-| W7-8 | **블랙스완 조기경보 v1** | Google Trends 키워드 모니터링, Cloudflare Radar, FRED 데이터 (TED Spread, 레포금리) |
-| W7-8 | **이벤트 태깅 시스템** | LLM 기반 자동 태깅 (섹터, 자산 클래스, 지역) |
-| W9-10 | **항공기 추적 v1** | OpenSky Network API → 군용기/정부기 레이어 (글로브 위 실시간) |
-| W9-10 | **수렴 감지 기본** | 동일 지역 반경 500km 내 3개+ 신호 → 에스컬레이션 배지 |
-| W9-10 | **반도체 공급망 트래커 v1** | TSMC/삼성/ASML 관련 뉴스 자동 태깅 + 공급망 맵 레이어 |
-
-### Phase 3: 임팩트 & 포트폴리오 (Week 11-13)
-
-| 주차 | 작업 | 산출물 |
-|------|------|--------|
-| W11-12 | **임팩트 스코어링** | 이벤트별 1-10 스코어 + 방향성 (강세/약세/중립) |
-| W11-12 | **히스토리컬 패턴 매칭 v1** | 과거 유사 이벤트 DB (수동 큐레이션 50개+) + 자동 매칭 |
-| W12-13 | **포트폴리오 입력 & 리스크 노출** | 종목 입력 → 활성 신호와 매칭 → 노출도 표시 |
-| W13 | **알림 시스템** | 3티어 (CRITICAL/WATCH/INFO), 브라우저 알림 + 선택적 디스코드 웹훅 |
-| W13 | **v0.1.0 릴리스** | GitHub Release + Tauri 바이너리 (macOS/Windows/Linux) |
+| 항목 | 값 |
+|---|---|
+| **Repo** | https://github.com/paperbags1103-hash/mentat-monitor |
+| **Vercel (라이브)** | https://signal-six-henna.vercel.app |
+| **로컬 경로** | `/Users/superdog/.openclaw/workspace/projects/signal/` |
+| **최신 커밋** | `90d0424` |
+| **현재 버전** | v0.6.9+ |
+| **라이선스** | AGPL v3 |
 
 ---
 
-## 3. 기술 아키텍처
-
-### 3.1 스택 (World Monitor 기반 유지)
+## 🏗️ 아키텍처
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  Tauri Desktop App               │
-│              (macOS / Windows / Linux)           │
-├─────────────────────────────────────────────────┤
-│   Frontend: TypeScript + Vite + React            │
-│   지도: deck.gl + MapLibre GL JS (3D Globe)      │
-│   상태: Zustand or 기존 상태관리 유지              │
-├─────────────────────────────────────────────────┤
-│   Tauri Rust Backend (사이드카)                   │
-│   ├── RSS Collector (기존 확장)                   │
-│   ├── API Fetcher (스케줄러)                      │
-│   ├── SQLite (로컬 캐시 + 포트폴리오)             │
-│   ├── Proto-first API (기존 17 서비스 확장)       │
-│   └── Ollama Bridge (AI 요약/태깅)               │
-├─────────────────────────────────────────────────┤
-│   External Data Sources (API/RSS/WebSocket)      │
-└─────────────────────────────────────────────────┘
+DATA → VISUALIZATION → MEANING (Mentat) → ACTION
 ```
 
-### 3.2 핵심 아키텍처 결정
+**4계층:**
+1. **DATA**: Yahoo Finance, FRED, Groq RSS, Reuters RSS, 경제캘린더
+2. **VISUALIZATION**: Leaflet 지도, lightweight-charts 캔들, 히트맵, 바차트
+3. **MEANING**: Groq AI 인퍼런스, 지정학 스코어링, 패턴 매처
+4. **ACTION**: 알림 시스템, 포트폴리오 리스크 노출도, 행동 제안
 
-| 결정사항 | 선택 | 근거 |
-|----------|------|------|
-| 백엔드 | **Tauri Rust 사이드카 유지** | World Monitor 구조 존중, 서버 비용 0원 |
-| DB | **SQLite (기존)** + 선택적 DuckDB | 로컬 우선, 히스토리컬 데이터 분석 시 DuckDB |
-| 데이터 수집 | **Rust 스케줄러 (cron식)** | RSS 5분, API 1-15분, 실시간은 WebSocket |
-| AI | **Ollama 로컬 LLM** (기본) + OpenAI API (선택) | 프라이버시 기본, 성능 원하면 API 키 입력 |
-| 호스팅 | **없음 (데스크탑 앱)** | 서버 비용 0원, 사용자 데이터 로컬 보관 |
-| 웹 버전 | **GitHub Pages (정적)** + 브라우저 API 호출 | 선택적, PWA 지원 (기존 World Monitor처럼) |
-| Proto/API | **기존 Proto-first 구조 확장** | 타입 안전성 유지, 신규 서비스 추가 |
-
-### 3.3 데이터 파이프라인
-
-```
-[Sources] → [Fetcher/Parser] → [Normalizer] → [SQLite Cache]
-                                      ↓
-                              [LLM Tagger] → [Event Store]
-                                      ↓
-                           [Impact Scorer] → [Alert Engine]
-                                      ↓
-                            [Globe Renderer] ← [Layer Manager]
-```
-
-**이벤트 정규화 스키마:**
-```typescript
-interface SignalEvent {
-  id: string;
-  source: string;           // "rss:yonhap" | "api:opensky" | "api:fred"
-  type: SignalType;          // GEOPOLITICAL | MILITARY | ECONOMIC | PANDEMIC | CYBER
-  title: string;
-  summary: string;          // AI 생성
-  lat: number;
-  lng: number;
-  timestamp: number;
-  severity: 1 | 2 | 3 | 4 | 5;
-  tags: string[];           // ["semiconductor", "KOSPI", "USD/KRW"]
-  impactScore?: number;     // -10 ~ +10 (약세~강세)
-  sectors?: string[];       // ["tech", "defense", "energy"]
-  relatedAssets?: string[]; // ["005930.KS", "NVDA", "WTI"]
-  convergenceZone?: string; // 수렴 감지 시 zone ID
-}
-```
+**기술 스택:**
+- Frontend: React 18 + TypeScript + Tailwind CSS + Zustand
+- Charts: lightweight-charts v4.2.0
+- Map: react-leaflet v4.2.1 + Leaflet 1.9.4
+- Build: Vite + Vercel (웹), Tauri (데스크탑)
+- AI: Groq llama-3.3-70b-versatile (무료 API)
+- 주가: Yahoo Finance (비공식, 무료)
 
 ---
 
-## 4. 데이터 소스 목록
+## ✅ 완료된 기능 전체 목록
 
-### Layer 1: 신호 수집
+### 인프라
+- [x] React 앱 (`src-react/`) — Vite 빌드, TypeScript, Tailwind
+- [x] Vercel 배포 + CORS 설정 (`api/_cors.js`)
+- [x] Zustand 스토어 (DataStore + LayoutStore + AlertStore + PortfolioStore)
+- [x] Tauri 데스크탑 빌드 (`src-tauri/tauri.mentat.conf.json`)
+- [x] API 키 설정 패널 (Groq/FRED/AlphaVantage → localStorage)
 
-#### 뉴스/지정학 (Phase 1)
+### 데이터 API (`api/` — Vercel Edge Functions)
+- [x] `korea-market.js` — KOSPI, KOSDAQ, USD/KRW, BTC/KRW
+- [x] `global-macro.js` — SPX, 나스닥, 금, WTI, DXY, VIX
+- [x] `precious-metals.js` — 금/은 선물
+- [x] `blackswan.js` — 6개 모듈 테일 리스크 지수
+- [x] `economic-calendar.js` — FOMC, BOK, ECB 일정
+- [x] `credit-stress.js` — IG/HY 스프레드 (FRED)
+- [x] `insight-briefing.js` — Groq AI 한국 투자 브리핑 (5분 캐시)
+- [x] `theme-discovery.js` — AI 투자 테마 자동 발견 (30분 캐시)
+- [x] `chart-data.js` — Yahoo Finance OHLCV (1mo~2y)
+- [x] `rss-proxy.js` — 뉴스 RSS 프록시
+- [x] `news-ai.js` — RSS + Groq 한국어 투자 요약 (10분 캐시) ← NEW
+- [x] `fear-greed.js` — 공포탐욕지수
+- [x] `vip-aircraft.js`, `opensky.js` — 항공기 추적
+- [x] `polymarket.js` — 예측 시장
 
-| 소스 | 무료/유료 | API 형태 | 주기 | 비고 |
-|------|-----------|----------|------|------|
-| 연합뉴스 RSS | 무료 | RSS | 5분 | 한국어 주요 뉴스 |
-| YTN RSS | 무료 | RSS | 5분 | |
-| 매일경제 RSS | 무료 | RSS | 5분 | 경제 특화 |
-| 한국은행 보도자료 | 무료 | RSS/HTML | 1시간 | 금리 결정 등 |
-| 38 North | 무료 | RSS | 1시간 | 북한 분석 |
-| CSIS Beyond Parallel | 무료 | RSS | 1시간 | 북한 위성 분석 |
-| KCNA Watch | 무료 | RSS | 1시간 | 북한 관영매체 번역 |
-| Reuters/AP/BBC (기존) | 무료 | RSS | 5분 | World Monitor 기존 |
-| GDELT Project | 무료 | REST API | 15분 | 글로벌 이벤트 DB |
+### AIP 레이아웃 (메인 화면)
+- [x] **Palantir AIP 스타일** — 사이드바 + 메인 뷰 + 라이브 피드 + 하단 스트립
+- [x] **WorldMapView v2** — GeoJSON 국가 오버레이 + 영향선 + 투자 시사점 패널 ← NEW
+  - GeoJSON choropleth (17개국 위험 점수 색상 오버레이)
+  - 핫스팟 핀 클릭 → 투자 시사점 카드 (섹터 + 종목 + 임플리케이션)
+  - 영향선 (Impact Arcs) — 연결 금융 허브까지 점선
+  - 레이어 토글 5개 (위협/오버레이/영향선/항공기/해운)
+- [x] **HeatMapView** — 17개 지역 × 위협 점수 그리드
+- [x] **ChartView** — 4종목 멀티 차트 (preset 4개, 1x1/1x2/2x2)
+- [x] **LiveFeed** — 인퍼런스 타임라인 (탭: 전체/위기/테마/브리핑)
+- [x] **LiveNews** — AI 요약 탭 + RSS 탭 ← NEW
+- [x] **BottomStrip** — 핵심 지표 스크롤 (KOSPI/KRW/VIX/SPX/금/WTI 등)
 
-#### 시장 데이터 (Phase 1)
+### 그리드 패널 (18개)
+- [x] 브리핑 패널 — AI 투자 내러티브
+- [x] 테마 패널 — AI 투자 테마 자동 발견
+- [x] 행동 제안 패널 — 구조화된 투자 행동
+- [x] 시장 현황 패널
+- [x] 글로벌 매크로 패널 (DXY, 수익률 곡선, 실질금리)
+- [x] 차트 패널 (캔들 + SMA 20/60일)
+- [x] 블랙스완 패널
+- [x] 경제 캘린더 패널
+- [x] 신용 스트레스 패널
+- [x] 신호 피드 패널
+- [x] 공포탐욕 패널
+- [x] **포트폴리오 패널 v2** ← NEW (3탭: 보유종목/섹터분산/지정학리스크)
+- [x] **알림 패널** (VIX/KOSPI/KRW 임계값 + CRITICAL 인퍼런스 자동 알림) ← NEW
+- [x] 스크리너 패널 (테마 연계 종목 서제스트)
+- [x] 뉴스 피드 패널
+- [x] 종목 상세 패널 (캔들 + OHLCV + 관련 테마)
+- [x] 시나리오 패널 (5개 지정학 시나리오 스트레스 테스트)
+- [x] VaR 패널 (포트폴리오 Value at Risk 95/99%)
+- [x] 설정 패널 (API 키 관리)
 
-| 소스 | 무료/유료 | API 형태 | 주기 | 비고 |
-|------|-----------|----------|------|------|
-| KRX 정보데이터시스템 | 무료 | REST API | 실시간(장중) | 코스피/코스닥, 등록 필요 |
-| 한국은행 ECOS | 무료 | REST API | 1일 | 환율, 금리 |
-| Yahoo Finance | 무료 | 비공식 API | 15분 | 글로벌 지수, 원자재 |
-| FRED (세인트루이스 연준) | 무료 | REST API | 1일 | TED Spread, 레포금리, VIX |
-| 업비트 API | 무료 | WebSocket | 실시간 | BTC/KRW (김치 프리미엄 계산) |
-| 바이낸스 API | 무료 | WebSocket | 실시간 | BTC/USDT |
-| Financial Modeling Prep | 프리미엄($14/월) | REST API | 15분 | 경제 캘린더, 실적 일정 |
-
-#### 블랙스완 조기경보 (Phase 2)
-
-| 소스 | 무료/유료 | API 형태 | 주기 | 비고 |
-|------|-----------|----------|------|------|
-| Google Trends | 무료 | pytrends (비공식) | 4시간 | 키워드 트렌드, 레이트리밋 주의 |
-| Cloudflare Radar | 무료 | REST API | 1시간 | 인터넷 장애 감지 |
-| ProMED-mail | 무료 | RSS/이메일 | 1시간 | 팬데믹 조기경보 |
-| IAEA PRIS | 무료 | HTML 스크래핑 | 6시간 | 원전 상태 |
-| WHO Disease Outbreak News | 무료 | RSS | 1시간 | |
-
-#### VIP 항공 추적 (Phase 2)
-
-| 소스 | 무료/유료 | API 형태 | 주기 | 비고 |
-|------|-----------|----------|------|------|
-| OpenSky Network | 무료 | REST API | 10초 | 레이트리밋: 비인증 100/일, 인증 4000/일 |
-| ADS-B Exchange | 무료(기본)/유료(API) | REST API | 실시간 | RapidAPI $10/월 for 빠른 접근 |
-| 군용기 테일넘버 DB | 무료 | 자체 JSON | 수동 | Milamos, PlaneSpotters 참조 |
-
-#### 선박/해양 (Phase 3+)
-
-| 소스 | 무료/유료 | API 형태 | 주기 | 비고 |
-|------|-----------|----------|------|------|
-| AISHub | 무료(기여형) | TCP/UDP | 실시간 | 데이터 기여 필요 |
-| MarineTraffic | 유료($$$) | REST API | — | 비용 높아 초기 제외 |
-
-### Layer 2: 임팩트 매핑 (Phase 3)
-
-| 소스 | 무료/유료 | 용도 |
-|------|-----------|------|
-| 자체 히스토리컬 DB | 무료 | 과거 이벤트-시장반응 매핑 (수동 큐레이션) |
-| Ollama (Llama 3, Mistral 등) | 무료 | 이벤트 태깅, 임팩트 스코어링 |
-| GICS 섹터 분류 | 무료 | 종목-섹터 매핑 |
-
-### Layer 3: 포트폴리오 (Phase 3)
-
-| 소스 | 무료/유료 | 용도 |
-|------|-----------|------|
-| 사용자 수동 입력 | — | 보유 종목 목록 |
-| Yahoo Finance | 무료 | 종목 메타데이터 (섹터, 산업, 국가) |
+### 크로스패널 연동
+- [x] `selectSymbol` 액션 — 스크리너/포트폴리오 클릭 → StockDetailPanel 연동
 
 ---
 
-## 5. 리스크 및 주의사항
+## 🛠️ 기술 결정 사항 (중요!)
 
-### 법적 리스크
+| 항목 | 결정 | 이유 |
+|---|---|---|
+| `react-grid-layout` | v1.4.4 고정 | 상위 버전 호환 이슈 |
+| `lightweight-charts` | v4.2.0 | v5 API 완전히 다름 (`addCandlestickSeries()` not `addSeries(CandlestickSeries)`) |
+| `react-leaflet` | v4.2.1 | v5 peer dep 충돌 (--legacy-peer-deps 필요) |
+| Vite `base` | `'./'` 고정 (절대 `'/'` 쓰지 말 것) | Tauri 빌드 경로 이슈 |
+| Tailwind 커스텀 색상 | `appbase` (not `base`) | `base`는 예약어 충돌 |
+| API routing | Tauri: `http://localhost:46123`, Web: `''` | store/index.ts 자동 감지 |
+| Leaflet import | `import L from 'leaflet'` | `require('leaflet')` 금지 (ESM 충돌) |
+| Groq 모델 | `llama-3.3-70b-versatile` | 무료 + 한국어 지원 우수 |
 
-| 리스크 | 심각도 | 완화 방안 |
-|--------|--------|-----------|
-| **투자 조언 해당 여부** | 🔴 높음 | 모든 화면에 "투자 조언이 아닙니다" 면책 고지. 임팩트 스코어는 "참고 정보"로 명시. 자본시장법 제9조 투자자문업 해당 여부 법률 검토 필요 |
-| **AGPL v3 라이선스** | 🟡 중간 | 포크 시 동일 AGPL v3 적용 필수. 소스코드 공개 의무. SaaS 제공 시 네트워크 사용자에게도 소스 공개 필요 → 오픈소스 유지하면 문제 없음 |
-| **데이터 스크래핑 합법성** | 🟡 중간 | RSS/공개 API만 사용. Google Trends 비공식 API는 ToS 위반 가능 → pytrends 사용 시 레이트리밋 엄수, 차단 시 대체재(SerpAPI $50/월) 준비 |
-| **항공 데이터 프라이버시** | 🟡 중간 | 개인(민간인) 항공기 추적 제외. 군용기/정부기만 추적. ICAO Annex 10 익명화 요청 항공기 자동 필터링 |
-| **북한 관련 콘텐츠** | 🟢 낮음 | 공개 소스 분석만 (OSINT). 국가정보원법 위반 소지 없도록 추측성 정보 라벨링 명확히 |
+### API 필드명 주의
+- `korea-market.js`: `changePercent` (not `change`), `usdkrw` (not `usdKrw`), `rate` 필드 포함
+- `global-macro.js`: `changePct` 반환 → store에서 `toTick()` 헬퍼로 `changePercent` 변환
+- `precious-metals.js`: `goldFutures`/`silverFutures` (not `gold`/`silver`)
+- `MarketTick.changePercent`: 항상 optional (`changePercent?: number`), 모든 `.toFixed()` 앞에 `?? 0`
 
-### 기술적 리스크
+### Vercel 배포
+- Build command: `cd src-react && npm install --legacy-peer-deps && npm run build`
+- Curl로 API 테스트 시 403 → Deployment Protection 때문, 브라우저에서는 정상
+- 구버전 WorldMonitor TypeScript 에러 (server/ 폴더) — 빌드에 영향 없음, 무시
 
-| 리스크 | 심각도 | 완화 방안 |
-|--------|--------|-----------|
-| **API 레이트리밋/차단** | 🔴 높음 | 모든 API에 exponential backoff + 캐시 레이어. 무료 티어 한도 모니터링 대시보드. 핵심 소스 2개+ 대체재 확보 |
-| **LLM 태깅 정확도** | 🟡 중간 | 초기에는 룰 기반 태깅 병행. LLM은 보조. 사용자 피드백으로 지속 개선 |
-| **LLM 환각 (임팩트 스코어)** | 🔴 높음 | 임팩트 스코어에 "AI 생성" 뱃지 명시. 히스토리컬 매칭은 수동 큐레이션 DB 우선, LLM은 보조 |
-| **Tauri 빌드 복잡성** | 🟡 중간 | World Monitor의 기존 CI/CD 그대로 사용. OS별 테스트 자동화 |
-| **데이터 볼륨 증가** | 🟡 중간 | SQLite는 10GB+도 감당 가능. 오래된 데이터 자동 아카이브 (90일 기본) |
-| **OpenSky API 안정성** | 🟡 중간 | 무료 티어 불안정. 캐시 적극 활용 + ADS-B Exchange 대체 |
-
-### 운영 리스크
-
-| 리스크 | 심각도 | 완화 방안 |
-|--------|--------|-----------|
-| **1-2인 개발 번아웃** | 🔴 높음 | MVP 스코프 엄격 관리. Phase 1만 완성해도 가치 있는 프로덕트가 되도록 설계. 커뮤니티 기여 유도 |
-| **World Monitor 업스트림 변경** | 🟡 중간 | 주기적 업스트림 머지 전략 수립. 코어 변경 최소화, 플러그인/레이어 형태로 기능 추가 |
+### DMG 빌드
+- 리빌드 전 마운트된 "Mentat Monitor" 볼륨 전부 꺼내야 함
 
 ---
 
-## 6. 실행 체크리스트 (Phase 1 킥오프)
+## 🔄 현재 진행 중 / 남은 작업
 
-- [ ] World Monitor 포크 + `signal` 레포 생성
-- [ ] AGPL v3 라이선스 확인 + NOTICE 파일 작성
-- [ ] 브랜딩 (이름 확정, 로고, 컬러 팔레트)
-- [ ] 한국어 i18n 번들 (`ko.json`) 생성
-- [ ] 한국 뉴스 RSS 피드 30개 수집 + 테스트
-- [ ] KRX API 키 발급 + 연동 프로토타입
-- [ ] 업비트/바이낸스 WebSocket 김치 프리미엄 계산
-- [ ] Yahoo Finance 원자재 피드 연동
-- [ ] FRED API 키 발급 + 핵심 지표 5개 연동
-- [ ] 북한 도발 히스토리컬 DB (JSON) 초기 데이터 50건+
-- [ ] 경제 캘린더 레이어 구현
-- [ ] Tauri 빌드 확인 (macOS ARM/x64, Windows, Linux)
-- [ ] GitHub Actions CI/CD 파이프라인
-- [ ] README.md (한국어/영어 병행)
+### 🔴 버그
+- [ ] `TypeError: u is not a function` — 방어 코딩 적용됨, 에러 발생 시 이제 컴포넌트 스택 표시. 재현 시 스크린샷 필요
+
+### 🟡 단기 (바로 할 수 있는 것)
+- [ ] 경제 캘린더 fallback 데이터 (FOMC/CPI/PPI 하드코딩 — API 없어도 표시)
+- [ ] RSI(14) / MACD 기술 지표 (ChartPanel에 추가)
+- [ ] Vercel GitHub 자동 배포 (GitHub Secrets → Vercel token)
+
+### 🟢 중기
+- [ ] 모바일 레이아웃 최적화 (반응형 breakpoints)
+- [ ] 포트폴리오 백테스팅 ("2022년 금리 인상기 수익률은?")
+- [ ] AI 투자 어시스턴트 채팅 인터페이스
 
 ---
 
-## 부록: 이름 후보
+## 💰 비용
 
-| 이름 | 장점 | 단점 |
-|------|------|------|
-| **Signal** | 직관적, 강렬 | 메신저 Signal과 혼동 |
-| **Sigint** | OSINT/SIGINT 감성 | 군사용어라 딱딱 |
-| **Overwatch** | 게이머 친화적 | 블리자드 상표 |
-| **Sentinel** | 감시/경계 의미 | GitHub Sentinel 등 기존 사용 많음 |
-| **Haetae (해태)** | 한국 수호신, 유니크 | 외국인 발음 어려움 |
-| **Nuri (누리)** | "세상" 의미, 한국적 | 누리호와 혼동 |
+**현재 $0/월** — 전부 무료 tier
 
-**권고:** "Signal"은 메신저와 혼동 우려. **"Sentinel"** 또는 **"Haetae"** 추천. 한국 타겟이면 "해태"가 독특한 브랜딩 가능.
+| 서비스 | 용도 | 제한 |
+|---|---|---|
+| Vercel | 호스팅 | 월 100GB 대역폭 |
+| Yahoo Finance | 주가 데이터 | 비공식 API, rate limit 없음 |
+| Groq | AI 요약/브리핑 | 분당 30 요청 |
+| FRED | 거시경제 데이터 | 하루 120 요청 |
+| CartoDB | 지도 타일 | 무료 |
+| Reuters RSS | 뉴스 | 무료 |
+
+---
+
+## 📁 파일 구조 (핵심)
+
+```
+projects/signal/
+├── api/                    # Vercel Edge Functions (28개)
+│   ├── _cors.js            # CORS 설정 (signal-six-henna.vercel.app 허용)
+│   ├── insight-briefing.js # Groq AI 브리핑 (핵심)
+│   ├── korea-market.js     # KOSPI/KRW
+│   ├── global-macro.js     # SPX/나스닥/금/WTI
+│   ├── news-ai.js          # RSS + Groq 뉴스 요약 (NEW)
+│   └── ...
+├── src-react/              # React 앱 (canonical frontend)
+│   └── src/
+│       ├── aip/            # AIP 레이아웃 컴포넌트
+│       │   ├── AIPLayout.tsx
+│       │   ├── WorldMapView.tsx  # 지도 v2 (GeoJSON + 영향선)
+│       │   ├── HeatMapView.tsx
+│       │   ├── ChartView.tsx
+│       │   ├── LiveFeed.tsx
+│       │   ├── LiveNews.tsx      # AI/RSS 탭
+│       │   ├── Sidebar.tsx
+│       │   └── BottomStrip.tsx
+│       ├── layout/         # 그리드 레이아웃
+│       ├── panels/         # 18개 패널 컴포넌트
+│       │   ├── PortfolioPanel.tsx  # v2: 3탭 (보유/섹터/지정학)
+│       │   ├── AlertPanel.tsx      # VIX/KOSPI/KRW 임계값 알림
+│       │   └── ...
+│       └── store/
+│           ├── index.ts    # 메인 Zustand 스토어
+│           └── portfolio.ts # 포트폴리오 스토어
+└── src-tauri/              # Tauri 데스크탑 설정
+```

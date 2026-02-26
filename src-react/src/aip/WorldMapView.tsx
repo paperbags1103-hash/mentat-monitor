@@ -30,10 +30,13 @@ interface Hotspot {
 
 interface HotspotInvestmentData {
   sectors: string[];
-  tickers: string[];
+  tickers: string[];       // 🇰🇷 한국
+  tickersUS?: string[];    // 🇺🇸 미국
+  tickersJP?: string[];    // 🇯🇵 일본
+  tickersCN?: string[];    // 🇨🇳 중국/홍콩
   implication: string;
-  arcsTo: [number, number][];  // [lat, lng][] — 영향받는 금융 허브들
-  isoCountries: string[];     // ISO_A2 코드 — 오버레이 강조
+  arcsTo: [number, number][];
+  isoCountries: string[];
 }
 
 // ─── 지정학 핫스팟 ────────────────────────────────────────────────────────────
@@ -55,77 +58,108 @@ const HOTSPOTS: Hotspot[] = [
 const INVESTMENT_DATA: Record<string, HotspotInvestmentData> = {
   korean_peninsula: {
     sectors: ['방산', '반도체', 'ETF'],
-    tickers: ['한화에어로스페이스', 'LIG넥스원', '삼성전자'],
+    tickers:   ['한화에어로스페이스', 'LIG넥스원', '삼성전자'],
+    tickersUS: ['LMT', 'RTX', 'NOC'],
+    tickersJP: ['三菱重工(7011)', '川崎重工(7012)'],
     implication: '북한 도발 시 방산주 급등 + 코스피 외국인 이탈 반복 패턴. 단기 헤지: KODEX 인버스.',
     arcsTo: [[35.6762, 139.6503], [1.3521, 103.8198]],
     isoCountries: ['KP', 'KR'],
   },
   taiwan_strait: {
     sectors: ['반도체', 'IT부품', '해운'],
-    tickers: ['삼성전자', 'SK하이닉스', 'HMM'],
+    tickers:   ['삼성전자', 'SK하이닉스', 'HMM'],
+    tickersUS: ['NVDA', 'AMD', 'AMAT'],
+    tickersJP: ['東京エレクトロン(8035)', '信越化学(4063)'],
+    tickersCN: ['SMIC(0981.HK)', 'Alibaba(9988.HK)'],
     implication: '대만 긴장 격화 시 TSMC 대체 수혜 vs. 공급망 차질 이중 효과. 엔화 강세 연동.',
     arcsTo: [[37.5665, 126.9780], [35.6762, 139.6503], [1.3521, 103.8198]],
     isoCountries: ['TW', 'CN'],
   },
   middle_east: {
     sectors: ['에너지', '항공', '화학'],
-    tickers: ['S-Oil', '대한항공', 'LG화학'],
+    tickers:   ['S-Oil', '대한항공', 'LG화학'],
+    tickersUS: ['XOM', 'CVX', 'SLB'],
+    tickersJP: ['ENEOS(5020)', 'ANA(9202)'],
+    tickersCN: ['CNOOC(0883.HK)', 'PetroChina(0857.HK)'],
     implication: '중동 불안 → 유가 상승 → 정유사 마진 개선, 항공주 비용 부담. 원화 약세 압력.',
     arcsTo: [[37.5665, 126.9780], [28.6139, 77.2090]],
     isoCountries: ['IL', 'IR', 'SA', 'YE', 'SY', 'IQ'],
   },
   ukraine: {
     sectors: ['곡물', '에너지', '철강'],
-    tickers: ['POSCO홀딩스', 'CJ제일제당', '대한항공'],
+    tickers:   ['POSCO홀딩스', 'CJ제일제당', '대한항공'],
+    tickersUS: ['LMT', 'RTX', 'BA'],
+    tickersJP: ['住友商事(8053)', 'JFEホールディングス(5411)'],
+    tickersCN: ['CNOOC(0883.HK)', 'Sinopec(0386.HK)'],
     implication: '전쟁 장기화 시 원자재 가격 구조적 상승 → 철강·식품 원가 부담 지속.',
     arcsTo: [[37.5665, 126.9780], [40.7128, -74.0060]],
     isoCountries: ['UA', 'RU'],
   },
   south_china_sea: {
     sectors: ['해운', '반도체', '무역'],
-    tickers: ['HMM', '팬오션', '삼성전자'],
+    tickers:   ['HMM', '팬오션', '삼성전자'],
+    tickersUS: ['FDX', 'UPS', 'ZIM'],
+    tickersJP: ['日本郵船(9101)', '商船三井(9104)', '川崎汽船(9107)'],
+    tickersCN: ['COSCO(1919.HK)', 'Orient Overseas(0316.HK)'],
     implication: '남중국해 분쟁 시 물류비 급등 + 한국 수출 차질. 해운주 단기 수혜 후 리스크.',
     arcsTo: [[37.5665, 126.9780], [1.3521, 103.8198]],
     isoCountries: ['CN', 'PH', 'VN'],
   },
   iran: {
     sectors: ['에너지', '해운', '화학'],
-    tickers: ['S-Oil', 'GS에너지', 'HMM'],
+    tickers:   ['S-Oil', 'GS에너지', 'HMM'],
+    tickersUS: ['XOM', 'CVX', 'MPC'],
+    tickersJP: ['ENEOS(5020)', 'Idemitsu(5019)'],
+    tickersCN: ['CNOOC(0883.HK)', 'PetroChina(0857.HK)'],
     implication: '호르무즈 봉쇄 리스크 시 한국 원유 수입 70%+ 차질. WTI +20% 시나리오.',
     arcsTo: [[37.5665, 126.9780], [22.3964, 114.1095]],
     isoCountries: ['IR'],
   },
   north_korea: {
     sectors: ['방산', 'ETF', '반도체'],
-    tickers: ['한화에어로스페이스', '현대로템', 'KODEX 200'],
+    tickers:   ['한화에어로스페이스', '현대로템', 'KODEX 200'],
+    tickersUS: ['LMT', 'RTX', 'GD'],
+    tickersJP: ['三菱重工(7011)', '川崎重工(7012)'],
     implication: '미사일 발사 당일 코스피 평균 -0.8%. 방산주 +3~8%. 3일내 대부분 회복.',
     arcsTo: [[37.5665, 126.9780], [35.6762, 139.6503]],
     isoCountries: ['KP'],
   },
   new_york: {
     sectors: ['금융', '기술주', '환율'],
-    tickers: ['미래에셋증권', '삼성자산운용', 'TIGER 미국나스닥100'],
+    tickers:   ['미래에셋증권', '삼성자산운용', 'TIGER 미국나스닥100'],
+    tickersUS: ['JPM', 'GS', 'BLK', 'TLT'],
+    tickersJP: ['野村HD(8604)', '大和証券(8601)'],
+    tickersCN: ['건설은행(0939.HK)', 'HSBC(0005.HK)'],
     implication: '연준 금리 결정 → 달러/원 직접 연동. 금리 인상 시 외국인 코스피 순매도 패턴.',
     arcsTo: [[37.5665, 126.9780], [51.5074, -0.1278]],
     isoCountries: ['US'],
   },
   beijing: {
     sectors: ['철강', '화학', '배터리'],
-    tickers: ['POSCO홀딩스', 'LG에너지솔루션', 'SK이노베이션'],
+    tickers:   ['POSCO홀딩스', 'LG에너지솔루션', 'SK이노베이션'],
+    tickersUS: ['AAPL', 'NVDA', 'QCOM'],
+    tickersJP: ['ソニー(6758)', 'トヨタ(7203)'],
+    tickersCN: ['Alibaba(9988.HK)', 'Tencent(0700.HK)', 'BYD(1211.HK)'],
     implication: '중국 부양책 시 철강·화학 수혜. 기술패권 충돌 심화 시 배터리 공급망 우려.',
     arcsTo: [[37.5665, 126.9780], [35.6762, 139.6503]],
     isoCountries: ['CN'],
   },
   moscow: {
     sectors: ['에너지', '곡물', '방산'],
-    tickers: ['한화에어로스페이스', 'POSCO홀딩스', 'CJ제일제당'],
+    tickers:   ['한화에어로스페이스', 'POSCO홀딩스', 'CJ제일제당'],
+    tickersUS: ['LMT', 'RTX', 'XOM'],
+    tickersJP: ['三菱商事(8058)', ' 住友商事(8053)'],
+    tickersCN: ['CNOOC(0883.HK)', 'Norinco Int\'l(0592.HK)'],
     implication: '러 제재 확대 → 유럽 에너지 가격 재상승 → LNG 관련주 간접 수혜.',
     arcsTo: [[37.5665, 126.9780], [51.5074, -0.1278]],
     isoCountries: ['RU'],
   },
   hormuz: {
     sectors: ['에너지', '해운', '화학'],
-    tickers: ['S-Oil', 'GS칼텍스', 'HMM'],
+    tickers:   ['S-Oil', 'GS칼텍스', 'HMM'],
+    tickersUS: ['XOM', 'CVX', 'MPC'],
+    tickersJP: ['ENEOS(5020)', 'ANA(9202)'],
+    tickersCN: ['CNOOC(0883.HK)', 'COSCO(1919.HK)'],
     implication: '호르무즈 봉쇄 = 블랙스완. 한국 에너지 안보 최대 취약점. 유가 WTI $150+ 시나리오.',
     arcsTo: [[37.5665, 126.9780], [1.3521, 103.8198]],
     isoCountries: ['IR', 'OM'],
@@ -338,13 +372,55 @@ function SelectedPanel({ hotspot, onClose }: { hotspot: ScoredHotspot; onClose: 
               </div>
             </div>
 
-            {/* Tickers */}
+            {/* Tickers — 국가별 */}
             <div>
               <div className="text-xs text-gray-500 uppercase tracking-widest mb-1.5">관련 종목</div>
-              <div className="flex flex-wrap gap-1">
-                {inv.tickers.map(t => (
-                  <span key={t} className="text-xs px-2 py-0.5 rounded border font-mono" style={{ borderColor: color + '60', color, background: color + '12' }}>{t}</span>
-                ))}
+              <div className="flex flex-col gap-1.5">
+                {/* 🇰🇷 한국 */}
+                {inv.tickers.length > 0 && (
+                  <div>
+                    <span className="text-[10px] text-gray-600 mb-1 block">🇰🇷 한국</span>
+                    <div className="flex flex-wrap gap-1">
+                      {inv.tickers.map(t => (
+                        <span key={t} className="text-xs px-2 py-0.5 rounded border font-mono"
+                          style={{ borderColor: color + '60', color, background: color + '12' }}>{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 🇺🇸 미국 */}
+                {(inv.tickersUS?.length ?? 0) > 0 && (
+                  <div>
+                    <span className="text-[10px] text-gray-600 mb-1 block">🇺🇸 미국</span>
+                    <div className="flex flex-wrap gap-1">
+                      {inv.tickersUS!.map(t => (
+                        <span key={t} className="text-xs px-2 py-0.5 rounded border border-blue-500/40 text-blue-300 bg-blue-500/10 font-mono">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 🇯🇵 일본 */}
+                {(inv.tickersJP?.length ?? 0) > 0 && (
+                  <div>
+                    <span className="text-[10px] text-gray-600 mb-1 block">🇯🇵 일본</span>
+                    <div className="flex flex-wrap gap-1">
+                      {inv.tickersJP!.map(t => (
+                        <span key={t} className="text-xs px-2 py-0.5 rounded border border-red-400/40 text-red-300 bg-red-500/10 font-mono">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 🇨🇳 중국/홍콩 */}
+                {(inv.tickersCN?.length ?? 0) > 0 && (
+                  <div>
+                    <span className="text-[10px] text-gray-600 mb-1 block">🇨🇳 중국/홍콩</span>
+                    <div className="flex flex-wrap gap-1">
+                      {inv.tickersCN!.map(t => (
+                        <span key={t} className="text-xs px-2 py-0.5 rounded border border-yellow-500/40 text-yellow-300 bg-yellow-500/10 font-mono">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </>

@@ -11,7 +11,7 @@ import { persist } from 'zustand/middleware';
 import { useStore } from '@/store';
 import { apiFetch } from '@/store';
 
-type AlertCondition = 'price_above' | 'price_below' | 'risk_above' | 'pct_change';
+type AlertCondition = 'price_above' | 'price_below' | 'risk_above' | 'pct_change' | 'vix_above' | 'krw_above' | 'kospi_below';
 type AlertStatus = 'active' | 'triggered' | 'dismissed';
 
 export interface PriceAlert {
@@ -78,31 +78,89 @@ async function sendNotification(title: string, body: string) {
 // ── Alert checker hook ─────────────────────────────────────────────────────
 
 export function useAlertChecker() {
-  const { globalRiskScore } = useStore();
+  const { globalRiskScore, vix, kospi, usdkrw, briefing } = useStore();
   const { alerts, triggerAlert } = useAlertStore();
-  const prevRisk = useRef(globalRiskScore);
+  const prevRisk    = useRef(globalRiskScore);
+  const prevVix     = useRef(vix?.price ?? 0);
+  const prevKospi   = useRef(kospi?.price ?? 0);
+  const prevKrw     = useRef(usdkrw?.rate ?? 0);
+  const prevBriefId = useRef<number | null>(null);
 
-  // Check risk level alerts every time risk score changes
+  // ── 리스크 지수 알림 ────────────────────────────────────────────────────────
   useEffect(() => {
-    const activeRiskAlerts = alerts.filter(a => a.status === 'active' && a.type === 'risk_above');
-    activeRiskAlerts.forEach(alert => {
+    alerts.filter(a => a.status === 'active' && a.type === 'risk_above').forEach(alert => {
       if (globalRiskScore >= alert.targetValue && prevRisk.current < alert.targetValue) {
         triggerAlert(alert.id);
-        void sendNotification(
-          `🚨 위협 등급 경고 — Mentat Monitor`,
-          `${alert.nameKo}: 리스크 지수 ${globalRiskScore} (임계값 ${alert.targetValue} 초과)`
-        );
+        void sendNotification(`🚨 위협 등급 경고 — Mentat`, `${alert.nameKo}: 리스크 ${globalRiskScore} (임계값 ${alert.targetValue})`);
       }
     });
     prevRisk.current = globalRiskScore;
   }, [globalRiskScore, alerts, triggerAlert]);
+
+  // ── VIX 임계값 알림 ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const curVix = vix?.price ?? 0;
+    alerts.filter(a => a.status === 'active' && a.type === 'vix_above').forEach(alert => {
+      if (curVix >= alert.targetValue && prevVix.current < alert.targetValue) {
+        triggerAlert(alert.id);
+        void sendNotification(`😱 VIX 공포 경보 — Mentat`, `VIX ${curVix.toFixed(1)} (임계값 ${alert.targetValue} 초과) — 시장 공포 구간`);
+      }
+    });
+    prevVix.current = curVix;
+  }, [vix, alerts, triggerAlert]);
+
+  // ── KOSPI 하락 알림 ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const curKospi = kospi?.price ?? 0;
+    alerts.filter(a => a.status === 'active' && a.type === 'kospi_below').forEach(alert => {
+      if (curKospi > 0 && curKospi <= alert.targetValue && prevKospi.current > alert.targetValue) {
+        triggerAlert(alert.id);
+        void sendNotification(`📉 KOSPI 하락 경보 — Mentat`, `KOSPI ${curKospi.toLocaleString('ko-KR')} (임계값 ${alert.targetValue.toLocaleString()} 이하)`);
+      }
+    });
+    prevKospi.current = curKospi;
+  }, [kospi, alerts, triggerAlert]);
+
+  // ── USD/KRW 급등 알림 ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const curKrw = usdkrw?.rate ?? 0;
+    alerts.filter(a => a.status === 'active' && a.type === 'krw_above').forEach(alert => {
+      if (curKrw >= alert.targetValue && prevKrw.current < alert.targetValue) {
+        triggerAlert(alert.id);
+        void sendNotification(`💸 원화 약세 경보 — Mentat`, `USD/KRW ₩${curKrw.toFixed(0)} (임계값 ₩${alert.targetValue} 돌파)`);
+      }
+    });
+    prevKrw.current = curKrw;
+  }, [usdkrw, alerts, triggerAlert]);
+
+  // ── 새 CRITICAL 인퍼런스 감지 ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!briefing) return;
+    const genAt = briefing.generatedAt;
+    if (prevBriefId.current !== null && genAt !== prevBriefId.current) {
+      const criticals = briefing.topInferences.filter(i => i.severity === 'CRITICAL');
+      if (criticals.length > 0) {
+        void sendNotification(
+          `🔴 CRITICAL 신호 감지 — Mentat`,
+          criticals.slice(0, 2).map(i => i.titleKo).join(' / ')
+        );
+      }
+    }
+    prevBriefId.current = genAt;
+  }, [briefing]);
 }
 
 // ── Add Alert Form ─────────────────────────────────────────────────────────
 
-const QUICK_ALERTS = [
-  { type: 'risk_above' as AlertCondition, nameKo: '위험 리스크 경보', targetValue: 70 },
-  { type: 'risk_above' as AlertCondition, nameKo: '심각 리스크 경보', targetValue: 85 },
+const QUICK_ALERTS: { type: AlertCondition; nameKo: string; targetValue: number; emoji: string }[] = [
+  { type: 'risk_above',   nameKo: '위험 리스크 경보',  targetValue: 70,   emoji: '🚨' },
+  { type: 'risk_above',   nameKo: '심각 리스크 경보',  targetValue: 85,   emoji: '🔴' },
+  { type: 'vix_above',    nameKo: 'VIX 공포 구간',    targetValue: 25,   emoji: '😱' },
+  { type: 'vix_above',    nameKo: 'VIX 극도 공포',    targetValue: 35,   emoji: '🆘' },
+  { type: 'krw_above',    nameKo: '원화 약세 경보',    targetValue: 1450, emoji: '💸' },
+  { type: 'krw_above',    nameKo: '원화 위기 경보',    targetValue: 1500, emoji: '🚑' },
+  { type: 'kospi_below',  nameKo: 'KOSPI 하락 경보',  targetValue: 2400, emoji: '📉' },
+  { type: 'kospi_below',  nameKo: 'KOSPI 급락 경보',  targetValue: 2200, emoji: '💥' },
 ];
 
 function AddAlertForm({ onClose }: { onClose: () => void }) {
@@ -130,12 +188,13 @@ function AddAlertForm({ onClose }: { onClose: () => void }) {
         <h3 className="text-sm font-bold text-primary mb-4">알림 추가</h3>
 
         {/* Quick presets */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="grid grid-cols-2 gap-1.5 mb-4">
           {QUICK_ALERTS.map((qa, i) => (
             <button key={i} type="button"
               onClick={() => { setType(qa.type); setNameKo(qa.nameKo); setTarget(String(qa.targetValue)); }}
-              className="text-xs px-2 py-0.5 rounded bg-surface border border-border hover:border-accent/60 text-secondary">
-              {qa.nameKo}
+              className="text-xs px-2 py-1 rounded bg-surface border border-border hover:border-accent/60 text-secondary text-left leading-tight">
+              {qa.emoji} {qa.nameKo}
+              <span className="text-muted ml-1">{qa.targetValue}</span>
             </button>
           ))}
         </div>
@@ -145,10 +204,13 @@ function AddAlertForm({ onClose }: { onClose: () => void }) {
             <label className="text-xs text-muted block mb-1">알림 유형</label>
             <select value={type} onChange={e => setType(e.target.value as AlertCondition)}
               className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-primary focus:border-accent focus:outline-none">
-              <option value="price_above">가격 이상</option>
-              <option value="price_below">가격 이하</option>
-              <option value="risk_above">리스크 지수 이상</option>
-              <option value="pct_change">변동률 초과</option>
+              <option value="risk_above">🚨 리스크 지수 이상</option>
+              <option value="vix_above">😱 VIX 이상</option>
+              <option value="krw_above">💸 USD/KRW 이상</option>
+              <option value="kospi_below">📉 KOSPI 이하</option>
+              <option value="price_above">↑ 가격 이상</option>
+              <option value="price_below">↓ 가격 이하</option>
+              <option value="pct_change">± 변동률 초과</option>
             </select>
           </div>
           {(type === 'price_above' || type === 'price_below' || type === 'pct_change') && (
@@ -182,10 +244,13 @@ function AddAlertForm({ onClose }: { onClose: () => void }) {
 // ── Main panel ─────────────────────────────────────────────────────────────
 
 const TYPE_LABEL: Record<AlertCondition, string> = {
-  price_above: '↑ 가격 이상',
-  price_below: '↓ 가격 이하',
-  risk_above:  '🚨 리스크 이상',
-  pct_change:  '± 변동률',
+  price_above:  '↑ 가격 이상',
+  price_below:  '↓ 가격 이하',
+  risk_above:   '🚨 리스크 이상',
+  pct_change:   '± 변동률',
+  vix_above:    '😱 VIX 이상',
+  krw_above:    '💸 USD/KRW 이상',
+  kospi_below:  '📉 KOSPI 이하',
 };
 
 const STATUS_CLS: Record<AlertStatus, string> = {

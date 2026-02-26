@@ -9,24 +9,25 @@ interface Webcam {
   tags: string[]; // geopolitical regions to auto-trigger
 }
 
-// Public embed webcams (windy.com station IDs or YouTube live)
+// 채널 ID 기반 YouTube Live embed — 스트림 ID 만료 없음
+// 형식: https://www.youtube.com/embed/live_stream?channel=CHANNEL_ID
 const WEBCAMS: Webcam[] = [
-  { id: 'seoul-gwanghwamun', nameKo: '서울 광화문', region: 'korean_peninsula', tags: ['korea', 'korean_peninsula'],
-    embedUrl: 'https://www.youtube.com/embed/rD6VhLLJPAE?autoplay=1&mute=1' },
-  { id: 'seoul-namsan',      nameKo: '서울 남산타워', region: 'korean_peninsula', tags: ['korea', 'korean_peninsula'],
-    embedUrl: 'https://www.youtube.com/embed/MNn1-5QHiE8?autoplay=1&mute=1' },
-  { id: 'tokyo-shibuya',     nameKo: '도쿄 시부야', region: 'east_asia', tags: ['japan', 'east_asia'],
-    embedUrl: 'https://www.youtube.com/embed/rDLs69n0IH8?autoplay=1&mute=1' },
-  { id: 'newyork-times-sq',  nameKo: '뉴욕 타임스퀘어', region: 'usa', tags: ['usa', 'financial'],
-    embedUrl: 'https://www.youtube.com/embed/1EiC9bvVGnk?autoplay=1&mute=1' },
-  { id: 'taipei-101',        nameKo: '타이페이 101', region: 'taiwan_strait', tags: ['taiwan', 'taiwan_strait'],
-    embedUrl: 'https://www.youtube.com/embed/DpSeqaEQUQs?autoplay=1&mute=1' },
-  { id: 'hongkong-harbor',   nameKo: '홍콩 항구', region: 'east_asia', tags: ['china', 'east_asia'],
-    embedUrl: 'https://www.youtube.com/embed/ViFLNSFa1HU?autoplay=1&mute=1' },
-  { id: 'jerusalem',         nameKo: '예루살렘', region: 'middle_east', tags: ['israel', 'middle_east'],
-    embedUrl: 'https://www.youtube.com/embed/wTGqNMiLMFo?autoplay=1&mute=1' },
-  { id: 'moscow-kremlin',    nameKo: '모스크바 크렘린', region: 'europe', tags: ['russia', 'europe'],
-    embedUrl: 'https://www.youtube.com/embed/z29HVmQ2bRE?autoplay=1&mute=1' },
+  { id: 'ytn-korea',   nameKo: 'YTN 뉴스 (한국)',    region: 'korean_peninsula', tags: ['korea', 'korean_peninsula'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCO_aKKYxn4tvrqPjcTzZ6EQ&autoplay=1&mute=1' },
+  { id: 'jtbc-korea',  nameKo: 'JTBC 뉴스 (한국)',   region: 'korean_peninsula', tags: ['korea', 'korean_peninsula'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCClrS_9IuFPXZmRtyIPW0fQ&autoplay=1&mute=1' },
+  { id: 'nhk-world',   nameKo: 'NHK World (일본)',   region: 'east_asia', tags: ['japan', 'east_asia'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCCcey5CP5GDZeom987rqosg&autoplay=1&mute=1' },
+  { id: 'abc-news',    nameKo: 'ABC News (미국)',     region: 'usa', tags: ['usa', 'financial'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCBi2mrWuNuyYy4gbM6fU18Q&autoplay=1&mute=1' },
+  { id: 'cgtn',        nameKo: 'CGTN (중국)',         region: 'east_asia', tags: ['china', 'taiwan', 'east_asia', 'taiwan_strait'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCt6Lg1zOR7yNO3sAm2WMXiA&autoplay=1&mute=1' },
+  { id: 'aljazeera',   nameKo: 'Al Jazeera (중동)',  region: 'middle_east', tags: ['israel', 'middle_east'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCNye-wNBqNL5ZzHSJj3l8Bg&autoplay=1&mute=1' },
+  { id: 'france24',    nameKo: 'France 24 (유럽)',   region: 'europe', tags: ['europe', 'russia'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCQfwfsi5VrQ8yKZ-UWmAEFg&autoplay=1&mute=1' },
+  { id: 'dw-news',     nameKo: 'DW News (유럽/글로벌)', region: 'europe', tags: ['europe'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg&autoplay=1&mute=1' },
 ];
 
 // Map entity IDs → webcam tags

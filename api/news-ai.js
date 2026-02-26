@@ -19,9 +19,9 @@ let cacheTs = 0;
 
 // ─── RSS 소스 ─────────────────────────────────────────────────────────────────
 const RSS_SOURCES = [
-  'https://feeds.reuters.com/reuters/businessNews',
-  'https://feeds.reuters.com/reuters/worldNews',
-  'https://rss.cnn.com/rss/money_markets.rss',
+  'https://feeds.bbci.co.uk/news/business/rss.xml',
+  'https://feeds.bbci.co.uk/news/world/rss.xml',
+  'https://feeds.bbci.co.uk/news/technology/rss.xml',
 ];
 
 // ─── 간단 XML 파서 (edge runtime) ─────────────────────────────────────────────

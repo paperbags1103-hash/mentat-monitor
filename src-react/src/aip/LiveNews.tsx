@@ -15,9 +15,9 @@ interface NewsItem {
 }
 
 const RSS_SOURCES = [
-  { label: 'Reuters 월드', url: 'https://feeds.reuters.com/reuters/worldNews' },
-  { label: 'Reuters 비즈', url: 'https://feeds.reuters.com/reuters/businessNews' },
-  { label: '연합뉴스',     url: 'https://www.yna.co.kr/rss/economy.xml' },
+  { label: 'BBC 비즈니스', url: 'https://feeds.bbci.co.uk/news/business/rss.xml' },
+  { label: 'BBC 월드',     url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+  { label: 'BBC 테크',     url: 'https://feeds.bbci.co.uk/news/technology/rss.xml' },
 ] as const;
 
 function timeAgo(dateStr: string): string {

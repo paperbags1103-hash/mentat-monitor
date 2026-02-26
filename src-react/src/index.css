@@ -2,13 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Theme Variables ─────────────────────────────────────────────────────── */
+:root, [data-theme="montra"] {
+  --color-appbase: #08101e;
+  --color-surface: #0c1628;
+  --color-panel: #0f1e35;
+  --color-border: #1c2d45;
+  --color-accent: #1d6ae8;
+  --color-accent-light: #60a5fa;
+  --color-muted: #4a6080;
+  --color-primary: #f1f5f9;
+  --color-secondary: #94a3b8;
+  --scrollbar-thumb: #1c2d45;
+  --scrollbar-hover: #1d6ae8;
+}
+[data-theme="ghost"] {
+  --color-appbase: #0a0a0f;
+  --color-surface: #12121a;
+  --color-panel: #1a1a28;
+  --color-border: #2a2a3f;
+  --color-accent: #7c3aed;
+  --color-accent-light: #a78bfa;
+  --color-muted: #475569;
+  --color-primary: #f1f5f9;
+  --color-secondary: #94a3b8;
+  --scrollbar-thumb: #2a2a3f;
+  --scrollbar-hover: #7c3aed;
+}
+[data-theme="matrix"] {
+  --color-appbase: #050f05;
+  --color-surface: #091409;
+  --color-panel: #0d1c0d;
+  --color-border: #1a2e1a;
+  --color-accent: #16a34a;
+  --color-accent-light: #4ade80;
+  --color-muted: #3d6b3d;
+  --color-primary: #dcfce7;
+  --color-secondary: #86efac;
+  --scrollbar-thumb: #1a2e1a;
+  --scrollbar-hover: #16a34a;
+}
+[data-theme="amber"] {
+  --color-appbase: #0f0c05;
+  --color-surface: #17120a;
+  --color-panel: #1f1a0f;
+  --color-border: #2e2510;
+  --color-accent: #d97706;
+  --color-accent-light: #fbbf24;
+  --color-muted: #6b5a2a;
+  --color-primary: #fef3c7;
+  --color-secondary: #fde68a;
+  --scrollbar-thumb: #2e2510;
+  --scrollbar-hover: #d97706;
+}
+
 @layer base {
   * { box-sizing: border-box; }
-  html, body { height: 100%; background: #0a0a0f; color: #f1f5f9; }
+  html, body { height: 100%; background: var(--color-appbase); color: var(--color-primary); }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a3f; border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 }
 
 /* ── react-grid-layout overrides ─────────────────────────────────────── */

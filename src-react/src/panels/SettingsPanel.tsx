@@ -3,6 +3,7 @@
  * 모든 설정은 localStorage에만 저장 (서버 전송 없음)
  */
 import { useState, useEffect } from 'react';
+import { useThemeStore, THEMES } from '@/store/theme';
 
 interface ApiKeys {
   groq: string;
@@ -76,6 +77,7 @@ function KeyField({ label, name, value, onChange, link, desc, placeholder }: Key
 export function SettingsPanel() {
   const [keys, setKeys] = useState<ApiKeys>({ groq: '', fred: '', alphavantage: '' });
   const [saved, setSaved] = useState(false);
+  const { theme, setTheme } = useThemeStore();
 
   useEffect(() => { setKeys(loadKeys()); }, []);
 
@@ -104,6 +106,33 @@ export function SettingsPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
+        {/* 테마 선택 */}
+        <div className="mb-5">
+          <div className="text-xs font-bold text-muted uppercase tracking-widest mb-2">UI 테마</div>
+          <div className="grid grid-cols-2 gap-2">
+            {THEMES.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded border text-left transition-all ${
+                  theme === t.id
+                    ? 'border-accent bg-accent/10 text-accent-light'
+                    : 'border-border text-muted hover:text-primary hover:border-accent/40'
+                }`}
+              >
+                <span className="text-base">{t.emoji}</span>
+                <div>
+                  <div className="text-xs font-bold font-mono">{t.name}</div>
+                  <div className="text-[10px] text-muted leading-tight">{t.desc}</div>
+                </div>
+                {theme === t.id && <span className="ml-auto text-xs text-accent-light">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-border/40 mb-4" />
+
         <KeyField
           label="Groq API"
           name="groq"

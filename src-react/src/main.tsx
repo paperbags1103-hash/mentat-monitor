@@ -2,6 +2,8 @@ import React, { Component, type ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import './index.css';
+import { initTheme } from '@/store/theme';
+initTheme(); // 저장된 테마를 DOM에 즉시 적용 (첫 렌더 전)
 
 class ErrorBoundary extends Component<
   { children: ReactNode },

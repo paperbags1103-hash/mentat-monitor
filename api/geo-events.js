@@ -14,9 +14,14 @@ const CACHE_TTL = 20 * 60_000;
 let cache = null;
 let cacheTs = 0;
 
-const RSS_SOURCES = [
+const RSS_SOURCES_PRIMARY = [
+  'https://www.aljazeera.com/xml/rss/all.xml',
+  'https://rss.dw.com/rdf/rss-en-all',
+];
+const RSS_SOURCES_FALLBACK = [
   'https://feeds.bbci.co.uk/news/world/rss.xml',
   'https://feeds.bbci.co.uk/news/business/rss.xml',
+  'https://www.theguardian.com/world/rss',
 ];
 
 // ─── 카테고리 메타데이터 ───────────────────────────────────────────────────────
@@ -30,11 +35,15 @@ export const CATEGORY_META = {
 };
 
 // ─── RSS fetch ────────────────────────────────────────────────────────────────
-async function fetchRssHeadlines() {
+async function fetchRssFrom(sources) {
   const headlines = [];
-  for (const url of RSS_SOURCES) {
+  const RSS_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (compatible; MentatMonitor/1.0; +https://signal-six-henna.vercel.app)',
+    'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+  };
+  for (const url of sources) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000), headers: RSS_HEADERS, redirect: 'follow' });
       if (!res.ok) continue;
       const xml = await res.text();
       const items = [...xml.matchAll(/<item>[\s\S]*?<\/item>/g)];
@@ -48,7 +57,14 @@ async function fetchRssHeadlines() {
       }
     } catch { /* skip */ }
   }
-  return headlines.slice(0, 20);
+  return headlines;
+}
+
+async function fetchRssHeadlines() {
+  const primary = await fetchRssFrom(RSS_SOURCES_PRIMARY);
+  if (primary.length >= 5) return primary.slice(0, 20);
+  const fallback = await fetchRssFrom(RSS_SOURCES_FALLBACK);
+  return [...primary, ...fallback].slice(0, 20);
 }
 
 // ─── Groq 지리 이벤트 추출 ────────────────────────────────────────────────────

@@ -319,9 +319,16 @@ const SEV_RADIUS: Record<GeoEvent['severity'], number> = {
   critical: 12, high: 9, medium: 7, low: 5,
 };
 
-function LayerControl({ layers, onToggle }: {
+type CategoryKey = GeoEvent['category'];
+type SeverityFilter = 'all' | 'high' | 'critical';
+
+function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, severityFilter, onSeverityChange }: {
   layers: LayerState;
   onToggle: (key: keyof LayerState) => void;
+  activeCategories: Set<CategoryKey>;
+  onToggleCategory: (cat: CategoryKey) => void;
+  severityFilter: SeverityFilter;
+  onSeverityChange: (f: SeverityFilter) => void;
 }) {
   const btns: { key: keyof LayerState; label: string; active: string }[] = [
     { key: 'threats',  label: '🎯 위협 핀',      active: 'text-red-400 border-red-500/50 bg-red-500/20' },
@@ -329,10 +336,18 @@ function LayerControl({ layers, onToggle }: {
     { key: 'arcs',     label: '⚡ 영향선',       active: 'text-purple-400 border-purple-500/50 bg-purple-500/20' },
     { key: 'aircraft', label: '✈ VIP 항공기',    active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
     { key: 'shipping', label: '🚢 해운 항로',     active: 'text-cyan-400 border-cyan-500/50 bg-cyan-500/20' },
-    { key: 'events',   label: '📌 뉴스 이벤트',   active: 'text-pink-400 border-pink-500/50 bg-pink-500/20' },
+    { key: 'events',   label: '📌 뉴스 이벤트',  active: 'text-pink-400 border-pink-500/50 bg-pink-500/20' },
   ];
+
+  const sevOptions: { key: SeverityFilter; label: string }[] = [
+    { key: 'all',      label: '전체' },
+    { key: 'high',     label: '높음↑' },
+    { key: 'critical', label: '위급만' },
+  ];
+
   return (
     <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-1.5">
+      {/* 레이어 토글 */}
       {btns.map(b => (
         <button key={b.key} onClick={() => onToggle(b.key)}
           className={`text-xs px-2.5 py-1 rounded border font-semibold transition-all backdrop-blur-sm ${
@@ -341,6 +356,52 @@ function LayerControl({ layers, onToggle }: {
           {b.label}
         </button>
       ))}
+
+      {/* 이벤트 필터 패널 — events 켜진 경우만 */}
+      {layers.events && (
+        <div className="bg-black/80 backdrop-blur-sm border border-pink-500/20 rounded-lg p-2 mt-1 flex flex-col gap-2">
+          {/* 카테고리 토글 */}
+          <div>
+            <p className="text-[10px] text-gray-500 mb-1 font-semibold">카테고리</p>
+            <div className="grid grid-cols-2 gap-1">
+              {(Object.entries(CATEGORY_META) as [CategoryKey, typeof CATEGORY_META[CategoryKey]][]).map(([key, meta]) => (
+                <button key={key} onClick={() => onToggleCategory(key)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded border transition-all flex items-center gap-1 ${
+                    activeCategories.has(key)
+                      ? 'border-opacity-60 font-semibold'
+                      : 'border-gray-700 text-gray-600 bg-transparent'
+                  }`}
+                  style={activeCategories.has(key) ? {
+                    borderColor: meta.color + '80',
+                    color: meta.color,
+                    background: meta.color + '18',
+                  } : undefined}
+                >
+                  <span>{meta.icon}</span>
+                  <span>{meta.labelKo}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 심각도 필터 */}
+          <div>
+            <p className="text-[10px] text-gray-500 mb-1 font-semibold">심각도</p>
+            <div className="flex gap-1">
+              {sevOptions.map(s => (
+                <button key={s.key} onClick={() => onSeverityChange(s.key)}
+                  className={`text-[10px] px-2 py-0.5 rounded border transition-all flex-1 ${
+                    severityFilter === s.key
+                      ? 'bg-pink-500/20 border-pink-500/50 text-pink-300 font-semibold'
+                      : 'border-gray-700 text-gray-600 hover:text-gray-400'
+                  }`}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -534,6 +595,20 @@ export function WorldMapView() {
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
+  // 이벤트 필터
+  const ALL_CATEGORIES = new Set<CategoryKey>(Object.keys(CATEGORY_META) as CategoryKey[]);
+  const [activeCategories, setActiveCategories] = useState<Set<CategoryKey>>(ALL_CATEGORIES);
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
+
+  function toggleCategory(cat: CategoryKey) {
+    setActiveCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) { next.delete(cat); if (next.size === 0) return new Set(ALL_CATEGORIES); }
+      else next.add(cat);
+      return next;
+    });
+  }
+
   // GeoJSON 데이터 (CDN 로드)
   const [geoData, setGeoData] = useState<any>(null);
 
@@ -688,7 +763,14 @@ export function WorldMapView() {
         ))}
 
         {/* ── 뉴스 이벤트 핀 ── */}
-        {layers.events && geoEvents.map(ev => {
+        {layers.events && geoEvents
+          .filter(ev => {
+            if (!activeCategories.has(ev.category)) return false;
+            if (severityFilter === 'critical' && ev.severity !== 'critical') return false;
+            if (severityFilter === 'high' && ev.severity !== 'critical' && ev.severity !== 'high') return false;
+            return true;
+          })
+          .map(ev => {
           const meta = CATEGORY_META[ev.category] ?? CATEGORY_META.politics;
           const radius = SEV_RADIUS[ev.severity] ?? 7;
           const isSelected = selectedEventId === ev.id;
@@ -758,7 +840,14 @@ export function WorldMapView() {
       </MapContainer>
 
       {/* 레이어 컨트롤 */}
-      <LayerControl layers={layers} onToggle={toggleLayer} />
+      <LayerControl
+        layers={layers}
+        onToggle={toggleLayer}
+        activeCategories={activeCategories}
+        onToggleCategory={toggleCategory}
+        severityFilter={severityFilter}
+        onSeverityChange={setSeverityFilter}
+      />
 
       {/* 선택된 핫스팟 상세 패널 */}
       {selectedHotspot && (

@@ -65,6 +65,7 @@ export interface ActiveTheme {
   beneficiaryKo?: string[];
   riskKo?: string[];
   koreanStocks?: string[];
+  usStocks?: string[];
   updatedAt: number;
 }
 
@@ -391,6 +392,7 @@ export const useStore = create<DataState>()((set, get) => ({
         beneficiaryKo: t.beneficiaryKo ?? [],
         riskKo:       t.riskKo        ?? [],
         koreanStocks:  t.koreanStocks  ?? [],
+        usStocks:      t.usStocks      ?? [],
       }));
       set({ activeThemes: themes, themeDiscoveryMethod: data.method });
     }

@@ -588,7 +588,8 @@ export default async function handler(req) {
     riskOn        = [],
     riskOff       = [],
     method: narrativeMethod,
-  } = await generateNarrative(inferences, globalRiskScore, riskLabel, process.env.GROQ_API_KEY, combinedMarket);
+  } = await generateNarrative(inferences, globalRiskScore, riskLabel,
+      process.env.GROQ_API_KEY || req.headers.get('x-groq-key') || '', combinedMarket);
 
   // ── Market outlook ────────────────────────────────────────────────────────────
 

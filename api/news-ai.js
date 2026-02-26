@@ -16,11 +16,17 @@ export const config = { runtime: 'edge' };
 const CACHE_TTL_MS = 10 * 60_000;
 const caches = new Map(); // key → { data, ts }
 
-// ─── RSS 소스 ─────────────────────────────────────────────────────────────────
-const RSS_SOURCES = [
-  'https://feeds.bbci.co.uk/news/business/rss.xml',
-  'https://feeds.bbci.co.uk/news/world/rss.xml',
-  'https://feeds.bbci.co.uk/news/technology/rss.xml',
+// ─── RSS 소스 (primary + fallback) ────────────────────────────────────────────
+const RSS_SOURCES_PRIMARY = [
+  { url: 'https://feeds.bbci.co.uk/news/business/rss.xml',    label: 'BBC 비즈' },
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml',       label: 'BBC 월드' },
+  { url: 'https://feeds.bbci.co.uk/news/technology/rss.xml',  label: 'BBC 테크' },
+];
+
+const RSS_SOURCES_FALLBACK = [
+  { url: 'https://www.theguardian.com/business/rss',           label: 'Guardian 비즈' },
+  { url: 'https://www.theguardian.com/world/rss',              label: 'Guardian 월드' },
+  { url: 'https://www.aljazeera.com/xml/rss/all.xml',          label: 'AlJazeera' },
 ];
 
 // ─── 간단 XML 파서 (edge runtime) ─────────────────────────────────────────────
@@ -50,7 +56,7 @@ function stripCDATA(str) {
 }
 
 // ─── RSS fetch ────────────────────────────────────────────────────────────────
-async function fetchRSS(url) {
+async function fetchRSS({ url, label }) {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
@@ -61,11 +67,20 @@ async function fetchRSS(url) {
     });
     if (!res.ok) return [];
     const xml = await res.text();
-    const label = url.includes('business') ? 'Reuters Biz' : url.includes('world') ? 'Reuters World' : 'CNN Markets';
     return parseRSSItems(xml, label);
   } catch {
     return [];
   }
+}
+
+async function fetchAllRSS() {
+  // 1차: primary 소스 시도
+  const primary = (await Promise.all(RSS_SOURCES_PRIMARY.map(fetchRSS))).flat();
+  if (primary.length >= 5) return primary;
+
+  // primary 실패 시 fallback 병렬 시도
+  const fallback = (await Promise.all(RSS_SOURCES_FALLBACK.map(fetchRSS))).flat();
+  return [...primary, ...fallback];
 }
 
 // ─── Groq 요약 ────────────────────────────────────────────────────────────────
@@ -174,8 +189,8 @@ export default async function handler(req) {
   const groqKey = process.env.GROQ_API_KEY || req.headers.get('x-groq-key') || '';
 
   try {
-    // RSS 병렬 fetch
-    const allItems = (await Promise.all(RSS_SOURCES.map(fetchRSS))).flat();
+    // RSS fetch (primary → fallback)
+    const allItems = await fetchAllRSS();
     // 중복 제목 제거 (앞 40자로 비교)
     const seen = new Set();
     const unique = allItems.filter(h => {

@@ -94,9 +94,9 @@ function AIPTopBar({ onLayoutSwitch }: { onLayoutSwitch: () => void }) {
           className="text-xs px-2.5 py-1 bg-accent/20 text-accent-light border border-accent/40 rounded hover:bg-accent/30 transition-colors font-semibold">
           + 패널
         </button>
-        <button onClick={resetLayout}
+        <button onClick={() => resetLayout?.()}
           className="text-xs px-2 py-1 text-muted hover:text-primary transition-colors" title="레이아웃 초기화">⟳</button>
-        <button onClick={onLayoutSwitch}
+        <button onClick={() => onLayoutSwitch?.()}
           className="text-xs px-2 py-1 bg-border text-secondary hover:text-primary rounded transition-colors" title="그리드 모드 전환">
           ⊞ 그리드
         </button>

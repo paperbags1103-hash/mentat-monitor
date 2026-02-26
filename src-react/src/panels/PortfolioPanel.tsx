@@ -230,7 +230,10 @@ export function PortfolioPanel() {
           {/* Holdings list */}
           <div className="flex-1 overflow-y-auto px-3 py-2">
             {holdings.map(h => (
-              <HoldingRow key={h.id} h={h} onRemove={() => removeHolding(h.id)} onSelect={() => selectSymbol(h.symbol, h.nameKo)} />
+              <HoldingRow key={h.id} h={h}
+                onRemove={() => removeHolding?.(h.id)}
+                onSelect={typeof selectSymbol === 'function' ? () => selectSymbol(h.symbol, h.nameKo) : undefined}
+              />
             ))}
           </div>
         </>

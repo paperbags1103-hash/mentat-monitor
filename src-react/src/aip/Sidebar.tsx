@@ -2,7 +2,9 @@
  * Sidebar — 왼쪽 아이콘 사이드바 (팔란티어 AIP 스타일)
  * 뷰 전환 + 주요 모듈 접근
  */
+import { useState } from 'react';
 import type { MainViewType } from './AIPLayout';
+import { useThemeStore, THEMES } from '@/store/theme';
 
 interface NavItem {
   view?: MainViewType;
@@ -30,7 +32,18 @@ interface Props {
   riskScore: number;
 }
 
+// 테마 색상 점 (미리보기)
+const THEME_PREVIEW: Record<string, string> = {
+  montra: '#1d6ae8',
+  ghost:  '#7c3aed',
+  matrix: '#16a34a',
+  amber:  '#d97706',
+};
+
 export function Sidebar({ activeView, onViewChange, riskScore }: Props) {
+  const [showTheme, setShowTheme] = useState(false);
+  const { theme, setTheme } = useThemeStore();
+
   return (
     <div className="w-14 bg-surface border-r border-border flex flex-col items-center py-2 shrink-0">
       {/* Logo */}
@@ -68,14 +81,40 @@ export function Sidebar({ activeView, onViewChange, riskScore }: Props) {
         })}
       </div>
 
-      {/* Bottom */}
-      <div className="flex flex-col gap-1 w-full px-1.5">
-        {BOTTOM_ITEMS.map((item, i) => (
-          <button key={i} title={item.label}
-            className="w-full h-10 rounded-lg flex items-center justify-center text-muted hover:text-primary hover:bg-border/60 transition-all">
-            {item.icon}
-          </button>
-        ))}
+      {/* Bottom — 테마 버튼 */}
+      <div className="flex flex-col gap-1 w-full px-1.5 relative">
+        <button
+          onClick={() => setShowTheme(s => !s)}
+          title="UI 테마 변경"
+          className={`w-full h-10 rounded-lg flex items-center justify-center text-muted hover:text-primary hover:bg-border/60 transition-all relative ${showTheme ? 'bg-border/60 text-primary' : ''}`}
+        >
+          {/* 현재 테마 색상 점 */}
+          <span style={{ fontSize: '18px', filter: `drop-shadow(0 0 4px ${THEME_PREVIEW[theme]})` }}>🎨</span>
+        </button>
+
+        {/* 테마 팝업 */}
+        {showTheme && (
+          <div className="absolute bottom-12 left-1 z-50 w-44 bg-panel border border-border rounded-lg shadow-2xl p-2">
+            <div className="text-[10px] text-muted uppercase tracking-widest mb-2 px-1">UI 테마</div>
+            {THEMES.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setTheme(t.id); setShowTheme(false); }}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all text-left ${
+                  theme === t.id
+                    ? 'bg-accent/15 text-accent-light'
+                    : 'text-muted hover:text-primary hover:bg-border/60'
+                }`}
+              >
+                <span className="w-3 h-3 rounded-full shrink-0 border"
+                  style={{ background: THEME_PREVIEW[t.id], borderColor: THEME_PREVIEW[t.id] + '88' }} />
+                <span className="text-xs font-mono font-bold">{t.name}</span>
+                <span className="text-[10px] text-muted ml-auto truncate">{t.desc}</span>
+                {theme === t.id && <span className="text-accent-light text-xs shrink-0">✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   MapContainer, TileLayer, CircleMarker, Circle,
-  Popup, ZoomControl, Polyline, useMap,
+  Popup, Tooltip, ZoomControl, Polyline, useMap,
 } from 'react-leaflet';
 import L from 'leaflet';
 import type { PathOptions, StyleFunction } from 'leaflet';
@@ -288,7 +288,36 @@ interface LayerState {
   arcs: boolean;
   aircraft: boolean;
   shipping: boolean;
+  events: boolean;
 }
+
+// ─── 지리 이벤트 (뉴스 기반) ─────────────────────────────────────────────────
+interface GeoEvent {
+  id: string;
+  lat: number;
+  lng: number;
+  region: string;
+  category: 'conflict' | 'terrorism' | 'politics' | 'economy' | 'social' | 'disaster';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  titleKo: string;
+  summaryKo: string;
+  tags?: string[];
+  investmentImpactKo?: string;
+  updatedAt: number;
+}
+
+const CATEGORY_META: Record<GeoEvent['category'], { icon: string; color: string; labelKo: string }> = {
+  conflict:  { icon: '⚔️',  color: '#ef4444', labelKo: '분쟁·전쟁' },
+  terrorism: { icon: '💣',  color: '#f97316', labelKo: '테러' },
+  politics:  { icon: '🏛️',  color: '#3b82f6', labelKo: '정치' },
+  economy:   { icon: '📈',  color: '#22c55e', labelKo: '경제' },
+  social:    { icon: '🧩',  color: '#eab308', labelKo: '사회' },
+  disaster:  { icon: '🌪️',  color: '#a855f7', labelKo: '재해' },
+};
+
+const SEV_RADIUS: Record<GeoEvent['severity'], number> = {
+  critical: 12, high: 9, medium: 7, low: 5,
+};
 
 function LayerControl({ layers, onToggle }: {
   layers: LayerState;
@@ -300,6 +329,7 @@ function LayerControl({ layers, onToggle }: {
     { key: 'arcs',     label: '⚡ 영향선',       active: 'text-purple-400 border-purple-500/50 bg-purple-500/20' },
     { key: 'aircraft', label: '✈ VIP 항공기',    active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
     { key: 'shipping', label: '🚢 해운 항로',     active: 'text-cyan-400 border-cyan-500/50 bg-cyan-500/20' },
+    { key: 'events',   label: '📌 뉴스 이벤트',   active: 'text-pink-400 border-pink-500/50 bg-pink-500/20' },
   ];
   return (
     <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-1.5">
@@ -430,6 +460,58 @@ function SelectedPanel({ hotspot, onClose }: { hotspot: ScoredHotspot; onClose: 
   );
 }
 
+// ─── 뉴스 이벤트 상세 패널 ───────────────────────────────────────────────────
+function EventPanel({ event, onClose }: { event: GeoEvent; onClose: () => void }) {
+  const meta = CATEGORY_META[event.category];
+  const sevColor = event.severity === 'critical' ? '#ef4444'
+    : event.severity === 'high' ? '#f97316'
+    : event.severity === 'medium' ? '#eab308' : '#22c55e';
+
+  return (
+    <div className="absolute bottom-12 left-3 z-[1000] w-72 bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl"
+      style={{ borderColor: meta.color + '55' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b"
+        style={{ borderColor: meta.color + '33', background: meta.color + '15' }}>
+        <div className="flex items-center gap-2">
+          <span>{meta.icon}</span>
+          <span className="text-xs font-bold" style={{ color: meta.color }}>{meta.labelKo}</span>
+          <span className="text-xs font-bold text-gray-400">·</span>
+          <span className="text-xs text-gray-300 font-semibold">{event.region}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+            style={{ background: sevColor + '30', color: sevColor }}>
+            {event.severity === 'critical' ? '위급' : event.severity === 'high' ? '높음'
+              : event.severity === 'medium' ? '보통' : '낮음'}
+          </span>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+        </div>
+      </div>
+
+      <div className="p-3 space-y-2.5">
+        <p className="text-sm font-bold text-white leading-tight">{event.titleKo}</p>
+        <p className="text-xs text-gray-300 leading-relaxed">{event.summaryKo}</p>
+
+        {event.tags && event.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {event.tags.map(tag => (
+              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700">#{tag}</span>
+            ))}
+          </div>
+        )}
+
+        {event.investmentImpactKo && (
+          <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-2.5">
+            <p className="text-[10px] text-green-400 font-semibold mb-1">💹 투자 영향</p>
+            <p className="text-xs text-gray-300 leading-relaxed">{event.investmentImpactKo}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export function WorldMapView() {
   const { briefing, globalRiskScore } = useStore();
@@ -442,10 +524,15 @@ export function WorldMapView() {
     arcs: true,
     aircraft: false,
     shipping: false,
+    events: true,
   });
 
   // 선택된 핫스팟
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // 뉴스 기반 지리 이벤트
+  const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   // GeoJSON 데이터 (CDN 로드)
   const [geoData, setGeoData] = useState<any>(null);
@@ -456,6 +543,19 @@ export function WorldMapView() {
       .then(r => r.json())
       .then(setGeoData)
       .catch(() => { /* GeoJSON 없어도 동작 — 핀만 표시 */ });
+  }, []);
+
+  // geo-events 로드 (뉴스 기반 이벤트 핀)
+  useEffect(() => {
+    const load = () => {
+      fetch('/api/geo-events')
+        .then(r => r.json())
+        .then(d => { if (Array.isArray(d.events)) setGeoEvents(d.events); })
+        .catch(() => { /* graceful */ });
+    };
+    load();
+    const id = setInterval(load, 20 * 60_000); // 20분마다 갱신
+    return () => clearInterval(id);
   }, []);
 
   function toggleLayer(key: keyof LayerState) {
@@ -564,31 +664,66 @@ export function WorldMapView() {
               weight: selectedId === h.id ? 3 : 2,
             }}
             eventHandlers={{
-              click: () => setSelectedId(prev => prev === h.id ? null : h.id),
+              click: () => {
+                setSelectedId(prev => prev === h.id ? null : h.id);
+                setSelectedEventId(null);
+              },
             }}
           >
-            <Popup>
-              <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '10px 12px', borderRadius: '8px', minWidth: '200px', fontFamily: 'monospace' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: scoreToColor(h.score), flexShrink: 0 }} />
-                  <span style={{ fontWeight: 'bold', fontSize: '13px' }}>{h.nameKo}</span>
-                  <span style={{ fontSize: '11px', color: scoreToColor(h.score), marginLeft: 'auto' }}>{Math.round(h.score)}/100</span>
+            <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+              <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${scoreToColor(h.score)}44`, fontFamily: 'system-ui', minWidth: '160px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: scoreToColor(h.score), flexShrink: 0 }} />
+                  <span style={{ fontWeight: 700, fontSize: '12px' }}>{h.nameKo}</span>
+                  <span style={{ fontSize: '11px', color: scoreToColor(h.score), marginLeft: 'auto', fontWeight: 'bold' }}>{Math.round(h.score)}</span>
                 </div>
-                {h.matchedInferences.slice(0, 2).map((inf, i) => (
-                  <div key={i} style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '3px' }}>
-                    · {severityKo(inf.severity)} {inf.titleKo}
-                  </div>
+                <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '3px' }}>위험도 {Math.round(h.score)}/100</div>
+                {h.matchedInferences.slice(0, 1).map((inf, i) => (
+                  <div key={i} style={{ fontSize: '10px', color: '#94a3b8' }}>· {inf.titleKo}</div>
                 ))}
-                {h.matchedInferences.length === 0 && (
-                  <div style={{ fontSize: '11px', color: '#475569' }}>활성 위협 없음</div>
-                )}
-                <div style={{ marginTop: '8px', fontSize: '10px', color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: '6px' }}>
-                  ↙ 클릭하면 투자 시사점 패널 표시
-                </div>
+                <div style={{ marginTop: '4px', fontSize: '10px', color: '#475569' }}>클릭 → 투자 시사점</div>
               </div>
-            </Popup>
+            </Tooltip>
           </CircleMarker>
         ))}
+
+        {/* ── 뉴스 이벤트 핀 ── */}
+        {layers.events && geoEvents.map(ev => {
+          const meta = CATEGORY_META[ev.category] ?? CATEGORY_META.politics;
+          const radius = SEV_RADIUS[ev.severity] ?? 7;
+          const isSelected = selectedEventId === ev.id;
+          return (
+            <CircleMarker key={ev.id}
+              center={[ev.lat, ev.lng]}
+              radius={radius}
+              pathOptions={{
+                color: meta.color,
+                fillColor: isSelected ? '#ffffff' : meta.color,
+                fillOpacity: isSelected ? 0.95 : 0.75,
+                weight: isSelected ? 3 : 1.5,
+                dashArray: ev.category === 'conflict' || ev.category === 'terrorism' ? undefined : '4 3',
+              }}
+              eventHandlers={{
+                click: () => {
+                  setSelectedEventId(prev => prev === ev.id ? null : ev.id);
+                  setSelectedId(null);
+                },
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${meta.color}44`, fontFamily: 'system-ui', minWidth: '160px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '14px' }}>{meta.icon}</span>
+                    <span style={{ fontWeight: 700, fontSize: '12px' }}>{ev.region}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: meta.color, fontWeight: 600, marginBottom: '2px' }}>{meta.labelKo}</div>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', lineHeight: 1.4 }}>{ev.titleKo}</div>
+                  <div style={{ marginTop: '4px', fontSize: '10px', color: '#475569' }}>클릭 → 세부정보</div>
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
 
         {/* ── VIP 항공기 ── */}
         {layers.aircraft && VIP_AIRCRAFT.map(ac => (
@@ -630,6 +765,14 @@ export function WorldMapView() {
         <SelectedPanel hotspot={selectedHotspot} onClose={() => setSelectedId(null)} />
       )}
 
+      {/* 뉴스 이벤트 상세 패널 */}
+      {selectedEventId && geoEvents.find(e => e.id === selectedEventId) && (
+        <EventPanel
+          event={geoEvents.find(e => e.id === selectedEventId)!}
+          onClose={() => setSelectedEventId(null)}
+        />
+      )}
+
       {/* 범례 */}
       <div className="absolute bottom-10 left-3 z-[1000] text-xs space-y-1 bg-black/80 backdrop-blur-sm rounded-lg p-2.5 border border-white/10">
         <div className="text-gray-400 font-semibold mb-2">위협 지수</div>
@@ -639,7 +782,16 @@ export function WorldMapView() {
             <span className="text-gray-300">{l as string}</span>
           </div>
         ))}
-        <div className="text-gray-600 mt-2 text-xs pt-2 border-t border-white/10">핀 클릭 → 투자 시사점</div>
+        <div className="text-gray-500 mt-2 mb-1 text-[11px] pt-2 border-t border-white/10">이벤트 카테고리</div>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+          {Object.values(CATEGORY_META).map(meta => (
+            <div key={meta.labelKo} className="flex items-center gap-1">
+              <span style={{ color: meta.color }}>{meta.icon}</span>
+              <span className="text-[10px] text-gray-400">{meta.labelKo}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-gray-600 mt-2 text-xs pt-2 border-t border-white/10">마우스오버: 지역/분야 · 클릭: 세부정보</div>
       </div>
 
       {/* 상단 힌트 (GeoJSON 로딩 중) */}

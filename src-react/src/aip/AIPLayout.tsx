@@ -114,7 +114,7 @@ interface Props {
 
 export function AIPLayout({ onSwitchToGrid }: Props) {
   const { fetchAll, globalRiskScore } = useStore();
-  const [mainView, setMainView] = useState<MainViewType>('heatmap');
+  const [mainView, setMainView] = useState<MainViewType>('map');
 
   useEffect(() => {
     void fetchAll();

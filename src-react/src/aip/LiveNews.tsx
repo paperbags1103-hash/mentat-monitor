@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '@/store';
+import { usePortfolioStore } from '@/store/portfolio';
 
 // ─── RSS 탭 ───────────────────────────────────────────────────────────────────
 interface NewsItem {
@@ -128,23 +129,30 @@ function AITab() {
   const [data, setData] = useState<AINewsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [portfolioMode, setPortfolioMode] = useState(false);
   const mountedRef = useRef(true);
+
+  const holdings = usePortfolioStore(s => s.holdings);
+  const portfolioNames = holdings.map(h => h.nameKo).filter(Boolean);
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
-  async function load() {
+  async function load(pfMode = portfolioMode) {
     setLoading(true);
+    setExpanded(null);
     try {
-      // apiFetch가 로컬스토리지의 Groq 키를 헤더에 자동 포함
-      const result = await apiFetch<AINewsResponse>('/api/news-ai');
+      const param = pfMode && portfolioNames.length > 0
+        ? `?portfolio=${encodeURIComponent(portfolioNames.join(','))}`
+        : '';
+      const result = await apiFetch<AINewsResponse>(`/api/news-ai${param}`);
       if (!mountedRef.current) return;
       setData(result);
     } catch { /* graceful */ }
     finally { if (mountedRef.current) setLoading(false); }
   }
 
-  useEffect(() => { void load(); }, []);
-  useEffect(() => { const id = setInterval(() => void load(), 10 * 60_000); return () => clearInterval(id); }, []);
+  useEffect(() => { void load(portfolioMode); }, [portfolioMode]);
+  useEffect(() => { const id = setInterval(() => void load(portfolioMode), 10 * 60_000); return () => clearInterval(id); }, [portfolioMode]);
 
   const items = data?.items ?? [];
   const hasAI = data?.hasAI ?? false;
@@ -152,14 +160,24 @@ function AITab() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* 상태바 */}
-      <div className="flex items-center gap-1.5 px-2 pb-1.5 shrink-0">
+      {/* 상태바 + 포트폴리오 토글 */}
+      <div className="flex items-center gap-1.5 px-2 pb-1.5 shrink-0 flex-wrap">
+        {/* 전체 / 내 종목 토글 */}
+        <div className="flex gap-0.5">
+          <button onClick={() => setPortfolioMode(false)}
+            className={`text-[10px] px-1.5 py-0.5 rounded-l border transition-colors ${
+              !portfolioMode ? 'bg-purple-500/20 text-purple-300 border-purple-500/50' : 'text-gray-600 border-gray-700 hover:text-gray-400'
+            }`}>전체</button>
+          <button onClick={() => setPortfolioMode(true)}
+            title={portfolioNames.length === 0 ? '포트폴리오를 먼저 추가하세요' : `${portfolioNames.join(', ')}`}
+            className={`text-[10px] px-1.5 py-0.5 rounded-r border transition-colors ${
+              portfolioMode ? 'bg-green-500/20 text-green-300 border-green-500/50' : 'text-gray-600 border-gray-700 hover:text-gray-400'
+            } ${portfolioNames.length === 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
+            disabled={portfolioNames.length === 0}>📌 내 종목</button>
+        </div>
         <span className={`text-xs px-1.5 py-0.5 rounded border font-semibold ${hasAI ? 'text-purple-400 border-purple-500/40 bg-purple-500/10' : 'text-gray-500 border-gray-700'}`}>
-          {hasAI ? '🧠 AI 요약' : '📰 원문'}
+          {hasAI ? '🧠 AI' : '📰'}
         </span>
-        {!hasAI && (
-          <span className="text-xs text-gray-600">Groq 키 필요</span>
-        )}
         {genTime && <span className="text-xs text-gray-600 ml-auto">{genTime}</span>}
         {loading && <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse shrink-0" />}
       </div>

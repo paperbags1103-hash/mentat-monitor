@@ -1339,7 +1339,7 @@ export function WorldMapView() {
           onSelect={(id, lat, lng) => {
             if (id) setSelectedAircraftId(id);
             setPanTarget({ lat, lng, zoom: 6 });
-            setShowFleetOverview(false);
+            // 플릿 패널 유지 — 계속 탐색 가능
           }}
           onClose={() => setShowFleetOverview(false)}
         />

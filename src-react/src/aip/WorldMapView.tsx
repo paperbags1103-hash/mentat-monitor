@@ -21,6 +21,7 @@ import { useStore } from '@/store';
 import type { Inference } from '@/store';
 import { findMatchingTickers } from '@/data/watchlist-map';
 import { useWatchlistStore } from '@/store/watchlist';
+import { SEMI_NODES, SEMI_EDGES, SemiNode, SemiEdge } from '../data/semiconductor-supply-chain';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 interface Hotspot {
@@ -738,27 +739,9 @@ interface LayerState {
   aircraft: boolean;
   shipping: boolean;
   events: boolean;
-  semiconductors: boolean;
+  semiconductor: boolean;
   nkHistory: boolean;
 }
-
-// ─── 반도체 공급망 노드 ───────────────────────────────────────────────────────
-interface SemiNode { symbol: string; nameKo: string; role: string; lat: number; lng: number; }
-const SEMI_ROLE_COLOR: Record<string, string> = {
-  memory: '#3b82f6', fab: '#ef4444', equipment: '#22c55e', design: '#f59e0b', integrated: '#a855f7',
-};
-const SEMI_NODES: SemiNode[] = [
-  { symbol: '005930.KS', nameKo: '삼성전자',          role: 'memory',     lat: 37.27, lng: 127.05 },
-  { symbol: '000660.KS', nameKo: 'SK하이닉스',         role: 'memory',     lat: 37.41, lng: 127.25 },
-  { symbol: 'TSM',       nameKo: 'TSMC',              role: 'fab',        lat: 24.78, lng: 120.97 },
-  { symbol: 'ASML',      nameKo: 'ASML (EUV장비)',     role: 'equipment',  lat: 51.44, lng: 5.48   },
-  { symbol: 'NVDA',      nameKo: '엔비디아',            role: 'design',     lat: 37.37, lng: -121.97},
-  { symbol: 'INTC',      nameKo: '인텔',               role: 'integrated', lat: 45.52, lng: -122.97},
-  { symbol: 'AMD',       nameKo: 'AMD',               role: 'design',     lat: 37.33, lng: -121.92},
-  { symbol: 'AMAT',      nameKo: '어플라이드 머티리얼즈', role: 'equipment',  lat: 37.39, lng: -121.97},
-  { symbol: 'LRCX',      nameKo: '램 리서치',           role: 'equipment',  lat: 37.65, lng: -121.80},
-  { symbol: '6857.T',    nameKo: '어드밴테스트',         role: 'equipment',  lat: 35.69, lng: 139.69 },
-];
 
 // ─── 북한 도발 이력 ───────────────────────────────────────────────────────────
 type NKType = 'missile_test' | 'nuclear_test' | 'cyber' | 'maritime' | 'artillery' | 'rhetoric';
@@ -974,7 +957,6 @@ function LayerControl({
     { key: 'aircraft', label: '✈ VIP 항공기',    active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
     { key: 'shipping', label: '⚓ 해운 병목',     active: 'text-green-400 border-green-500/50 bg-green-500/20' },
     { key: 'events',        label: '📌 뉴스 이벤트',  active: 'text-pink-400 border-pink-500/50 bg-pink-500/20' },
-    { key: 'semiconductors', label: '🔵 반도체 공급망', active: 'text-blue-400 border-blue-500/50 bg-blue-500/20' },
     { key: 'nkHistory',      label: '⚡ 북한 도발 이력', active: 'text-yellow-400 border-yellow-500/50 bg-yellow-500/20' },
   ];
 
@@ -1014,6 +996,20 @@ function LayerControl({
           )}
         </div>
       ))}
+      <div className="flex gap-1">
+        <button
+          onClick={() => onToggle('semiconductor' as keyof LayerState)}
+          title="반도체 공급망"
+          style={{
+            background: layers.semiconductor ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${layers.semiconductor ? '#22c55e' : 'rgba(255,255,255,0.1)'}`,
+            color: layers.semiconductor ? '#86efac' : '#94a3b8',
+            borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          🔬
+        </button>
+      </div>
       <div className="flex gap-1">
         <button
           onClick={() => onToggle('convergence' as keyof LayerState)}
@@ -1496,7 +1492,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
     aircraft: false,
     shipping: false,
     events: true,
-    semiconductors: false,
+    semiconductor: false,
     nkHistory: false,
   });
 
@@ -1511,6 +1507,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedChokeId, setSelectedChokeId] = useState<string | null>(null);
+  const [selectedSemiNodeId, setSelectedSemiNodeId] = useState<string | null>(null);
 
   // 이벤트 필터
   const ALL_CATEGORIES = new Set<CategoryKey>(Object.keys(CATEGORY_META) as CategoryKey[]);
@@ -1638,6 +1635,17 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
     ), 0),
     [geoEvents, tickers],
   );
+  const stressedEdgeIds = React.useMemo(() => {
+    const allEventText = geoEvents
+      .map(ev => `${ev.titleKo} ${ev.region} ${(ev as GeoEvent & { descKo?: string }).descKo ?? ev.summaryKo ?? ''}`)
+      .join(' ')
+      .toLowerCase();
+    return new Set(
+      SEMI_EDGES
+        .filter(edge => edge.geopoliticalKeywords.some(kw => allEventText.includes(kw.toLowerCase())))
+        .map(edge => `${edge.from}-${edge.to}`)
+    );
+  }, [geoEvents]);
 
   return (
     <div className="relative w-full h-full">
@@ -1799,25 +1807,98 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
           );
         })}
 
-        {/* ── 반도체 공급망 핀 ── */}
-        {layers.semiconductors && SEMI_NODES.map(node => {
-          const color = SEMI_ROLE_COLOR[node.role] ?? '#94a3b8';
+        {/* ── 반도체 공급망 레이어 ── */}
+        {layers.semiconductor && (() => {
+          const relevantEdges: SemiEdge[] = selectedSemiNodeId
+            ? SEMI_EDGES.filter(e => e.from === selectedSemiNodeId || e.to === selectedSemiNodeId)
+            : SEMI_EDGES;
+
+          const relevantNodeIds: Set<string> | null = selectedSemiNodeId
+            ? new Set([selectedSemiNodeId, ...relevantEdges.flatMap(e => [e.from, e.to])])
+            : null;
+
           return (
-            <CircleMarker key={node.symbol}
-              center={[node.lat, node.lng]}
-              radius={9}
-              pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: 2 }}
-            >
-              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${color}55`, fontFamily: 'system-ui' }}>
-                  <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: '3px' }}>{node.nameKo}</div>
-                  <div style={{ fontSize: '10px', color, fontWeight: 600 }}>{node.role.toUpperCase()}</div>
-                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>{node.symbol}</div>
-                </div>
-              </Tooltip>
-            </CircleMarker>
+            <>
+              {relevantEdges.map(edge => {
+                const fromNode = SEMI_NODES.find(n => n.id === edge.from);
+                const toNode = SEMI_NODES.find(n => n.id === edge.to);
+                if (!fromNode || !toNode) return null;
+
+                const edgeKey = `${edge.from}-${edge.to}`;
+                const isStressed = stressedEdgeIds.has(edgeKey);
+                const isHighlighted = selectedSemiNodeId === edge.from || selectedSemiNodeId === edge.to;
+
+                const color = isStressed ? '#ef4444' : isHighlighted ? '#fbbf24' : '#22c55e';
+                const opacity = selectedSemiNodeId ? (isHighlighted ? 0.85 : 0.15) : (isStressed ? 0.75 : 0.45);
+                const weight = Math.max(1, edge.value * 0.8) + (isHighlighted ? 1 : 0);
+
+                return (
+                  <React.Fragment key={edgeKey}>
+                    <Polyline
+                      positions={[[fromNode.lat, fromNode.lng], [toNode.lat, toNode.lng]]}
+                      pathOptions={{ color, weight, opacity, dashArray: isStressed ? '5 4' : undefined }}
+                    />
+                    {(isHighlighted || isStressed) && (
+                      <Tooltip
+                        position={[(fromNode.lat + toNode.lat) / 2, (fromNode.lng + toNode.lng) / 2]}
+                        permanent={false}
+                        direction="top"
+                        opacity={1}
+                      >
+                        <div style={{ background: '#0f172a', color: isStressed ? '#ef4444' : '#fbbf24', padding: '3px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, border: `1px solid ${isStressed ? '#ef444444' : '#fbbf2444'}` }}>
+                          {isStressed ? '⚠️ ' : ''}{edge.label}
+                        </div>
+                      </Tooltip>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+
+              {SEMI_NODES
+                .filter(n => !relevantNodeIds || relevantNodeIds.has(n.id))
+                .map((node: SemiNode) => {
+                  const isSelected = selectedSemiNodeId === node.id;
+                  const isDimmed = selectedSemiNodeId && !relevantNodeIds?.has(node.id);
+                  const TYPE_COLOR: Record<string, string> = {
+                    fab: '#22c55e',
+                    equipment: '#a78bfa',
+                    material: '#fb923c',
+                    designer: '#38bdf8',
+                    consumer: '#f472b6',
+                    packaging: '#fbbf24',
+                  };
+                  const color = TYPE_COLOR[node.type] ?? '#94a3b8';
+
+                  return (
+                    <CircleMarker
+                      key={node.id}
+                      center={[node.lat, node.lng]}
+                      radius={isSelected ? 9 : 6}
+                      pathOptions={{
+                        color,
+                        fillColor: isSelected ? '#ffffff' : color,
+                        fillOpacity: isDimmed ? 0.2 : isSelected ? 1 : 0.75,
+                        weight: isSelected ? 3 : 1.5,
+                        opacity: isDimmed ? 0.3 : 1,
+                      }}
+                      eventHandlers={{
+                        click: () => setSelectedSemiNodeId(prev => prev === node.id ? null : node.id),
+                      }}
+                    >
+                      <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                        <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '7px 10px', borderRadius: 7, border: `1px solid ${color}55`, fontFamily: 'system-ui', minWidth: 140 }}>
+                          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 3 }}>{node.nameKo}</div>
+                          {node.ticker && <div style={{ fontSize: 10, color, fontFamily: 'monospace', fontWeight: 700, marginBottom: 2 }}>{node.ticker}</div>}
+                          <div style={{ fontSize: 10, color: '#64748b' }}>{node.country} · {node.type}</div>
+                          <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>클릭 → 공급망 X-ray</div>
+                        </div>
+                      </Tooltip>
+                    </CircleMarker>
+                  );
+                })}
+            </>
           );
-        })}
+        })()}
 
         {/* ── 북한 도발 이력 핀 ── */}
         {layers.nkHistory && NK_EVENTS.map(ev => {
@@ -2008,6 +2089,87 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
           );
         })}
       </MapContainer>
+
+      {/* ── 반도체 공급망 X-ray 패널 ── */}
+      {layers.semiconductor && selectedSemiNodeId && (() => {
+        const node = SEMI_NODES.find(n => n.id === selectedSemiNodeId);
+        if (!node) return null;
+
+        const upstreamEdges = SEMI_EDGES.filter(e => e.to === selectedSemiNodeId);
+        const downstreamEdges = SEMI_EDGES.filter(e => e.from === selectedSemiNodeId);
+        const allEdges = [...upstreamEdges, ...downstreamEdges];
+        const stressedCountReal = allEdges.filter(e => stressedEdgeIds.has(`${e.from}-${e.to}`)).length;
+
+        const TYPE_COLOR: Record<string, string> = {
+          fab: '#22c55e', equipment: '#a78bfa', material: '#fb923c',
+          designer: '#38bdf8', consumer: '#f472b6', packaging: '#fbbf24',
+        };
+        const nodeColor = TYPE_COLOR[node.type] ?? '#94a3b8';
+
+        return (
+          <DraggablePanel className="absolute top-16 left-5 z-[1000] w-80">
+            <div style={{ border: '1px solid #1e293b', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#020617', borderBottom: '1px solid #1e293b' }}>
+                <span style={{ fontSize: 14 }}>🔬</span>
+                <span style={{ fontWeight: 700, fontSize: 12 }}>공급망 X-ray — {node.nameKo}</span>
+                {stressedCountReal > 0 && (
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#ef4444', fontWeight: 700 }}>⚠️ {stressedCountReal}개 위험</span>
+                )}
+                <button onClick={() => setSelectedSemiNodeId(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16, marginLeft: stressedCountReal > 0 ? 0 : 'auto' }}>×</button>
+              </div>
+              <div style={{ padding: '10px 12px', fontSize: 12, color: '#e2e8f0', background: '#0f172a', maxHeight: 350, overflowY: 'auto' }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 10, padding: '3px 7px', borderRadius: 4, background: `${nodeColor}22`, color: nodeColor, border: `1px solid ${nodeColor}44`, fontWeight: 700 }}>
+                    {node.type}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#64748b' }}>{node.country}</span>
+                  {node.ticker && <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#60a5fa', fontWeight: 700 }}>{node.ticker}</span>}
+                </div>
+
+                {upstreamEdges.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#64748b', marginBottom: 5 }}>⬆️ 상류 (공급받는 것)</div>
+                    {upstreamEdges.map(e => {
+                      const fromNode = SEMI_NODES.find(n => n.id === e.from);
+                      const isStressed = stressedEdgeIds.has(`${e.from}-${e.to}`);
+                      return (
+                        <div key={`${e.from}-${e.to}`} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #1e293b', alignItems: 'center' }}>
+                          <span style={{ fontSize: 12, color: isStressed ? '#ef4444' : '#22c55e' }}>{isStressed ? '⚠️' : '✅'}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600 }}>{fromNode?.nameKo ?? e.from}</div>
+                            <div style={{ fontSize: 10, color: '#64748b' }}>{e.label}</div>
+                          </div>
+                          {isStressed && <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>RISK</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {downstreamEdges.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: '#64748b', marginBottom: 5 }}>⬇️ 하류 (공급하는 것)</div>
+                    {downstreamEdges.map(e => {
+                      const toNode = SEMI_NODES.find(n => n.id === e.to);
+                      const isStressed = stressedEdgeIds.has(`${e.from}-${e.to}`);
+                      return (
+                        <div key={`${e.from}-${e.to}`} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #1e293b', alignItems: 'center' }}>
+                          <span style={{ fontSize: 12, color: isStressed ? '#ef4444' : '#22c55e' }}>{isStressed ? '⚠️' : '✅'}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600 }}>{toNode?.nameKo ?? e.to}</div>
+                            <div style={{ fontSize: 10, color: '#64748b' }}>{e.label}</div>
+                          </div>
+                          {isStressed && <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>RISK</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </DraggablePanel>
+        );
+      })()}
 
       {/* 레이어 컨트롤 */}
       <LayerControl

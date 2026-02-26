@@ -12,22 +12,23 @@ interface Webcam {
 // 채널 ID 기반 YouTube Live embed — 스트림 ID 만료 없음
 // 형식: https://www.youtube.com/embed/live_stream?channel=CHANNEL_ID
 const WEBCAMS: Webcam[] = [
-  { id: 'ytn-korea',   nameKo: 'YTN 뉴스 (한국)',    region: 'korean_peninsula', tags: ['korea', 'korean_peninsula'],
-    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCO_aKKYxn4tvrqPjcTzZ6EQ&autoplay=1&mute=1' },
-  { id: 'jtbc-korea',  nameKo: 'JTBC 뉴스 (한국)',   region: 'korean_peninsula', tags: ['korea', 'korean_peninsula'],
-    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCClrS_9IuFPXZmRtyIPW0fQ&autoplay=1&mute=1' },
+  // 국제 방송 채널만 사용 (embed 제한 없음)
+  { id: 'arirang',     nameKo: 'Arirang TV (한국)',  region: 'korean_peninsula', tags: ['korea', 'korean_peninsula'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCQ0ohhEsTgrSKSJbEGRy8cA&autoplay=1&mute=1' },
   { id: 'nhk-world',   nameKo: 'NHK World (일본)',   region: 'east_asia', tags: ['japan', 'east_asia'],
     embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCCcey5CP5GDZeom987rqosg&autoplay=1&mute=1' },
-  { id: 'abc-news',    nameKo: 'ABC News (미국)',     region: 'usa', tags: ['usa', 'financial'],
-    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCBi2mrWuNuyYy4gbM6fU18Q&autoplay=1&mute=1' },
-  { id: 'cgtn',        nameKo: 'CGTN (중국)',         region: 'east_asia', tags: ['china', 'taiwan', 'east_asia', 'taiwan_strait'],
-    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCt6Lg1zOR7yNO3sAm2WMXiA&autoplay=1&mute=1' },
+  { id: 'bloomberg',   nameKo: 'Bloomberg (글로벌)', region: 'usa', tags: ['usa', 'financial', 'china', 'east_asia', 'taiwan_strait'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP_mQ&autoplay=1&mute=1' },
+  { id: 'cnbc',        nameKo: 'CNBC (미국)',         region: 'usa', tags: ['usa', 'financial'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCrp_UI8XtuYfpiqADfgcK9A&autoplay=1&mute=1' },
   { id: 'aljazeera',   nameKo: 'Al Jazeera (중동)',  region: 'middle_east', tags: ['israel', 'middle_east'],
     embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCNye-wNBqNL5ZzHSJj3l8Bg&autoplay=1&mute=1' },
   { id: 'france24',    nameKo: 'France 24 (유럽)',   region: 'europe', tags: ['europe', 'russia'],
     embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCQfwfsi5VrQ8yKZ-UWmAEFg&autoplay=1&mute=1' },
-  { id: 'dw-news',     nameKo: 'DW News (유럽/글로벌)', region: 'europe', tags: ['europe'],
+  { id: 'dw-news',     nameKo: 'DW News (유럽)',     region: 'europe', tags: ['europe'],
     embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg&autoplay=1&mute=1' },
+  { id: 'wion',        nameKo: 'WION (인도/아시아)', region: 'east_asia', tags: ['east_asia', 'middle_east'],
+    embedUrl: 'https://www.youtube.com/embed/live_stream?channel=UCc8nNFlVOCkaTa2gAl8M3nA&autoplay=1&mute=1' },
 ];
 
 // Map entity IDs → webcam tags

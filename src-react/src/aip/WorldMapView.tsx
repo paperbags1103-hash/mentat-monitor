@@ -471,18 +471,18 @@ function DraggablePanel({ children, className, style }: {
   }, []);
 
   return (
-    <div className={className} style={{ ...style, transform: `translate(${offset.x}px,${offset.y}px)`, userSelect: 'none' }}>
-      {/* 드래그 핸들 영역 — 자식의 첫 번째 헤더에 이벤트 위임 */}
-      <div
-        className="absolute inset-x-0 top-0 h-10 cursor-grab active:cursor-grabbing z-10"
-        onMouseDown={e => {
-          if ((e.target as HTMLElement).closest('button')) return;
-          drag.current = { sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y };
-          document.body.style.cursor = 'grabbing';
-          e.stopPropagation();
-          e.preventDefault();
-        }}
-      />
+    <div
+      className={className}
+      style={{ ...style, transform: `translate(${offset.x}px,${offset.y}px)`, userSelect: 'none', cursor: 'grab' }}
+      onMouseDown={e => {
+        // 버튼·링크·인풋 클릭은 드래그 무시 — 닫기 버튼 등이 정상 작동
+        const target = e.target as HTMLElement;
+        if (target.closest('button, input, a, select, [role="button"]')) return;
+        drag.current = { sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y };
+        document.body.style.cursor = 'grabbing';
+        e.stopPropagation();
+      }}
+    >
       {children}
     </div>
   );

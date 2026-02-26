@@ -378,13 +378,34 @@ function runInference(fusion, ctx) {
 
 // ─── Groq narrative ───────────────────────────────────────────────────────────
 
-async function generateNarrative(inferences, riskScore, riskLabel, groqKey) {
+async function generateNarrative(inferences, riskScore, riskLabel, groqKey, marketData) {
   if (!groqKey) return buildTemplate(inferences, riskScore, riskLabel);
 
   const top = inferences.slice(0, 4);
-  const userMsg = `위협 수준: ${riskScore}/100 (${riskLabel})\n\n${
-    top.map((i, n) => `${n + 1}. [${i.severity}] ${i.titleKo}\n${i.summaryKo}\n제안: ${i.suggestedActionKo}`).join('\n\n')
-  }`;
+
+  // 시장 퍼포먼스 요약
+  const mkt = marketData || {};
+  const fmtPct = (v) => v != null ? `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}%` : 'N/A';
+  const marketSummary = [
+    mkt.kospi    ? `KOSPI ${fmtPct(mkt.kospi.changePercent)}`    : null,
+    mkt.kosdaq   ? `KOSDAQ ${fmtPct(mkt.kosdaq.changePercent)}`  : null,
+    mkt.spx      ? `S&P500 ${fmtPct(mkt.spx.changePct)}`         : null,
+    mkt.nasdaq   ? `나스닥 ${fmtPct(mkt.nasdaq.changePct)}`       : null,
+    mkt.vix      ? `VIX ${mkt.vix.price?.toFixed(1)}`             : null,
+    mkt.gold     ? `금 ${fmtPct(mkt.gold.changePct)}`             : null,
+    mkt.oil      ? `WTI ${fmtPct(mkt.oil.changePct)}`             : null,
+    mkt.usdkrw   ? `USD/KRW ${fmtPct(mkt.usdkrw.changePercent)}`  : null,
+  ].filter(Boolean).join(' | ');
+
+  const riskContext = top.map((i, n) =>
+    `${n + 1}. [${i.severity}] ${i.titleKo}: ${i.summaryKo}`
+  ).join('\n');
+
+  const userMsg = `## 현재 시장 데이터
+${marketSummary || '데이터 수집 중'}
+
+## 위협 수준: ${riskScore}/100 (${riskLabel})
+${riskContext || '주요 위협 없음'}`;
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -395,19 +416,49 @@ async function generateNarrative(inferences, riskScore, riskLabel, groqKey) {
         messages: [
           {
             role: 'system',
-            content: '한국 개인투자자를 위한 지정학 리스크 분석가. 주어진 데이터만 사용해 250자 이내 한국어 투자 브리핑 작성. 첫 줄: 위협 수준 요약. 중간: 핵심 위협 2-3개. 마지막: 구체적 투자 행동 제안.',
+            content: `당신은 한국 개인투자자를 위한 금융 인텔리전스 분석가입니다.
+주어진 시장 데이터와 위협 신호를 바탕으로 다음 JSON 구조로 브리핑하세요.
+반드시 유효한 JSON만 반환. 다른 텍스트 없이.
+
+{
+  "riskBriefing": "위협 수준과 핵심 리스크 요약 (150자 이내)",
+  "moneyFlow": "현재 자금 흐름 분석 — 어느 시장/섹터에 돈이 몰리는지, 이유 포함 (200자 이내)",
+  "outlookShort": "단기(~1개월) 전망과 주목할 트레이드 (150자 이내)",
+  "outlookMid": "중기(3-6개월) 전망과 포지셔닝 전략 (150자 이내)",
+  "outlookLong": "장기(1년+) 구조적 기회와 리스크 (150자 이내)",
+  "riskOn": ["리스크 온 환경에서 유리한 자산/섹터 3개"],
+  "riskOff": ["리스크 오프 환경에서 유리한 자산/섹터 3개"]
+}`,
           },
           { role: 'user', content: userMsg },
         ],
-        temperature: 0.3,
-        max_tokens: 400,
+        temperature: 0.4,
+        max_tokens: 800,
       }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(12000),
     });
     if (res.ok) {
       const data = await res.json();
-      const text = data.choices?.[0]?.message?.content?.trim();
-      if (text?.length > 50) return { text, method: 'llm' };
+      const raw = data.choices?.[0]?.message?.content?.trim() ?? '';
+      // JSON 파싱 (마크다운 코드블록 제거)
+      const jsonStr = raw.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.riskBriefing) {
+          return {
+            text: parsed.riskBriefing,
+            opportunityKo: parsed.moneyFlow ?? '',
+            outlookShort: parsed.outlookShort ?? '',
+            outlookMid: parsed.outlookMid ?? '',
+            outlookLong: parsed.outlookLong ?? '',
+            riskOn: parsed.riskOn ?? [],
+            riskOff: parsed.riskOff ?? [],
+            method: 'llm',
+          };
+        }
+      } catch {}
+      // JSON 파싱 실패 시 텍스트 그대로
+      if (raw.length > 50) return { text: raw, method: 'llm' };
     }
   } catch {}
 
@@ -468,17 +519,19 @@ export default async function handler(req) {
 
   // ── Gather all sources in parallel ──────────────────────────────────────────
 
-  const [bsRes, vipRes, mktRes, calRes] = await Promise.allSettled([
+  const [bsRes, vipRes, mktRes, calRes, macroRes] = await Promise.allSettled([
     fetchJson(`${base}/api/blackswan`),
     fetchJson(`${base}/api/vip-aircraft`, 5000),
     fetchJson(`${base}/api/korea-market`, 5000),
     fetchJson(`${base}/api/economic-calendar`, 5000),
+    fetchJson(`${base}/api/global-macro`, 5000),
   ]);
 
-  const bsData  = bsRes.status  === 'fulfilled' ? bsRes.value  : (staleWarnings.push('블랙스완 수집 실패'), null);
-  const vipData = vipRes.status === 'fulfilled' ? vipRes.value : (staleWarnings.push('VIP항공기 수집 실패'), null);
-  const mktData = mktRes.status === 'fulfilled' ? mktRes.value : (staleWarnings.push('시장데이터 수집 실패'), null);
-  const calData = calRes.status === 'fulfilled' ? calRes.value : null;
+  const bsData    = bsRes.status    === 'fulfilled' ? bsRes.value    : (staleWarnings.push('블랙스완 수집 실패'), null);
+  const vipData   = vipRes.status   === 'fulfilled' ? vipRes.value   : (staleWarnings.push('VIP항공기 수집 실패'), null);
+  const mktData   = mktRes.status   === 'fulfilled' ? mktRes.value   : (staleWarnings.push('시장데이터 수집 실패'), null);
+  const calData   = calRes.status   === 'fulfilled' ? calRes.value   : null;
+  const macroData = macroRes.status === 'fulfilled' ? macroRes.value : null;
 
   // ── Normalize + fuse ─────────────────────────────────────────────────────────
 
@@ -514,8 +567,28 @@ export default async function handler(req) {
 
   // ── Narrative ────────────────────────────────────────────────────────────────
 
-  const { text: narrativeKo, method: narrativeMethod } =
-    await generateNarrative(inferences, globalRiskScore, riskLabel, process.env.GROQ_API_KEY);
+  // 시장 데이터 병합 (korea-market + global-macro)
+  const combinedMarket = {
+    kospi:   mktData?.kospi ?? null,
+    kosdaq:  mktData?.kosdaq ?? null,
+    usdkrw:  mktData?.usdkrw ?? null,
+    spx:     macroData?.spx ?? null,
+    nasdaq:  macroData?.nasdaq ?? null,
+    vix:     macroData?.vix ?? null,
+    gold:    macroData?.gold ?? null,
+    oil:     macroData?.oil ?? null,
+  };
+
+  const {
+    text: narrativeKo,
+    opportunityKo = '',
+    outlookShort  = '',
+    outlookMid    = '',
+    outlookLong   = '',
+    riskOn        = [],
+    riskOff       = [],
+    method: narrativeMethod,
+  } = await generateNarrative(inferences, globalRiskScore, riskLabel, process.env.GROQ_API_KEY, combinedMarket);
 
   // ── Market outlook ────────────────────────────────────────────────────────────
 
@@ -572,6 +645,12 @@ export default async function handler(req) {
     topInferences: finalInferences.slice(0, 5),
     narrativeKo,
     narrativeMethod,
+    opportunityKo,
+    outlookShort,
+    outlookMid,
+    outlookLong,
+    riskOn,
+    riskOff,
     signalSummary: {
       total: signals.length,
       bySeverity: {

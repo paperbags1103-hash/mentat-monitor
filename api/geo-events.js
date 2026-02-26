@@ -211,6 +211,13 @@ function buildFallbackEvents() {
   ];
 }
 
+function withBreakingFlag(event) {
+  return {
+    ...event,
+    breaking: event.severity === 'critical',
+  };
+}
+
 // ─── NASA EONET 자연재해 fetch ────────────────────────────────────────────────
 const EONET_CATEGORY_MAP = {
   volcanoes:    { category: 'disaster', severity: 'high',   titleSuffix: '화산 활동' },
@@ -293,7 +300,7 @@ export default async function handler(req) {
     );
     if (!dup) allEvents.push(eo);
   }
-  const events = allEvents.slice(0, 25); // 최대 25개
+  const events = allEvents.slice(0, 25).map(withBreakingFlag); // 최대 25개
 
   cache = events;
   cacheTs = Date.now();

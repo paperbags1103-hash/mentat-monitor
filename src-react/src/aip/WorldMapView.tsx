@@ -363,6 +363,7 @@ const SHIPPING_ROUTES: [number, number][][] = [
 interface VipAircraft {
   icao24: string;
   callsign: string | null;
+  reg?: string | null;
   originCountry: string;
   lat: number;
   lng: number;
@@ -462,6 +463,46 @@ function VipAircraftPanel({ ac, onClose }: { ac: VipAircraft; onClose: () => voi
   const altFt = ac.altBaro != null ? Math.round(ac.altBaro * 3.28084) : null;
   const spdKts = ac.velocity != null ? Math.round(ac.velocity * 1.94384) : null;
   const headingDeg = ac.heading != null ? Math.round(ac.heading) : null;
+  const [photoUrl, setPhotoUrl] = React.useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!ac.reg) {
+      setPhotoUrl(null);
+      setPhotoLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPhotoLoading(true);
+    setPhotoUrl(null);
+
+    fetch(`https://api.planespotters.net/pub/photos/reg/${ac.reg}`)
+      .then(r => r.json())
+      .then((data: { photos?: Array<{ thumbnail_large?: { src?: string }; thumbnail?: { src?: string } }> }) => {
+        if (cancelled) return;
+        const photo = data.photos?.[0];
+        if (photo?.thumbnail_large?.src) {
+          setPhotoUrl(photo.thumbnail_large.src);
+        } else if (photo?.thumbnail?.src) {
+          setPhotoUrl(photo.thumbnail.src);
+        } else {
+          setPhotoUrl(null);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPhotoUrl(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setPhotoLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ac.reg]);
 
   return (
     <DraggablePanel className="absolute bottom-14 left-3 z-[1000] w-72">
@@ -475,6 +516,7 @@ function VipAircraftPanel({ ac, onClose }: { ac: VipAircraft; onClose: () => voi
             <div>
               <div className="text-xs font-bold font-mono" style={{ color }}>{ac.label}</div>
               <div className="text-[10px] text-gray-400">{ac.country}</div>
+              {ac.reg && <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#60a5fa' }}>{ac.reg}</span>}
             </div>
           </div>
           <span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ color, borderColor: color + '66', background: color + '1f' }}>{cat}</span>
@@ -516,6 +558,33 @@ function VipAircraftPanel({ ac, onClose }: { ac: VipAircraft; onClose: () => voi
             <div>
               <div className="text-[10px] text-gray-500">서버 궤적</div>
               <div className="text-xs font-mono text-primary">{ac.pathHistory.length}점</div>
+            </div>
+          )}
+        </div>
+
+        {/* Aircraft Photo */}
+        <div className="px-3 pt-2">
+          {photoLoading && (
+            <div style={{ height: 120, background: '#1e293b', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: '#475569' }}>사진 로딩 중...</span>
+            </div>
+          )}
+          {photoUrl && !photoLoading && (
+            <div style={{ marginBottom: 8, borderRadius: 6, overflow: 'hidden', border: '1px solid #334155' }}>
+              <img
+                src={photoUrl}
+                alt={ac.label}
+                style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                onError={() => setPhotoUrl(null)}
+              />
+              <div style={{ padding: '4px 8px', background: '#0f172a', fontSize: 9, color: '#475569' }}>
+                Photo: Planespotters.net
+              </div>
+            </div>
+          )}
+          {!photoUrl && !photoLoading && ac.reg && (
+            <div style={{ height: 60, background: '#0f172a', borderRadius: 6, border: '1px dashed #334155', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: '#475569' }}>✈️ {ac.reg} · 사진 없음</span>
             </div>
           )}
         </div>
@@ -777,6 +846,7 @@ export interface GeoEvent {
   summaryKo: string;
   tags?: string[];
   investmentImpactKo?: string;
+  breaking?: boolean;
   updatedAt: number;
 }
 
@@ -936,6 +1006,7 @@ function LayerControl({
   aircraftAirborne,
   convergenceCount,
   relevantCount,
+  topOffset = 12,
 }: {
   layers: LayerState;
   onToggle: (key: keyof LayerState) => void;
@@ -949,6 +1020,7 @@ function LayerControl({
   aircraftAirborne?: number;
   convergenceCount: number;
   relevantCount: number;
+  topOffset?: number;
 }) {
   const btns: { key: keyof LayerState; label: string; active: string }[] = [
     { key: 'threats',  label: '🎯 위협 핀',      active: 'text-red-400 border-red-500/50 bg-red-500/20' },
@@ -967,7 +1039,7 @@ function LayerControl({
   ];
 
   return (
-    <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-1.5">
+    <div className="absolute left-3 z-[1000] flex flex-col gap-1.5" style={{ top: topOffset }}>
       {relevantCount > 0 && (
         <div className="text-xs px-2.5 py-1 rounded border border-yellow-400/40 bg-yellow-400/15 text-yellow-300 font-semibold backdrop-blur-sm">
           ⭐ 관심종목 {relevantCount}건
@@ -1629,6 +1701,10 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
     }),
     [geoEvents, activeCategories, severityFilter],
   );
+  const breakingEvents = useMemo(
+    () => geoEvents.filter(ev => ev.breaking || ev.severity === 'critical'),
+    [geoEvents],
+  );
   const watchlistRelevantCount = useMemo(
     () => geoEvents.reduce((count, ev) => (
       findMatchingTickers(ev.titleKo, ev.region, tickers).length > 0 ? count + 1 : count
@@ -1649,6 +1725,34 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
 
   return (
     <div className="relative w-full h-full">
+      {/* ── Breaking News Ticker ── */}
+      {breakingEvents.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000,
+          background: 'rgba(239,68,68,0.12)', borderBottom: '1px solid rgba(239,68,68,0.4)',
+          display: 'flex', alignItems: 'center', overflow: 'hidden', height: 28,
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            flexShrink: 0, background: '#ef4444', color: 'white',
+            padding: '0 10px', height: '100%', display: 'flex', alignItems: 'center',
+            fontSize: 10, fontWeight: 900, letterSpacing: 1,
+          }}>
+            ⚡ BREAKING
+          </div>
+          <div style={{
+            flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center',
+            padding: '0 12px', gap: 24,
+          }}>
+            {breakingEvents.slice(0, 3).map((ev, i) => (
+              <span key={ev.id} style={{ fontSize: 11, color: '#fca5a5', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {i > 0 && <span style={{ color: '#ef4444', marginRight: 24 }}>·</span>}
+                📍 {ev.region} — {ev.titleKo}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <MapContainer
         center={[20, 20]}
         zoom={2}
@@ -1757,6 +1861,20 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
           const matchedTickers = findMatchingTickers(ev.titleKo, ev.region, tickers);
           return (
             <React.Fragment key={ev.id}>
+              {ev.breaking && (
+                <CircleMarker
+                  center={[ev.lat, ev.lng]}
+                  radius={16}
+                  pathOptions={{
+                    color: '#ef4444',
+                    fillColor: 'transparent',
+                    fillOpacity: 0,
+                    weight: 2,
+                    opacity: 0.7,
+                    dashArray: '3 3',
+                  }}
+                />
+              )}
               {matchedTickers.length > 0 && (
                 <CircleMarker
                   center={[ev.lat, ev.lng]}
@@ -1797,6 +1915,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
                         <span style={{ marginLeft: 'auto', color: '#fbbf24', fontWeight: 700, fontSize: '11px' }}>⭐ {matchedTickers.length}</span>
                       )}
                     </div>
+                    {ev.breaking && <span style={{ color: '#ef4444', fontWeight: 900, fontSize: 9, letterSpacing: 1 }}>● BREAKING</span>}
                     <div style={{ fontSize: '11px', color: meta.color, fontWeight: 600, marginBottom: '2px' }}>{meta.labelKo}</div>
                     <div style={{ fontSize: '10px', color: '#94a3b8', lineHeight: 1.4 }}>{ev.titleKo}</div>
                     <div style={{ marginTop: '4px', fontSize: '10px', color: '#475569' }}>클릭 → 세부정보</div>
@@ -2185,6 +2304,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
         aircraftAirborne={liveAircraft.filter(a => !a.onGround).length}
         convergenceCount={convergenceZones.length}
         relevantCount={watchlistRelevantCount}
+        topOffset={breakingEvents.length > 0 ? 36 : 12}
       />
 
       {/* 선택된 핫스팟 상세 패널 */}

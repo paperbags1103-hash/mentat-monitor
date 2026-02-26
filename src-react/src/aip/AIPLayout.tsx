@@ -28,6 +28,7 @@ import { PanelCatalog } from '@/layout/PanelCatalog';
 import { useLayoutStore } from '@/store';
 import { PortfolioPanel } from '@/panels/PortfolioPanel';
 import WatchlistPanelWrapper from '@/panels/WatchlistPanelWrapper';
+import ChatAgentPanel from '@/panels/ChatAgentPanel';
 
 export type MainViewType = 'map' | 'heatmap' | 'charts' | 'grid' | 'portfolio';
 
@@ -115,9 +116,15 @@ interface Props {
 }
 
 export function AIPLayout({ onSwitchToGrid }: Props) {
-  const { fetchAll, globalRiskScore } = useStore();
+  const { fetchAll, globalRiskScore, kospi, usdkrw, vix } = useStore();
   const [mainView, setMainView] = useState<MainViewType>('map');
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
+
+  const marketSummary = {
+    kospi: kospi ? kospi.price.toFixed(2) : undefined,
+    usdkrw: usdkrw ? usdkrw.rate.toFixed(2) : undefined,
+    vix: vix ? vix.price.toFixed(2) : undefined,
+  };
 
   useEffect(() => {
     void fetchAll();
@@ -157,6 +164,14 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
         <div className="w-72 shrink-0 min-h-0 overflow-hidden flex flex-col">
           <div className="flex-1 min-h-0 overflow-hidden border-b border-border">
             <LiveFeed />
+          </div>
+          <div className="h-[36%] min-h-0 overflow-hidden border-b border-border bg-appbase">
+            <div className="h-8 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">
+              🤖 AI 브리핑 에이전트
+            </div>
+            <div className="h-[calc(100%-2rem)]">
+              <ChatAgentPanel geoEvents={geoEvents} convergenceZones={[]} marketSummary={marketSummary} />
+            </div>
           </div>
           <div className="h-[34%] min-h-0 overflow-hidden border-b border-border bg-appbase">
             <div className="h-8 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">

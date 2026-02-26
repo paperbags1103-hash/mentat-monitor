@@ -406,6 +406,44 @@ function LayerControl({ layers, onToggle, activeCategories, onToggleCategory, se
   );
 }
 
+// ─── 드래그 가능한 패널 래퍼 ─────────────────────────────────────────────────
+function DraggablePanel({ children, className, style }: {
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!drag.current) return;
+      setOffset({ x: drag.current.ox + e.clientX - drag.current.sx, y: drag.current.oy + e.clientY - drag.current.sy });
+    };
+    const onUp = () => { drag.current = null; document.body.style.cursor = ''; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, []);
+
+  return (
+    <div className={className} style={{ ...style, transform: `translate(${offset.x}px,${offset.y}px)`, userSelect: 'none' }}>
+      {/* 드래그 핸들 영역 — 자식의 첫 번째 헤더에 이벤트 위임 */}
+      <div
+        className="absolute inset-x-0 top-0 h-10 cursor-grab active:cursor-grabbing z-10"
+        onMouseDown={e => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          drag.current = { sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y };
+          document.body.style.cursor = 'grabbing';
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+      />
+      {children}
+    </div>
+  );
+}
+
 // ─── 선택된 핫스팟 상세 패널 ──────────────────────────────────────────────────
 interface ScoredHotspot extends Hotspot {
   score: number;
@@ -417,7 +455,8 @@ function SelectedPanel({ hotspot, onClose }: { hotspot: ScoredHotspot; onClose: 
   const color = scoreToColor(hotspot.score);
 
   return (
-    <div className="absolute bottom-12 right-3 z-[1000] w-72 bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl"
+    <DraggablePanel className="absolute bottom-14 right-3 z-[1000] w-72" >
+    <div className="bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl relative"
       style={{ borderColor: color + '55' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: color + '33', background: color + '15' }}>
@@ -518,6 +557,7 @@ function SelectedPanel({ hotspot, onClose }: { hotspot: ScoredHotspot; onClose: 
         )}
       </div>
     </div>
+    </DraggablePanel>
   );
 }
 
@@ -529,7 +569,8 @@ function EventPanel({ event, onClose }: { event: GeoEvent; onClose: () => void }
     : event.severity === 'medium' ? '#eab308' : '#22c55e';
 
   return (
-    <div className="absolute bottom-12 left-3 z-[1000] w-72 bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl"
+    <DraggablePanel className="absolute top-16 right-3 z-[1000] w-72">
+    <div className="bg-black/90 backdrop-blur-md border rounded-xl overflow-hidden shadow-2xl relative"
       style={{ borderColor: meta.color + '55' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b"
@@ -570,6 +611,7 @@ function EventPanel({ event, onClose }: { event: GeoEvent; onClose: () => void }
         )}
       </div>
     </div>
+    </DraggablePanel>
   );
 }
 

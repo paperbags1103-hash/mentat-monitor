@@ -1677,11 +1677,20 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
   // ACLED 무력충돌 데이터
   const [acledEvents, setAcledEvents] = useState<any[]>([]);
   const [acledLoaded, setAcledLoaded] = useState(false);
+  const [acledLoading, setAcledLoading] = useState(false);
+  const [acledError, setAcledError] = useState<string | null>(null);
   useEffect(() => {
     if (!layers.acled || acledLoaded) return;
-    apiFetch<{ events: any[] }>('/api/acled-events')
-      .then(data => { setAcledEvents(data?.events ?? []); setAcledLoaded(true); })
-      .catch(() => setAcledLoaded(true));
+    setAcledLoading(true);
+    setAcledError(null);
+    apiFetch<{ events: any[]; error?: string }>('/api/acled-events')
+      .then(data => {
+        if (data?.error && !data.events?.length) setAcledError(data.error);
+        setAcledEvents(data?.events ?? []);
+        setAcledLoaded(true);
+      })
+      .catch(e => { setAcledError(e?.message ?? '연결 실패'); setAcledLoaded(true); })
+      .finally(() => setAcledLoading(false));
   }, [layers.acled]);
 
   // 뉴스 기반 지리 이벤트
@@ -2264,6 +2273,19 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
             </React.Fragment>
           );
         })}
+
+        {/* ── ACLED 상태 표시 ── */}
+        {layers.acled && (acledLoading || acledError || (acledLoaded && acledEvents.length === 0)) && (
+          <div style={{ position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)', zIndex: 1001,
+            background: acledError ? 'rgba(239,68,68,0.15)' : 'rgba(10,15,30,0.9)',
+            border: `1px solid ${acledError ? '#ef4444' : '#334155'}`,
+            borderRadius: 6, padding: '6px 14px', fontSize: 11, color: acledError ? '#fca5a5' : '#94a3b8',
+            pointerEvents: 'none' }}>
+            {acledLoading ? '⚔️ ACLED 데이터 로딩 중...' :
+             acledError ? `⚠️ ACLED 오류: ${acledError}` :
+             '⚔️ ACLED: 해당 기간 이벤트 없음'}
+          </div>
+        )}
 
         {/* ── ACLED 무력충돌 레이어 ── */}
         {layers.acled && acledEvents.map((ev: any) => {

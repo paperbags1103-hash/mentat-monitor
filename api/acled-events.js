@@ -2,28 +2,32 @@
  * /api/acled-events
  *
  * Fetches recent armed conflict events from ACLED API.
- * Uses key+email query-param authentication (programmatic method).
+ * Uses OAuth Bearer token authentication (programmatic method).
  * Cache: 30 minutes.
  *
  * Required env vars:
- *   ACLED_API_KEY  — API key from developer.acleddata.com
  *   ACLED_EMAIL    — myACLED account email
+ *   ACLED_PASSWORD — myACLED account password
  */
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = { runtime: 'edge' };
 
-const CACHE_TTL = 30 * 60_000;
-let cache = null;
-let cacheTs = 0;
+const CACHE_TTL   = 30 * 60_000;   // data cache: 30 min
+const TOKEN_TTL   = 23 * 60 * 60_000; // token cache: 23h (token valid 24h)
+
+let cache     = null;
+let cacheTs   = 0;
+let bearerToken    = null;
+let tokenExpiry    = 0;
 
 const EVENT_TYPE_MAP = {
-  'Battles': 'conflict',
-  'Explosions/Remote violence': 'conflict',
-  'Violence against civilians': 'conflict',
-  'Protests': 'social',
-  'Riots': 'social',
-  'Strategic developments': 'politics',
+  'Battles':                      'conflict',
+  'Explosions/Remote violence':   'conflict',
+  'Violence against civilians':   'conflict',
+  'Protests':                     'social',
+  'Riots':                        'social',
+  'Strategic developments':       'politics',
 };
 
 function getSeverity(eventType, fatalities) {
@@ -37,15 +41,43 @@ function getSeverity(eventType, fatalities) {
   return fat >= 20 ? 'high' : 'medium';
 }
 
+async function getToken(email, password) {
+  if (bearerToken && Date.now() < tokenExpiry) return bearerToken;
+
+  const res = await fetch('https://acleddata.com/oauth/token', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:    new URLSearchParams({
+      username:   email,
+      password:   password,
+      grant_type: 'password',
+      client_id:  'acled',
+    }),
+    signal: AbortSignal.timeout(6000),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`ACLED OAuth failed ${res.status}: ${body.slice(0, 100)}`);
+  }
+
+  const data = await res.json();
+  if (!data.access_token) throw new Error('ACLED OAuth: no access_token in response');
+
+  bearerToken = data.access_token;
+  tokenExpiry = Date.now() + TOKEN_TTL;
+  return bearerToken;
+}
+
 export default async function handler(req) {
   const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
   if (isDisallowedOrigin(req)) return new Response('Forbidden', { status: 403 });
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
 
-  const apiKey = process.env.ACLED_API_KEY || '';
-  const email  = process.env.ACLED_EMAIL    || '';
+  const email    = process.env.ACLED_EMAIL    || '';
+  const password = process.env.ACLED_PASSWORD || '';
 
-  if (!apiKey || !email) {
+  if (!email || !password) {
     return new Response(JSON.stringify({ events: [], error: 'ACLED credentials not configured' }), {
       status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
@@ -59,13 +91,14 @@ export default async function handler(req) {
   }
 
   try {
+    const token = await getToken(email, password);
+
     const endDate   = new Date();
     const startDate = new Date(endDate - 30 * 24 * 60 * 60 * 1000);
-    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const fmt = (d) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const params = new URLSearchParams({
-      key:              apiKey,
-      email:            email,
       event_date:       `${fmt(startDate)}|${fmt(endDate)}`,
       event_date_where: 'BETWEEN',
       event_type:       'Battles:Explosions/Remote violence:Violence against civilians',
@@ -75,17 +108,19 @@ export default async function handler(req) {
       orderby:          'DESC',
     });
 
-    const res = await fetch(`https://api.acleddata.com/acled/read?${params}`, {
+    const res = await fetch(`https://acleddata.com/api/acled/read?${params}`, {
       headers: {
-        'Accept':     'application/json',
-        'User-Agent': 'mentat-monitor/1.0 (research)',
+        'Authorization': `Bearer ${token}`,
+        'Content-Type':  'application/json',
+        'Accept':        'application/json',
       },
       signal: AbortSignal.timeout(7000),
     });
 
     if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      throw new Error(`ACLED ${res.status}: ${errBody.slice(0, 150)}`);
+      bearerToken = null; // reset token on 401/403 so next call re-auths
+      const body = await res.text().catch(() => '');
+      throw new Error(`ACLED data ${res.status}: ${body.slice(0, 150)}`);
     }
 
     const data = await res.json();
@@ -117,7 +152,7 @@ export default async function handler(req) {
     }).filter(Boolean);
 
     const result = { events, fetchedAt: new Date().toISOString(), count: events.length, cached: false };
-    cache  = result;
+    cache   = result;
     cacheTs = now;
 
     return new Response(JSON.stringify(result), {

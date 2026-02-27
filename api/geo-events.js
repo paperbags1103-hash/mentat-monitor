@@ -10,7 +10,7 @@ import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = { runtime: 'edge' };
 
-const CACHE_TTL = 20 * 60_000;
+const CACHE_TTL = 10 * 60_000;
 let cache = null;
 let cacheTs = 0;
 
@@ -80,7 +80,7 @@ async function fetchRssFrom(sources) {
       if (!res.ok) continue;
       const xml = await res.text();
       const items = [...xml.matchAll(/<item(?:\s[^>]*)?>[\s\S]*?<\/item>/g)];
-      for (const item of items.slice(0, 12)) {
+      for (const item of items.slice(0, 15)) {
         const title = item[0].match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1]
           ?? item[0].match(/<title>(.*?)<\/title>/)?.[1] ?? '';
         const desc = item[0].match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1]
@@ -95,9 +95,9 @@ async function fetchRssFrom(sources) {
 
 async function fetchRssHeadlines() {
   const primary = await fetchRssFrom(RSS_SOURCES_PRIMARY);
-  if (primary.length >= 5) return primary.slice(0, 20);
+  if (primary.length >= 5) return primary.slice(0, 25);
   const fallback = await fetchRssFrom(RSS_SOURCES_FALLBACK);
-  return [...primary, ...fallback].slice(0, 20);
+  return [...primary, ...fallback].slice(0, 25);
 }
 
 // ─── Groq 지리 이벤트 추출 ────────────────────────────────────────────────────
@@ -120,30 +120,31 @@ async function extractGeoEvents(headlines, groqKey) {
         messages: [
           {
             role: 'system',
-            content: `오늘은 ${dateStr}입니다. 뉴스 헤드라인에서 지도에 핀으로 표시할 만한 지리적 이벤트를 추출하세요.
-분쟁, 전쟁, 테러, 중요 정치 이벤트, 경제 위기, 사회 불안, 자연재해 등을 포함합니다.
+            content: `오늘은 ${dateStr}입니다. 뉴스 헤드라인에서 지도에 핀으로 표시할 만한 지정학적으로 중요한 이벤트를 추출하세요.
+분쟁, 전쟁, 테러, 핵협상, 군사훈련, 제재, 외교위기, 경제 위기, 사회 불안, 자연재해 등을 포함합니다.
+국가 또는 지역 수준으로만 알려져도 포함하세요 (도시 좌표가 없어도 국가 중심 좌표 사용).
+이란, 이스라엘, 우크라이나, 러시아, 북한, 대만, 중국 관련 뉴스는 반드시 포함하세요.
 반드시 아래 JSON 배열만 출력하세요 (다른 텍스트 없이):
 [
   {
     "id": "snake_case_고유id",
-    "lat": 위도(숫자),
-    "lng": 경도(숫자),
+    "lat": 위도(숫자, 국가 중심 좌표),
+    "lng": 경도(숫자, 국가 중심 좌표),
     "region": "지역명 (한국어, 도시/국가/지역)",
     "category": "conflict|terrorism|politics|economy|social|disaster 중 하나",
     "severity": "critical|high|medium|low 중 하나",
     "titleKo": "이벤트 제목 (한국어, 30자 이내)",
     "summaryKo": "3문장 이내 요약 (한국어)",
     "tags": ["태그1", "태그2"],
-    "investmentImpactKo": "관련 투자 영향 (선택사항, 있으면 기재)"
+    "investmentImpactKo": "관련 투자 영향 (있으면 기재, 한국 종목 포함)"
   }
 ]
-중복 지역은 하나로 합치고, 지리적으로 특정할 수 없는 이벤트는 제외하세요.
-최대 10개.`,
+중복 지역은 하나로 합치세요. 최대 12개.`,
           },
           { role: 'user', content: newsBlock },
         ],
         temperature: 0.3,
-        max_tokens: 1000,
+        max_tokens: 1200,
       }),
       signal: AbortSignal.timeout(4000),
     });

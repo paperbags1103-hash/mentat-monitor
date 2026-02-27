@@ -1671,6 +1671,9 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedConvergenceId, setSelectedConvergenceId] = useState<string | null>(null);
 
+  // 범례 표시 상태
+  const [legendVisible, setLegendVisible] = useState(true);
+
   // ACLED 무력충돌 데이터
   const [acledEvents, setAcledEvents] = useState<any[]>([]);
   const [acledLoaded, setAcledLoaded] = useState(false);
@@ -2651,26 +2654,46 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
         );
       })()}
 
-      {/* 범례 */}
-      <div className="absolute bottom-10 left-3 z-[1000] text-xs space-y-1 bg-black/80 backdrop-blur-sm rounded p-2.5 border border-white/10">
-        <div className="text-gray-400 font-semibold mb-2">위협 지수</div>
-        {[['#ef4444', '위험 (>70)'], ['#f97316', '경계 (45-70)'], ['#eab308', '주의 (25-45)'], ['#22c55e', '안전 (<25)']] .map(([c, l]) => (
-          <div key={l as string} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ background: c as string }} />
-            <span className="text-gray-300">{l as string}</span>
-          </div>
-        ))}
-        <div className="text-gray-500 mt-2 mb-1 text-[11px] pt-2 border-t border-white/10">이벤트 카테고리</div>
-        <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-          {Object.values(CATEGORY_META).map(meta => (
-            <div key={meta.labelKo} className="flex items-center gap-1">
-              <span style={{ color: meta.color }}>{meta.icon}</span>
-              <span className="text-[10px] text-gray-400">{meta.labelKo}</span>
+      {/* 범례 토글 버튼 (닫혔을 때) */}
+      {!legendVisible && (
+        <button
+          onClick={() => setLegendVisible(true)}
+          className="absolute bottom-10 left-3 z-[1000] text-xs bg-black/80 backdrop-blur-sm rounded px-2 py-1 border border-white/10 text-gray-400 hover:text-white"
+        >
+          📋 범례
+        </button>
+      )}
+
+      {/* 범례 (드래그 가능) */}
+      {legendVisible && (
+        <DraggablePanel className="absolute bottom-10 left-3 z-[1000]">
+          <div className="text-xs space-y-1 bg-black/80 backdrop-blur-sm rounded p-2.5 border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-400 font-semibold">위협 지수</span>
+              <button
+                onClick={() => setLegendVisible(false)}
+                className="text-gray-600 hover:text-gray-300 text-xs ml-3 leading-none"
+              >✕</button>
             </div>
-          ))}
-        </div>
-        <div className="text-gray-600 mt-2 text-xs pt-2 border-t border-white/10">마우스오버: 지역/분야 · 클릭: 세부정보</div>
-      </div>
+            {[['#ef4444', '위험 (>70)'], ['#f97316', '경계 (45-70)'], ['#eab308', '주의 (25-45)'], ['#22c55e', '안전 (<25)']] .map(([c, l]) => (
+              <div key={l as string} className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: c as string }} />
+                <span className="text-gray-300">{l as string}</span>
+              </div>
+            ))}
+            <div className="text-gray-500 mt-2 mb-1 text-[11px] pt-2 border-t border-white/10">이벤트 카테고리</div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+              {Object.values(CATEGORY_META).map(meta => (
+                <div key={meta.labelKo} className="flex items-center gap-1">
+                  <span style={{ color: meta.color }}>{meta.icon}</span>
+                  <span className="text-[10px] text-gray-400">{meta.labelKo}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-gray-600 mt-2 text-xs pt-2 border-t border-white/10">마우스오버: 지역/분야 · 클릭: 세부정보</div>
+          </div>
+        </DraggablePanel>
+      )}
 
       {/* 상단 힌트 (GeoJSON 로딩 중) */}
       {layers.overlay && !geoData && (

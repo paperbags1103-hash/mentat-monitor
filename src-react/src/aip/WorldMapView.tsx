@@ -821,6 +821,7 @@ interface LayerState {
   events: boolean;
   semiconductor: boolean;
   nkHistory: boolean;
+  acled: boolean;
 }
 
 // ─── 북한 도발 이력 ───────────────────────────────────────────────────────────
@@ -1190,6 +1191,18 @@ function LayerControl({
           }}
         >
           🌡️
+        </button>
+        <button
+          onClick={() => onToggle('acled' as keyof LayerState)}
+          title="ACLED 무력충돌 (30일)"
+          style={{
+            background: layers.acled ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${layers.acled ? '#dc2626' : 'rgba(255,255,255,0.1)'}`,
+            color: layers.acled ? '#fca5a5' : '#94a3b8',
+            borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          ⚔️
         </button>
       </div>
       {layers.convergence && convergenceCount > 0 && (
@@ -1648,6 +1661,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
     events: true,
     semiconductor: false,
     nkHistory: false,
+    acled: false,
   });
 
   // NK 도발 선택 상태
@@ -1656,6 +1670,16 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
   // 선택된 핫스팟
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedConvergenceId, setSelectedConvergenceId] = useState<string | null>(null);
+
+  // ACLED 무력충돌 데이터
+  const [acledEvents, setAcledEvents] = useState<any[]>([]);
+  const [acledLoaded, setAcledLoaded] = useState(false);
+  useEffect(() => {
+    if (!layers.acled || acledLoaded) return;
+    apiFetch<{ events: any[] }>('/api/acled-events')
+      .then(data => { setAcledEvents(data?.events ?? []); setAcledLoaded(true); })
+      .catch(() => setAcledLoaded(true));
+  }, [layers.acled]);
 
   // 뉴스 기반 지리 이벤트
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
@@ -2235,6 +2259,31 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
                 </Tooltip>
               ) : null}
             </React.Fragment>
+          );
+        })}
+
+        {/* ── ACLED 무력충돌 레이어 ── */}
+        {layers.acled && acledEvents.map((ev: any) => {
+          const SEV_COLOR: Record<string, string> = { critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#65a30d' };
+          const color = SEV_COLOR[ev.severity] ?? '#94a3b8';
+          const radius = ev.severity === 'critical' ? 8 : ev.severity === 'high' ? 6 : 5;
+          return (
+            <CircleMarker key={ev.id} center={[ev.lat, ev.lng]} radius={radius}
+              pathOptions={{ color, fillColor: color, fillOpacity: 0.8, weight: 1.5 }}>
+              <Tooltip direction="top" offset={[0, -radius - 4]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: 8, border: `1px solid ${color}55`, fontFamily: 'system-ui', maxWidth: 240 }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                    <span>⚔️</span>
+                    <span style={{ fontWeight: 700, fontSize: 11 }}>{ev.region}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color, fontWeight: 600, marginBottom: 3 }}>{ev.eventType}</div>
+                  {ev.actors && <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 3 }}>{ev.actors}</div>}
+                  {ev.fatalities > 0 && <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>사망 {ev.fatalities}명</div>}
+                  <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>{ev.date} · ACLED</div>
+                  {ev.notes && <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, lineHeight: 1.4 }}>{ev.notes.slice(0, 100)}{ev.notes.length > 100 ? '...' : ''}</div>}
+                </div>
+              </Tooltip>
+            </CircleMarker>
           );
         })}
 

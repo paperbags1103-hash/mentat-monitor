@@ -51,17 +51,31 @@ async function getSessionCookie(email, password) {
 
   if (!res.ok) throw new Error(`ACLED login failed: ${res.status}`);
 
-  // Extract Set-Cookie header
-  const setCookieHeader = res.headers.get('set-cookie') || '';
-  const csrfRes = await res.json();
-  const csrfToken = csrfRes.csrf_token || '';
+  const body = await res.json();
+  const csrfToken = body.csrf_token || '';
 
-  // Parse session cookie (SESS* or similar)
-  const cookieMatch = setCookieHeader.match(/(SESS[^=]+=\S+?)(?:;|$)/);
-  if (!cookieMatch) throw new Error('No session cookie in ACLED response');
+  // Collect ALL Set-Cookie headers — fetch returns them merged with commas
+  // Try getSetCookie() (Node 18+), fall back to parsing get('set-cookie')
+  let cookies = '';
+  try {
+    // @ts-ignore — getSetCookie is available in newer runtimes
+    const all = res.headers.getSetCookie?.() ?? [];
+    cookies = all.map(c => c.split(';')[0]).join('; ');
+  } catch {}
 
-  sessionCookie = { cookie: cookieMatch[1], csrf: csrfToken };
-  sessionExpiry = Date.now() + 60 * 60_000; // 1 hour
+  if (!cookies) {
+    // Fallback: parse the merged Set-Cookie header
+    const raw = res.headers.get('set-cookie') || '';
+    // Each cookie in the merged string looks like: NAME=VALUE; Path=..., NAME2=VALUE2; ...
+    // Split on ', ' but not inside quoted strings or date values
+    const parts = raw.split(/,\s*(?=[A-Za-z_][^=]+=)/);
+    cookies = parts.map(p => p.split(';')[0].trim()).filter(Boolean).join('; ');
+  }
+
+  if (!cookies) throw new Error('No cookies in ACLED login response');
+
+  sessionCookie = { cookie: cookies, csrf: csrfToken };
+  sessionExpiry = Date.now() + 60 * 60_000;
   return sessionCookie;
 }
 
@@ -107,11 +121,17 @@ export default async function handler(req) {
       headers: {
         Cookie: session.cookie,
         'X-CSRF-Token': session.csrf,
+        'Accept': 'application/json',
+        'Referer': 'https://acleddata.com/',
+        'User-Agent': 'Mozilla/5.0 (compatible; research-bot)',
       },
       signal: AbortSignal.timeout(7000),
     });
 
-    if (!dataRes.ok) throw new Error(`ACLED data ${dataRes.status}`);
+    if (!dataRes.ok) {
+      const errBody = await dataRes.text().catch(() => '');
+      throw new Error(`ACLED data ${dataRes.status}: ${errBody.slice(0, 100)}`);
+    }
     const data = await dataRes.json();
 
     if (!data.data || !Array.isArray(data.data)) throw new Error('Unexpected ACLED format');

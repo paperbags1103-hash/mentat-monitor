@@ -277,6 +277,23 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: 
   const rafRef       = useRef<number>(0);
   const dataRef      = useRef({ siteScores, meAcled, meFirms, meQuakes, meAircraft });
   const trailsRef    = useRef<Map<string, Array<[number,number]>>>(new Map());
+  const [hiddenSides, setHiddenSides] = useState<Set<Side>>(new Set());
+
+  /* 진영 필터 */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer('wr-forces-fill')) return;
+    const all: Side[] = ['iran','israel','us','hezbollah','houthi','pmf'];
+    const vis = all.filter(s => !hiddenSides.has(s));
+    const sf = vis.length > 0 ? ['in', ['get','side'], ['literal', vis]] : ['==', 1, 0];
+    try {
+      map.setFilter('wr-forces-inactive-ring', ['all', ['==', ['get','active'], false], sf]);
+      map.setFilter('wr-forces-glow',          ['all', ['==', ['get','active'], true],  sf]);
+      map.setFilter('wr-forces-fill',          ['all', ['==', ['get','active'], true],  sf]);
+      map.setFilter('wr-forces-symbol', sf);
+      map.setFilter('wr-forces-label',  sf);
+    } catch {}
+  }, [hiddenSides]);
 
   /* 위성 모드 전환 */
   useEffect(() => {
@@ -682,7 +699,46 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: 
     };
   }, []);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+  const SIDES: { side: Side; label: string; icon: string }[] = [
+    { side: 'iran',      label: '이란 IRGC',  icon: '🔴' },
+    { side: 'israel',    label: 'IDF',         icon: '🔵' },
+    { side: 'us',        label: '미국',         icon: '🔷' },
+    { side: 'hezbollah', label: '헤즈볼라',    icon: '🟠' },
+    { side: 'houthi',    label: '후티',         icon: '🟡' },
+    { side: 'pmf',       label: 'PMF',          icon: '🟤' },
+  ];
+
+  return (
+    <div style={{ width:'100%', height:'100%', position:'relative' }}>
+      <div ref={containerRef} style={{ width:'100%', height:'100%' }} />
+      {/* 진영 필터 토글 오버레이 */}
+      <div style={{ position:'absolute', bottom:28, left:8, zIndex:20, display:'flex', flexDirection:'column', gap:3 }}>
+        <div style={{ fontSize:8, color:'#2d5a7a', letterSpacing:2, marginBottom:2, fontFamily:"'Courier New', monospace" }}>▸ FORCE FILTER</div>
+        {SIDES.map(({ side, label, icon }) => {
+          const active = !hiddenSides.has(side);
+          const col = SIDE_COLOR[side];
+          return (
+            <button key={side} onClick={() => setHiddenSides(prev => {
+              const n = new Set(prev);
+              if (n.has(side)) n.delete(side); else n.add(side);
+              return n;
+            })} style={{
+              display:'flex', alignItems:'center', gap:5,
+              background: active ? col+'22' : '#00000066',
+              border: `1px solid ${active ? col+'88' : '#1a3a4a'}`,
+              borderRadius:2, padding:'2px 7px', cursor:'pointer',
+              fontFamily:"'Courier New', monospace", fontSize:9,
+              color: active ? col : '#2d5a7a',
+              letterSpacing:1, transition:'all 0.15s',
+            }}>
+              <span style={{ fontSize:7, opacity: active ? 1 : 0.4 }}>{icon}</span>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /* ══════════════════════════════════════════════════════

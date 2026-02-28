@@ -1,5 +1,5 @@
 /**
- * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v8
+ * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v9
  *
  * v6 추가: 이란 리알(IRR) 선행지표, 영공제한 레이어, YouTube 라이브 마커
  * 에스컬레이션 인덱스 9차원 벡터 (IRR 추가)
@@ -437,19 +437,30 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
     if (!map) return;
     const apply = () => {
       if (!map.isStyleLoaded()) return;
-      const cfg: Record<SatMode, { night: string; true_: string; soar: string; darkOp: number; satOp: number }> = {
-        satellite:   { night: 'none', true_: 'none', soar: 'none', darkOp: 0.30, satOp: 0.88 },
-        nightlights: { night: 'visible', true_: 'none', soar: 'none', darkOp: 0.04, satOp: 0.10 },
-        truecolor:   { night: 'none', true_: 'visible', soar: 'none', darkOp: 0.12, satOp: 0.05 },
-        soar:        { night: 'none', true_: 'none', soar: 'visible', darkOp: 0.10, satOp: 0.20 },
-      };
-      const c = cfg[satMode] ?? cfg.satellite;
       try {
-        if (map.getLayer('wr-night-lights')) map.setLayoutProperty('wr-night-lights', 'visibility', c.night);
-        if (map.getLayer('wr-true-color'))   map.setLayoutProperty('wr-true-color',   'visibility', c.true_);
-        if (map.getLayer('wr-soar'))         map.setLayoutProperty('wr-soar',         'visibility', c.soar);
-        if (map.getLayer('dark-overlay'))    map.setPaintProperty('dark-overlay', 'raster-opacity', c.darkOp);
-        if (map.getLayer('satellite-base'))  map.setPaintProperty('satellite-base', 'raster-opacity', c.satOp);
+        // 레이어 visibility
+        const nightVis = satMode === 'nightlights' ? 'visible' : 'none';
+        const trueVis  = satMode === 'truecolor'   ? 'visible' : 'none';
+        const soarVis  = satMode === 'soar'        ? 'visible' : 'none';
+        if (map.getLayer('wr-night-lights')) map.setLayoutProperty('wr-night-lights', 'visibility', nightVis);
+        if (map.getLayer('wr-true-color'))   map.setLayoutProperty('wr-true-color',   'visibility', trueVis);
+        if (map.getLayer('wr-soar'))         map.setLayoutProperty('wr-soar',         'visibility', soarVis);
+
+        // 위성 기본 레이어 opacity
+        const satOp = satMode === 'nightlights' ? 0.08 : satMode === 'truecolor' ? 0.08 : 0.90;
+        if (map.getLayer('satellite-base'))  map.setPaintProperty('satellite-base', 'raster-opacity', satOp);
+
+        // dark overlay: 줌 반응형 (줌인 시 위성 디테일 표시)
+        if (map.getLayer('dark-overlay')) {
+          const darkExpr = satMode === 'nightlights' ? 0.03 : satMode === 'soar' ? 0.08
+            : ['interpolate', ['linear'], ['zoom'],
+                4, 0.28,   // 광역뷰: 지도 느낌 살림
+                9, 0.18,   // 중간 줌
+                12, 0.05,  // 도시 수준: 거의 투명
+                15, 0.0,   // 건물 수준: 완전 위성
+              ];
+          map.setPaintProperty('dark-overlay', 'raster-opacity', darkExpr);
+        }
       } catch {}
     };
     if (map.isStyleLoaded?.()) apply(); else map.once('load', apply);
@@ -541,15 +552,16 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
             {
               id: 'satellite-base', type: 'raster', source: 'satellite',
               paint: {
-                'raster-opacity': 0.88,
-                'raster-saturation': -0.35,
-                'raster-brightness-min': 0.02,
-                'raster-brightness-max': 0.72,
-                'raster-contrast': 0.05,
+                'raster-opacity': 0.92,
+                'raster-saturation': -0.15,   // 약간만 탈채도 (전술 느낌 유지)
+                'raster-brightness-min': 0.04,
+                'raster-brightness-max': 0.95, // 더 밝게
+                'raster-contrast': 0.08,
               },
             },
             // 다크 오버레이 (레이블·도로 살리면서 군사 분위기 유지)
-            { id: 'dark-overlay', type: 'raster', source: 'darkgrid', paint: { 'raster-opacity': 0.30 } },
+            { id: 'dark-overlay', type: 'raster', source: 'darkgrid',
+              paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 4, 0.28, 9, 0.18, 12, 0.05, 15, 0.0] as any } },
           ],
         },
         center: [46, 32], zoom: 5.0, pitch: 45, bearing: 0,
@@ -599,11 +611,18 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
           tiles: [`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_DayNightBand_ENCC/default/${gibsDate}/GoogleMapsCompatible/{z}/{y}/{x}.jpg`],
           tileSize: 256, attribution: 'NASA GIBS / VIIRS',
         });
+        // 야간 조명: dark-overlay 위에 레이어 추가 (위에 있어야 보임)
         map.addLayer({
           id: 'wr-night-lights', type: 'raster', source: 'gibs-night',
-          paint: { 'raster-opacity': 0.95, 'raster-saturation': -0.1, 'raster-brightness-max': 2.0 },
+          paint: {
+            'raster-opacity': 0.98,
+            'raster-saturation': 0.2,
+            'raster-brightness-min': 0.0,
+            'raster-brightness-max': 4.0, // 도시 불빛 강조
+            'raster-contrast': 0.5,       // 대비 강화
+          },
           layout: { 'visibility': 'none' },
-        }, 'dark-overlay'); // dark-overlay 아래 삽입
+        }); // dark-overlay 위에 — 다른 레이어 아래
 
         // MODIS Terra 자연색 (250m 해상도, 실제 구름/지형 색상)
         map.addSource('gibs-true', {
@@ -678,16 +697,22 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
         const basesGeoJSON = { type: 'FeatureCollection' as const, features: MILITARY_BASES.map(b => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [b.lng, b.lat] }, properties: { name: b.name, type: b.type, country: b.country, color: COUNTRY_COLOR[b.country] ?? '#94a3b8', symbol: BASE_SYMBOL[b.type] ?? '●', baseColor: BASE_COLOR[b.type] ?? '#94a3b8' } })) };
         map.addSource('wr-bases', { type: 'geojson', data: basesGeoJSON });
         // 헤일로
-        map.addLayer({ id: 'wr-bases-halo', type: 'circle', source: 'wr-bases', paint: { 'circle-radius': 16, 'circle-color': ['get','baseColor'], 'circle-opacity': 0.08, 'circle-blur': 1 } });
-        // 기지 점
-        map.addLayer({ id: 'wr-bases-dot', type: 'circle', source: 'wr-bases', paint: { 'circle-radius': ['match', ['get','type'], 'nuclear', 7, 'airbase', 5, 4], 'circle-color': ['get','baseColor'], 'circle-opacity': 0.92, 'circle-stroke-width': 1.5, 'circle-stroke-color': ['get','baseColor'] } });
-        // 기지 레이블
-        map.addLayer({ id: 'wr-bases-label', type: 'symbol', source: 'wr-bases', layout: { 'text-field': ['get','name'], 'text-size': 9, 'text-offset': [0,-1.4], 'text-anchor': 'bottom', 'text-font': ['literal', ['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true }, paint: { 'text-color': ['get','baseColor'], 'text-halo-color': '#000810', 'text-halo-width': 1.5 } });
+        map.addLayer({ id: 'wr-bases-halo', type: 'circle', source: 'wr-bases',
+          paint: { 'circle-radius': 22, 'circle-color': ['get','baseColor'], 'circle-opacity': 0.12, 'circle-blur': 1.2 } });
+        // 기지 점 (크기 증가)
+        map.addLayer({ id: 'wr-bases-dot', type: 'circle', source: 'wr-bases',
+          paint: { 'circle-radius': ['match', ['get','type'], 'nuclear', 11, 'airbase', 9, 8],
+            'circle-color': ['get','baseColor'], 'circle-opacity': 0.95,
+            'circle-stroke-width': 2, 'circle-stroke-color': '#000810' } });
+        // 기지 레이블 (크기 증가, minzoom 낮춤)
+        map.addLayer({ id: 'wr-bases-label', type: 'symbol', source: 'wr-bases', minzoom: 4.5,
+          layout: { 'text-field': ['get','name'], 'text-size': 11, 'text-offset': [0,-1.6], 'text-anchor': 'bottom',
+            'text-font': ['literal', ['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true, 'text-max-width': 10 },
+          paint: { 'text-color': ['get','baseColor'], 'text-halo-color': '#000810', 'text-halo-width': 2.5 } });
 
         /* ── 위협 기둥 ── */
+        // 원기둥 소스 유지 (데이터 업데이트용), 레이어는 렌더링 안 함
         map.addSource('wr-columns', { type: 'geojson', data: columns });
-        map.addLayer({ id: 'wr-columns-fill', type: 'fill-extrusion', source: 'wr-columns', paint: { 'fill-extrusion-color': ['get','color'], 'fill-extrusion-height': ['get','height'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.8 } });
-        map.addLayer({ id: 'wr-columns-cap', type: 'fill-extrusion', source: 'wr-columns', paint: { 'fill-extrusion-color': ['get','color'], 'fill-extrusion-height': ['*', ['get','height'], 1.04], 'fill-extrusion-base': ['*', ['get','height'], 0.98], 'fill-extrusion-opacity': 0.4 } });
 
         /* ── FIRMS 화재 ── */
         map.addSource('wr-fires', { type: 'geojson', data: fires });
@@ -696,20 +721,45 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
 
         /* ── GDELT 분쟁 ── */
         map.addSource('wr-conflicts', { type: 'geojson', data: conflicts });
-        map.addLayer({ id: 'wr-conflicts-halo', type: 'circle', source: 'wr-conflicts', paint: { 'circle-radius': 14, 'circle-color': ['match',['get','severity'],'critical','#ef4444','high','#f97316','#fbbf24'], 'circle-opacity': 0.13, 'circle-blur': 0.8 } });
-        map.addLayer({ id: 'wr-conflicts-dot', type: 'circle', source: 'wr-conflicts', paint: { 'circle-radius': ['match',['get','severity'],'critical',8,'high',6,4], 'circle-color': ['match',['get','severity'],'critical','#ef4444','high','#f97316','#fbbf24'], 'circle-opacity': ['case',['get','isRecent'],1,0.75], 'circle-stroke-width': ['case',['get','isRecent'],2,0], 'circle-stroke-color': '#fff' } });
+        map.addLayer({ id: 'wr-conflicts-halo', type: 'circle', source: 'wr-conflicts',
+          paint: { 'circle-radius': 18, 'circle-color': ['match',['get','severity'],'critical','#ef4444','high','#f97316','#fbbf24'],
+            'circle-opacity': 0.15, 'circle-blur': 1 } });
+        map.addLayer({ id: 'wr-conflicts-dot', type: 'circle', source: 'wr-conflicts',
+          paint: { 'circle-radius': ['match',['get','severity'],'critical',10,'high',8,6],
+            'circle-color': ['match',['get','severity'],'critical','#ef4444','high','#f97316','#fbbf24'],
+            'circle-opacity': ['case',['get','isRecent'],1,0.82],
+            'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
 
         /* ── USGS ── */
         map.addSource('wr-seismic', { type: 'geojson', data: seismic });
         map.addLayer({ id: 'wr-seismic-dot', type: 'circle', source: 'wr-seismic', paint: { 'circle-radius': ['interpolate',['linear'],['get','mag'], 2.5,5, 6,14], 'circle-color': '#f97316', 'circle-opacity': 0.85, 'circle-stroke-width': 2, 'circle-stroke-color': '#fff7ed' } });
 
-        /* ── OpenSky (일반 항공기) ── */
+        /* ── ADS-B / OpenSky 항공기 ── */
         map.addSource('wr-aircraft', { type: 'geojson', data: acft });
-        map.addLayer({ id: 'wr-aircraft-dot', type: 'circle', source: 'wr-aircraft', filter: ['!=', ['get','mil'], true], paint: { 'circle-radius': 4, 'circle-color': '#3b82f6', 'circle-opacity': 0.85, 'circle-stroke-width': 1, 'circle-stroke-color': '#93c5fd' } });
-        /* ── 군용기 — 별도 하이라이트 ── */
-        map.addLayer({ id: 'wr-aircraft-mil-halo', type: 'circle', source: 'wr-aircraft', filter: ['==', ['get','mil'], true], paint: { 'circle-radius': 18, 'circle-color': '#facc15', 'circle-opacity': 0.15, 'circle-blur': 1 } });
-        map.addLayer({ id: 'wr-aircraft-mil-dot', type: 'circle', source: 'wr-aircraft', filter: ['==', ['get','mil'], true], paint: { 'circle-radius': 6, 'circle-color': '#facc15', 'circle-opacity': 1, 'circle-stroke-width': 2, 'circle-stroke-color': '#fef08a' } });
-        map.addLayer({ id: 'wr-aircraft-mil-label', type: 'symbol', source: 'wr-aircraft', filter: ['==', ['get','mil'], true], layout: { 'text-field': ['get','callsign'], 'text-size': 9, 'text-offset': [0,-1.5], 'text-anchor': 'bottom', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true }, paint: { 'text-color': '#facc15', 'text-halo-color': '#000810', 'text-halo-width': 1.5 } });
+        // 일반 항공기: 흰색 배경 점 + 파란 외곽
+        map.addLayer({ id: 'wr-aircraft-dot', type: 'circle', source: 'wr-aircraft',
+          filter: ['!=', ['get','mil'], true],
+          paint: { 'circle-radius': 5, 'circle-color': '#60a5fa', 'circle-opacity': 0.92,
+            'circle-stroke-width': 1.5, 'circle-stroke-color': '#fff' } });
+        map.addLayer({ id: 'wr-aircraft-label', type: 'symbol', source: 'wr-aircraft',
+          filter: ['!=', ['get','mil'], true],
+          minzoom: 7,
+          layout: { 'text-field': ['get','callsign'], 'text-size': 10, 'text-offset': [0,-1.4], 'text-anchor': 'bottom',
+            'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true },
+          paint: { 'text-color': '#93c5fd', 'text-halo-color': '#000c1a', 'text-halo-width': 2 } });
+        /* ── 군용기 — 황색 강조 ── */
+        map.addLayer({ id: 'wr-aircraft-mil-halo', type: 'circle', source: 'wr-aircraft',
+          filter: ['==', ['get','mil'], true],
+          paint: { 'circle-radius': 22, 'circle-color': '#facc15', 'circle-opacity': 0.18, 'circle-blur': 1 } });
+        map.addLayer({ id: 'wr-aircraft-mil-dot', type: 'circle', source: 'wr-aircraft',
+          filter: ['==', ['get','mil'], true],
+          paint: { 'circle-radius': 8, 'circle-color': '#facc15', 'circle-opacity': 1,
+            'circle-stroke-width': 2.5, 'circle-stroke-color': '#fef08a' } });
+        map.addLayer({ id: 'wr-aircraft-mil-label', type: 'symbol', source: 'wr-aircraft',
+          filter: ['==', ['get','mil'], true],
+          layout: { 'text-field': ['get','callsign'], 'text-size': 11, 'text-offset': [0,-1.8], 'text-anchor': 'bottom',
+            'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true },
+          paint: { 'text-color': '#facc15', 'text-halo-color': '#000810', 'text-halo-width': 2 } });
 
         /* ── 항공기 궤적 trail ── */
         const { trails: initialTrails, baseStrikes: initialBaseStrikes } = buildDynGeoJSON();
@@ -807,16 +857,18 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
         map.addLayer({ id: 'wr-forces-icon', type: 'symbol', source: 'wr-forces',
           layout: {
             'icon-image': ['concat', 'force-icon-', ['get','type']],
-            'icon-size': ['case',['==',['get','strength'],'xl'],1.35,['==',['get','strength'],'lg'],1.05,['==',['get','strength'],'md'],0.82,0.62],
+            // 전체적으로 1.5x 크게 → 더 잘 보임
+            'icon-size': ['case',['==',['get','strength'],'xl'],2.0,['==',['get','strength'],'lg'],1.65,['==',['get','strength'],'md'],1.3,1.0],
             'icon-allow-overlap': true, 'icon-rotation-alignment': 'map',
           } as any,
-          paint: { 'icon-color': ['get','color'], 'icon-opacity': ['get','opacity'], 'icon-halo-color': '#000000', 'icon-halo-width': 0.8 } as any,
+          paint: { 'icon-color': ['get','color'], 'icon-opacity': ['get','opacity'], 'icon-halo-color': '#000000', 'icon-halo-width': 1.5 } as any,
         });
-        // 부대명 레이블 (호버/줌 시)
+        // 부대명 레이블 (더 크고 더 일찍 표시)
         map.addLayer({ id: 'wr-forces-label', type: 'symbol', source: 'wr-forces',
-          minzoom: 5,
-          layout: { 'text-field': ['get','name'], 'text-size': 8, 'text-offset': [0, -1.8], 'text-anchor': 'bottom', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true, 'text-max-width': 12 },
-          paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 1.5, 'text-opacity': ['get','opacity'] },
+          minzoom: 4,
+          layout: { 'text-field': ['get','name'], 'text-size': 11, 'text-offset': [0, -2.2], 'text-anchor': 'bottom',
+            'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true, 'text-max-width': 14 },
+          paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 2.5, 'text-opacity': ['get','opacity'] },
         });
 
         // 클릭 팝업
@@ -1300,7 +1352,6 @@ function VolumeHistogram({ buckets, timeWindow }: { buckets: Array<{hour:number;
    CSS
 ══════════════════════════════════════════════════════ */
 const CSS = `
-@keyframes wr-sweep { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 @keyframes wr-blink { 0%,100%{opacity:1} 50%{opacity:0} }
 @keyframes wr-pulse-border {
   0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.6),inset 0 0 0 1px rgba(239,68,68,0.8)}
@@ -1880,14 +1931,6 @@ export function WarRoomView() {
           {/* 우클릭 힌트 */}
           <div style={{ position:'absolute', top:8, left:'50%', transform:'translateX(-50%)', zIndex:1000, fontSize:8, color:'#2d5a7a', letterSpacing:1, fontFamily:"'Courier New',monospace", pointerEvents:'none' }}>
             우클릭 → 타격 보고 &nbsp;|&nbsp; 🎯 {strikeReports.length}건
-          </div>
-
-          {/* CRT 스캔라인 */}
-          <div style={{ position:'absolute', inset:0, zIndex:999, pointerEvents:'none', backgroundImage:'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px)' }} />
-
-          {/* 레이더 스윕 */}
-          <div style={{ position:'absolute', inset:0, zIndex:998, pointerEvents:'none', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
-            <div style={{ width:'140%', paddingBottom:'140%', background:'conic-gradient(from -5deg, transparent 0deg, rgba(0,255,136,0.06) 18deg, transparent 22deg)', animation:'wr-sweep 7s linear infinite', borderRadius:'50%', position:'absolute' }} />
           </div>
 
           {/* 3D 지도 */}

@@ -75,14 +75,15 @@ export default async function handler(req, res) {
 
   try {
     /* Step 1: get latest GDELT events file URL */
-    const luRes = await fetch('https://data.gdeltproject.org/gdeltv2/lastupdate.txt', {
+    // GDELT does not have a valid HTTPS cert — use HTTP
+    const luRes = await fetch('http://data.gdeltproject.org/gdeltv2/lastupdate.txt', {
       signal: AbortSignal.timeout(4000),
     });
     if (!luRes.ok) throw new Error(`GDELT lastupdate ${luRes.status}`);
     const luText    = await luRes.text();
-    let eventsUrl   = luText.trim().split('\n')[0].trim().split(/\s+/)[2];
+    // lastupdate.txt returns http:// URLs — keep as-is
+    const eventsUrl = luText.trim().split('\n')[0].trim().split(/\s+/)[2];
     if (!eventsUrl) throw new Error('Cannot parse GDELT lastupdate.txt');
-    eventsUrl = eventsUrl.replace(/^http:\/\//, 'https://');
 
     /* Step 2: download ZIP as Buffer */
     const zipRes = await fetch(eventsUrl, { signal: AbortSignal.timeout(6000) });

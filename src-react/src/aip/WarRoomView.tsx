@@ -1512,7 +1512,7 @@ function StrikeModal({ lat, lng, onSave, onClose }: { lat:number; lng:number; on
 /* ══════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════ */
-interface FeedItem { id:string; time:string; icon:string; title:string; region:string; severity:string; source:string; lat?:number; lng?:number; }
+interface FeedItem { id:string; time:string; addedAt:number; icon:string; title:string; region:string; severity:string; source:string; lat?:number; lng?:number; }
 interface OilData   { price:number|null; change:number; }
 interface Oil       { wti:OilData|null; brent:OilData|null; }
 
@@ -1600,7 +1600,7 @@ export function WarRoomView() {
       if (adsbRes.status==='fulfilled' && adsbRes.value?.emergency?.length > 0) {
         const emList = adsbRes.value.emergency;
         emList.forEach((em: any) => {
-          const item: FeedItem = { id: `em-${em.callsign}`, time: new Date().toISOString(), icon:'🆘', title:`비상 스쿼크: ${em.callsign} (${em.emergency})`, region:'항공', severity:'critical', source:'ADS-B' };
+          const item: FeedItem = { id: `em-${em.callsign}`, time: new Date().toISOString(), addedAt: Date.now(), icon:'🆘', title:`비상 스쿼크: ${em.callsign} (${em.emergency})`, region:'항공', severity:'critical', source:'ADS-B' };
           setFeed(prev => [item, ...prev.slice(0, 79)]);
         });
       }
@@ -1666,11 +1666,12 @@ export function WarRoomView() {
       setFreshness({ gdelt: t, usgs: t, firms: t, adsb: t, gdacs: t });
 
       /* 이벤트 피드 */
+      const _now = Date.now();
       const items: FeedItem[] = [
-        ...aData.filter((e:any)=>inBBOX(e.lat,e.lng)).map((e:any)=>({ id:e.id, time:e.date||'', icon:'⚔️', title:e.eventType||'전투', region:e.region||e.country, severity:e.severity, source:'GDELT', lat:e.lat, lng:e.lng })),
-        ...qData.filter((q:any)=>q.isSuspect&&inBBOX(q.lat,q.lng)).map((q:any)=>({ id:q.id, time:new Date(q.time).toISOString(), icon:'🌋', title:`M${q.magnitude} 이상진동`, region:q.place, severity:q.severity, source:'USGS', lat:q.lat, lng:q.lng })),
-        ...gData.filter((e:any)=>inBBOX(e.lat,e.lng)).map((e:any)=>({ id:e.id, time:e.date||'', icon:'🚨', title:e.eventType, region:e.country, severity:e.severity, source:'GDACS' })),
-        ...fData.filter((e:any)=>inBBOX(e.lat,e.lng)&&e.frp>20).map((e:any)=>({ id:e.id, time:`${e.date} ${e.time}`, icon:'🔥', title:`화재 ${e.frp}MW`, region:e.zone, severity:e.severity, source:'FIRMS' })),
+        ...aData.filter((e:any)=>inBBOX(e.lat,e.lng)).map((e:any)=>({ id:e.id, time:e.date||'', addedAt:_now, icon:'⚔️', title:e.eventType||'전투', region:e.region||e.country, severity:e.severity, source:'GDELT', lat:e.lat, lng:e.lng })),
+        ...qData.filter((q:any)=>q.isSuspect&&inBBOX(q.lat,q.lng)).map((q:any)=>({ id:q.id, time:new Date(q.time).toISOString(), addedAt:_now, icon:'🌋', title:`M${q.magnitude} 이상진동`, region:q.place, severity:q.severity, source:'USGS', lat:q.lat, lng:q.lng })),
+        ...gData.filter((e:any)=>inBBOX(e.lat,e.lng)).map((e:any)=>({ id:e.id, time:e.date||'', addedAt:_now, icon:'🚨', title:e.eventType, region:e.country, severity:e.severity, source:'GDACS' })),
+        ...fData.filter((e:any)=>inBBOX(e.lat,e.lng)&&e.frp>20).map((e:any)=>({ id:e.id, time:`${e.date} ${e.time}`, addedAt:_now, icon:'🔥', title:`화재 ${e.frp}MW`, region:e.zone, severity:e.severity, source:'FIRMS' })),
       ].sort((a,b)=>b.time.localeCompare(a.time));
       setFeed(items.slice(0,80));
 
@@ -1695,13 +1696,12 @@ export function WarRoomView() {
 
   /* 시간창 필터 */
   const filteredFeed = useMemo(() => {
-    if (timeWindow >= 24) return feed;
-    const cutoff = Date.now() - timeWindow * 3600_000;
-    return feed.filter(item => {
-      if (!item.time) return true;
-      const t = new Date(item.time).getTime();
-      return isNaN(t) || t >= cutoff;
-    });
+    // 심각도 필터: 슬라이더가 작을수록 중요 이벤트만 표시
+    // 24h → ALL / 12h → medium+ / 6h → high+ / 1h → critical only
+    const SMAP: Record<string,number> = { critical:4, high:3, medium:2, low:1, unknown:0 };
+    const minSev = timeWindow <= 2 ? 4 : timeWindow <= 6 ? 3 : timeWindow <= 12 ? 2 : 0;
+    if (minSev === 0) return feed;
+    return feed.filter(item => (SMAP[item.severity] ?? 0) >= minSev);
   }, [feed, timeWindow]);
   useEffect(() => {
     if (threatScore > 0) {
@@ -1970,14 +1970,22 @@ export function WarRoomView() {
           )}
 
           {/* ── Timeline Scrubber ── */}
-          <div style={{ position:'absolute', bottom: liveNews.length > 0 ? 66 : 36, left:0, right:0, zIndex:1000, padding:'0 10px 3px', background:'rgba(0,8,16,0.82)', backdropFilter:'blur(4px)', borderTop:'1px solid #0a1f2f', display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ fontSize:8, color:'#4a7a9b', letterSpacing:2, flexShrink:0, fontFamily:"'Courier New',monospace" }}>🕐 WINDOW</div>
+          {/* ── 심각도 필터 슬라이더 ── */}
+          <div style={{ position:'absolute', bottom: liveNews.length > 0 ? 66 : 36, left:0, right:0, zIndex:1000, padding:'3px 10px', background:'rgba(0,8,16,0.88)', backdropFilter:'blur(4px)', borderTop:'1px solid #0a1f2f', display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:8, color:'#4a7a9b', letterSpacing:2, flexShrink:0, fontFamily:"'Courier New',monospace" }}>FILTER</div>
             <input
               type="range" min={1} max={24} step={1} value={timeWindow}
               onChange={e => setTimeWindow(+e.target.value)}
-              style={{ flex:1, accentColor:'#ef4444', height:3, cursor:'pointer', WebkitAppearance:'none', background:`linear-gradient(to right, #ef4444 ${(timeWindow/24)*100}%, #1a3a4a ${(timeWindow/24)*100}%)`, borderRadius:2 }}
+              style={{ flex:1, accentColor: timeWindow<=2?'#ef4444':timeWindow<=6?'#f97316':timeWindow<=12?'#fbbf24':'#22c55e',
+                height:4, cursor:'pointer',
+                background:`linear-gradient(to right, ${timeWindow<=2?'#ef4444':timeWindow<=6?'#f97316':timeWindow<=12?'#fbbf24':'#22c55e'} ${(timeWindow/24)*100}%, #1a3a4a ${(timeWindow/24)*100}%)`,
+                borderRadius:2 }}
             />
-            <div style={{ fontSize:9, color:'#ef4444', fontWeight:700, letterSpacing:1, flexShrink:0, minWidth:28, textAlign:'right', fontFamily:"'Courier New',monospace" }}>{timeWindow}H</div>
+            {/* 현재 필터 레이블 */}
+            {(() => {
+              const [label,col] = timeWindow<=2 ? ['🔴 CRITICAL 전용','#ef4444'] : timeWindow<=6 ? ['🟠 HIGH+','#f97316'] : timeWindow<=12 ? ['🟡 MEDIUM+','#fbbf24'] : ['🟢 전체','#22c55e'];
+              return <div style={{ fontSize:9, color:col, fontWeight:700, letterSpacing:1, flexShrink:0, minWidth:70, textAlign:'right', fontFamily:"'Courier New',monospace" }}>{label}</div>;
+            })()}
           </div>
 
           {/* LIVE 뉴스 티커 */}
@@ -2042,7 +2050,7 @@ export function WarRoomView() {
           <div style={{ padding:'5px 12px 4px', borderBottom:'1px solid #0a1f2f', flexShrink:0, background:'#020c18' }}>
             <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
               ▸ EVENT VOLUME
-              <span style={{ marginLeft:'auto', fontSize:8, color:'#ef4444' }}>최근 {timeWindow}h</span>
+              <span style={{ marginLeft:'auto', fontSize:8, color:'#ef4444' }}>최근 24h</span>
             </div>
             <VolumeHistogram buckets={volBuckets} timeWindow={timeWindow} />
           </div>
@@ -2283,8 +2291,8 @@ export function WarRoomView() {
             <div style={{ padding:'5px 12px', borderBottom:'1px solid #0a1f2f', display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
               <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2 }}>▸ INTEL FEED</span>
               <span className="wr-blink" style={{ fontSize:9, color:'#ef4444', letterSpacing:1 }}>● LIVE</span>
-              <span style={{ marginLeft:'auto', fontSize:9, color:'#4a7a9b' }}>{filteredFeed.length}</span>
-              {timeWindow < 24 && <span style={{ fontSize:8, color:'#ef4444', letterSpacing:1 }}>/{timeWindow}h</span>}
+              <span style={{ marginLeft:'auto', fontSize:9, color:'#4a7a9b' }}>{filteredFeed.length}/{feed.length}</span>
+              {timeWindow < 13 && <span style={{ fontSize:8, color: timeWindow<=2?'#ef4444':timeWindow<=6?'#f97316':'#fbbf24', letterSpacing:1 }}>{timeWindow<=2?'CRITICAL':timeWindow<=6?'HIGH+':'MED+'}</span>}
             </div>
             <div ref={feedRef} style={{ flex:1, overflowY:'auto', padding:'0 2px' }}>
               {filteredFeed.length===0 && <div style={{ padding:20, textAlign:'center', color:'#4a7a9b', fontSize:11 }}>{loading?'인텔 수집 중...':'감지된 이벤트 없음'}</div>}

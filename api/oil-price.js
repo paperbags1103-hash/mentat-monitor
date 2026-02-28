@@ -2,7 +2,7 @@
  * Oil Price — WTI/Brent 실시간 (Yahoo Finance proxy)
  * 15분 캐시
  */
-export const config = { runtime: 'nodejs18.x' };
+export const config = { runtime: 'nodejs' };
 
 let cache = null;
 let cacheTime = 0;

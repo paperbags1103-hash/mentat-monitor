@@ -1,5 +1,5 @@
 /**
- * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v6
+ * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v8
  *
  * v6 추가: 이란 리알(IRR) 선행지표, 영공제한 레이어, YouTube 라이브 마커
  * 에스컬레이션 인덱스 9차원 벡터 (IRR 추가)
@@ -291,7 +291,7 @@ function circlePoly(lng: number, lat: number, radiusKm: number, sides = 48): [nu
 /* ══════════════════════════════════════════════════════
    MAP 3D COMPONENT
 ══════════════════════════════════════════════════════ */
-type SatMode = 'satellite' | 'nightlights' | 'truecolor';
+type SatMode = 'satellite' | 'nightlights' | 'truecolor' | 'soar';
 
 // GIBS 날짜 (36h 전 — 처리 지연 감안)
 const getGibsDate = () => {
@@ -437,15 +437,17 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
     if (!map) return;
     const apply = () => {
       if (!map.isStyleLoaded()) return;
-      const cfg: Record<SatMode, { night: string; true_: string; darkOp: number; satOp: number }> = {
-        satellite:   { night: 'none', true_: 'none', darkOp: 0.30, satOp: 0.88 },
-        nightlights: { night: 'visible', true_: 'none', darkOp: 0.04, satOp: 0.10 },
-        truecolor:   { night: 'none', true_: 'visible', darkOp: 0.12, satOp: 0.05 },
+      const cfg: Record<SatMode, { night: string; true_: string; soar: string; darkOp: number; satOp: number }> = {
+        satellite:   { night: 'none', true_: 'none', soar: 'none', darkOp: 0.30, satOp: 0.88 },
+        nightlights: { night: 'visible', true_: 'none', soar: 'none', darkOp: 0.04, satOp: 0.10 },
+        truecolor:   { night: 'none', true_: 'visible', soar: 'none', darkOp: 0.12, satOp: 0.05 },
+        soar:        { night: 'none', true_: 'none', soar: 'visible', darkOp: 0.10, satOp: 0.20 },
       };
-      const c = cfg[satMode];
+      const c = cfg[satMode] ?? cfg.satellite;
       try {
         if (map.getLayer('wr-night-lights')) map.setLayoutProperty('wr-night-lights', 'visibility', c.night);
         if (map.getLayer('wr-true-color'))   map.setLayoutProperty('wr-true-color',   'visibility', c.true_);
+        if (map.getLayer('wr-soar'))         map.setLayoutProperty('wr-soar',         'visibility', c.soar);
         if (map.getLayer('dark-overlay'))    map.setPaintProperty('dark-overlay', 'raster-opacity', c.darkOp);
         if (map.getLayer('satellite-base'))  map.setPaintProperty('satellite-base', 'raster-opacity', c.satOp);
       } catch {}
@@ -612,6 +614,25 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
         map.addLayer({
           id: 'wr-true-color', type: 'raster', source: 'gibs-true',
           paint: { 'raster-opacity': 0.95 },
+          layout: { 'visibility': 'none' },
+        }, 'dark-overlay');
+
+        // SOAR Atlas 실시간 위성 (soaratlas.com/maps/15424 — Iran War WMS)
+        // wms.soar.earth CORS: Access-Control-Allow-Origin: * → 직접 사용 가능
+        const SOAR_WMS = 'https://wms.soar.earth/maps/15424';
+        map.addSource('soar-wms', {
+          type: 'raster',
+          tiles: [
+            `${SOAR_WMS}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+            `&LAYERS=15424&CRS=EPSG:3857&BBOX={bbox-epsg-3857}` +
+            `&WIDTH=256&HEIGHT=256&FORMAT=image/png&STYLES=&TRANSPARENT=true`,
+          ],
+          tileSize: 256,
+          attribution: '© SOAR Atlas — soaratlas.com',
+        });
+        map.addLayer({
+          id: 'wr-soar', type: 'raster', source: 'soar-wms',
+          paint: { 'raster-opacity': 0.90 },
           layout: { 'visibility': 'none' },
         }, 'dark-overlay');
 
@@ -1878,6 +1899,7 @@ export function WarRoomView() {
               { mode: 'satellite',   label: '🛰️', title: 'Esri 위성사진 (정적)' },
               { mode: 'nightlights', label: '🌙', title: `NASA VIIRS 야간조명 (${getGibsDate()})` },
               { mode: 'truecolor',   label: '🎨', title: `MODIS 자연색 (${getGibsDate()})` },
+              { mode: 'soar',        label: '🔴', title: 'SOAR Atlas 실시간 이란 전장 위성 (soaratlas.com/maps/15424)' },
             ] as const).map(btn => (
               <button key={btn.mode} onClick={() => setSatMode(btn.mode)} title={btn.title}
                 style={{ width:32, height:26, background: satMode===btn.mode ? '#00d4ff22' : '#020c18cc', border: `1px solid ${satMode===btn.mode ? '#00d4ff' : '#1a3a4a'}`, borderRadius:3, color: satMode===btn.mode ? '#00d4ff' : '#4a7a9b', cursor:'pointer', fontSize:13, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -1895,6 +1917,12 @@ export function WarRoomView() {
           {satMode === 'truecolor' && (
             <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #fbbf2455', borderRadius:3, padding:'6px 14px', fontSize:9, color:'#fbbf24', letterSpacing:1, whiteSpace:'nowrap' }}>
               🎨 MODIS Terra 자연색 — {getGibsDate()} 기준 · 250m 해상도
+            </div>
+          )}
+          {satMode === 'soar' && (
+            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(16,0,0,0.92)', border:'1px solid #ef444455', borderRadius:3, padding:'6px 16px', fontSize:9, color:'#ef4444', letterSpacing:1, whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:8 }}>
+              <span className="wr-blink">●</span>
+              SOAR Atlas 실시간 이란 전장 위성 · <a href="https://soaratlas.com/maps/15424" target="_blank" rel="noopener" style={{ color:'#f87171', textDecoration:'underline' }}>soaratlas.com/maps/15424</a>
             </div>
           )}
 

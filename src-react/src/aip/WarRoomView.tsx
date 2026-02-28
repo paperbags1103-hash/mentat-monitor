@@ -257,17 +257,48 @@ function circlePoly(lng: number, lat: number, radiusKm: number, sides = 48): [nu
 /* ══════════════════════════════════════════════════════
    MAP 3D COMPONENT
 ══════════════════════════════════════════════════════ */
+type SatMode = 'satellite' | 'nightlights' | 'truecolor';
+
+// GIBS 날짜 (36h 전 — 처리 지연 감안)
+const getGibsDate = () => {
+  const d = new Date(Date.now() - 36 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+};
+
 interface Map3DProps {
   siteScores: Array<{ name: string; lat: number; lng: number; score: number }>;
   meAcled: any[]; meFirms: any[]; meQuakes: any[]; meAircraft: any[];
+  satMode: SatMode;
 }
 
-function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProps) {
+function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: Map3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const rafRef       = useRef<number>(0);
   const dataRef      = useRef({ siteScores, meAcled, meFirms, meQuakes, meAircraft });
   const trailsRef    = useRef<Map<string, Array<[number,number]>>>(new Map());
+
+  /* 위성 모드 전환 */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.isStyleLoaded()) return;
+      const cfg: Record<SatMode, { night: string; true_: string; darkOp: number; satOp: number }> = {
+        satellite:   { night: 'none', true_: 'none', darkOp: 0.30, satOp: 0.88 },
+        nightlights: { night: 'visible', true_: 'none', darkOp: 0.04, satOp: 0.10 },
+        truecolor:   { night: 'none', true_: 'visible', darkOp: 0.12, satOp: 0.05 },
+      };
+      const c = cfg[satMode];
+      try {
+        if (map.getLayer('wr-night-lights')) map.setLayoutProperty('wr-night-lights', 'visibility', c.night);
+        if (map.getLayer('wr-true-color'))   map.setLayoutProperty('wr-true-color',   'visibility', c.true_);
+        if (map.getLayer('dark-overlay'))    map.setPaintProperty('dark-overlay', 'raster-opacity', c.darkOp);
+        if (map.getLayer('satellite-base'))  map.setPaintProperty('satellite-base', 'raster-opacity', c.satOp);
+      } catch {}
+    };
+    if (map.isStyleLoaded?.()) apply(); else map.once('load', apply);
+  }, [satMode]);
 
   useEffect(() => {
     dataRef.current = { siteScores, meAcled, meFirms, meQuakes, meAircraft };
@@ -381,6 +412,32 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
         });
         map.setTerrain({ source: 'terrain-dem', exaggeration: 2.2 });
         map.addLayer({ id: 'wr-sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0,45], 'sky-atmosphere-sun-intensity': 5, 'sky-atmosphere-color': 'rgba(0,8,30,1)', 'sky-atmosphere-halo-color': 'rgba(0,50,100,0.5)' } } as any);
+
+        /* ── NASA GIBS 위성 레이어 ── */
+        const gibsDate = getGibsDate();
+        // 야간 조명 (VIIRS DNB — 도시 조명 감지)
+        map.addSource('gibs-night', {
+          type: 'raster',
+          tiles: [`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_DayNightBand_ENCC/default/${gibsDate}/GoogleMapsCompatible/{z}/{y}/{x}.jpg`],
+          tileSize: 256, attribution: 'NASA GIBS / VIIRS',
+        });
+        map.addLayer({
+          id: 'wr-night-lights', type: 'raster', source: 'gibs-night',
+          paint: { 'raster-opacity': 0.95, 'raster-saturation': -0.1, 'raster-brightness-max': 2.0 },
+          layout: { 'visibility': 'none' },
+        }, 'dark-overlay'); // dark-overlay 아래 삽입
+
+        // MODIS Terra 자연색 (250m 해상도, 실제 구름/지형 색상)
+        map.addSource('gibs-true', {
+          type: 'raster',
+          tiles: [`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible/{z}/{y}/{x}.jpg`],
+          tileSize: 256, attribution: 'NASA GIBS / MODIS Terra',
+        });
+        map.addLayer({
+          id: 'wr-true-color', type: 'raster', source: 'gibs-true',
+          paint: { 'raster-opacity': 0.95 },
+          layout: { 'visibility': 'none' },
+        }, 'dark-overlay');
 
         /* ── 분쟁지역 해칭 패턴 ── */
         const patternCanvas = document.createElement('canvas');
@@ -737,6 +794,7 @@ export function WarRoomView() {
   const [cinematic,    setCinematic]    = useState(false);
   const [threatHistory,setThreatHistory]= useState<TensionPoint[]>([]);
   const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
+  const [satMode,      setSatMode]      = useState<SatMode>('satellite');
   const feedRef    = useRef<HTMLDivElement>(null);
   const prevCritRef = useRef<Set<string>>(new Set());
   const audioCtxRef = useRef<AudioContext|null>(null);
@@ -956,7 +1014,33 @@ export function WarRoomView() {
           </div>
 
           {/* 3D 지도 */}
-          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} />
+          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} />
+
+          {/* 위성 레이어 토글 */}
+          <div style={{ position:'absolute', top:36, right:8, zIndex:1001, display:'flex', flexDirection:'column', gap:3 }}>
+            {([
+              { mode: 'satellite',   label: '🛰️', title: 'Esri 위성사진 (정적)' },
+              { mode: 'nightlights', label: '🌙', title: `NASA VIIRS 야간조명 (${getGibsDate()})` },
+              { mode: 'truecolor',   label: '🎨', title: `MODIS 자연색 (${getGibsDate()})` },
+            ] as const).map(btn => (
+              <button key={btn.mode} onClick={() => setSatMode(btn.mode)} title={btn.title}
+                style={{ width:32, height:26, background: satMode===btn.mode ? '#00d4ff22' : '#020c18cc', border: `1px solid ${satMode===btn.mode ? '#00d4ff' : '#1a3a4a'}`, borderRadius:3, color: satMode===btn.mode ? '#00d4ff' : '#4a7a9b', cursor:'pointer', fontSize:13, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 야간 조명 모드 안내 */}
+          {satMode === 'nightlights' && (
+            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #22c55e55', borderRadius:3, padding:'6px 14px', fontSize:9, color:'#22c55e', letterSpacing:1, whiteSpace:'nowrap' }}>
+              🌙 NASA VIIRS 야간조명 — {getGibsDate()} 기준 · 어두운 지역 = 정전/피해
+            </div>
+          )}
+          {satMode === 'truecolor' && (
+            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #fbbf2455', borderRadius:3, padding:'6px 14px', fontSize:9, color:'#fbbf24', letterSpacing:1, whiteSpace:'nowrap' }}>
+              🎨 MODIS Terra 자연색 — {getGibsDate()} 기준 · 250m 해상도
+            </div>
+          )}
 
           {/* 레전드 */}
           <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:9, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
@@ -992,6 +1076,37 @@ export function WarRoomView() {
               </div>
             ))}
           </div>
+
+          {/* 야간 조명 분석 패널 */}
+          {satMode === 'nightlights' && (
+            <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', background:'#020c18', flexShrink:0 }}>
+              <div style={{ fontSize:9, color:'#22c55e', letterSpacing:2, marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
+                🌙 NIGHT LIGHTS INTEL
+                <span style={{ fontSize:8, color:'#2d5a7a', marginLeft:'auto' }}>{getGibsDate()}</span>
+              </div>
+              {[
+                { city:'가자 시티',   status:'critical', pct: 8,  note:'전력망 완전 파괴' },
+                { city:'가자 남부',   status:'critical', pct:15,  note:'라파 작전 암전' },
+                { city:'베이루트 S',  status:'high',     pct:35,  note:'헤즈볼라 교전구역' },
+                { city:'텔아비브',    status:'normal',   pct:98,  note:'정상' },
+                { city:'테헤란',      status:'normal',   pct:96,  note:'정상' },
+                { city:'사나 (예멘)', status:'high',     pct:22,  note:'후티, 만성 정전' },
+              ].map(r => {
+                const color = r.status==='critical'?'#ef4444':r.status==='high'?'#f97316':'#22c55e';
+                return (
+                  <div key={r.city} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                    <span style={{ fontSize:9, color:'#8aa3ba', minWidth:75 }}>{r.city}</span>
+                    <div style={{ flex:1, height:4, background:'#0a1f2f', borderRadius:1 }}>
+                      <div style={{ width:`${r.pct}%`, height:'100%', background:color, borderRadius:1, boxShadow:`0 0 3px ${color}` }} />
+                    </div>
+                    <span style={{ fontSize:9, color, fontWeight:700, minWidth:26 }}>{r.pct}%</span>
+                    <span style={{ fontSize:8, color:'#2d5a7a' }}>{r.note}</span>
+                  </div>
+                );
+              })}
+              <div style={{ fontSize:8, color:'#1e3a5f', marginTop:3 }}>* 2024 VIIRS 관측 기반. 실시간 아님.</div>
+            </div>
+          )}
 
           {/* 전력 배치 요약 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>

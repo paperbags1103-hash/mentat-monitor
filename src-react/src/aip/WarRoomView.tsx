@@ -270,14 +270,23 @@ const getGibsDate = () => {
 
 interface ImgItem { id:string; title:string; titleKo?:string; image:string; url:string; domain:string; ageMin:number|null; lat:number; lng:number; region:string; }
 
+type TheaterKey = 'iran-israel' | 'ukraine' | 'taiwan';
+const THEATERS: Record<TheaterKey, { label:string; center:[number,number]; zoom:number; pitch:number; bearing:number; flag:string }> = {
+  'iran-israel': { label:'이란-이스라엘',  flag:'🎯', center:[40, 32],  zoom:4.5, pitch:55, bearing:-18 },
+  'ukraine':     { label:'우크라이나-러시아', flag:'🇺🇦', center:[32, 49], zoom:5.2, pitch:45, bearing:0  },
+  'taiwan':      { label:'대만해협',       flag:'🇹🇼', center:[121,24], zoom:5.5, pitch:45, bearing:0  },
+};
+
 interface Map3DProps {
   siteScores: Array<{ name: string; lat: number; lng: number; score: number }>;
   meAcled: any[]; meFirms: any[]; meQuakes: any[]; meAircraft: any[];
   satMode: SatMode;
   imgItems: ImgItem[];
+  theater: TheaterKey;
+  newsActiveIds: string[];
 }
 
-function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, imgItems }: Map3DProps) {
+function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, imgItems, theater, newsActiveIds }: Map3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const rafRef       = useRef<number>(0);
@@ -296,10 +305,41 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
       map.setFilter('wr-forces-inactive-ring', ['all', ['==', ['get','active'], false], sf]);
       map.setFilter('wr-forces-glow',          ['all', ['==', ['get','active'], true],  sf]);
       map.setFilter('wr-forces-fill',          ['all', ['==', ['get','active'], true],  sf]);
+      map.setFilter('wr-forces-news-pulse',    sf);
       map.setFilter('wr-forces-icon',   sf);
       map.setFilter('wr-forces-label',  sf);
     } catch {}
   }, [hiddenSides]);
+
+  /* 전장 전환 flyTo */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const t = THEATERS[theater];
+    if (!t) return;
+    try { map.flyTo({ center: t.center as [number,number], zoom: t.zoom, pitch: t.pitch, bearing: t.bearing, duration: 1800, essential: true }); } catch {}
+  }, [theater]);
+
+  /* GDELT 뉴스 활성 자산 강조 */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getSource('wr-forces')) return;
+    const gj = {
+      type: 'FeatureCollection' as const,
+      features: FORCE_ASSETS.map(a => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [a.lng, a.lat] },
+        properties: {
+          id: a.id, name: a.name, detail: a.detail, side: a.side, type: a.type, active: a.active,
+          color: SIDE_COLOR[a.side], symbol: TYPE_SYMBOL[a.type], sideLabel: SIDE_LABEL[a.side], typeLabel: TYPE_LABEL[a.type],
+          radius: a.strength==='xl'?11:a.strength==='lg'?8:a.strength==='md'?6:4,
+          opacity: a.active?1:0.42, strokeOpacity: a.active?0.9:0.3,
+          newsActive: newsActiveIds.includes(a.id),
+        },
+      })),
+    };
+    try { (map.getSource('wr-forces') as any).setData(gj); } catch {}
+  }, [newsActiveIds]);
 
   /* 뉴스 이미지 마커 업데이트 */
   useEffect(() => {
@@ -652,6 +692,12 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
           filter: ['==', ['get','active'], true],
           paint: { 'circle-radius': ['+', ['get','radius'], 10], 'circle-color': ['get','color'], 'circle-opacity': 0.08, 'circle-blur': 1 },
         });
+        // 뉴스 언급 자산: 오렌지 외부 펄스 (CSS 애니메이션)
+        map.addLayer({ id: 'wr-forces-news-pulse', type: 'circle', source: 'wr-forces',
+          filter: ['==', ['get','newsActive'], true],
+          paint: { 'circle-radius': ['+', ['get','radius'], 18], 'circle-color': '#f97316', 'circle-opacity': 0.12, 'circle-blur': 1.5 },
+        });
+
         // 활성 자산: 내부 채움
         map.addLayer({ id: 'wr-forces-fill', type: 'circle', source: 'wr-forces',
           filter: ['==', ['get','active'], true],
@@ -1049,6 +1095,9 @@ export function WarRoomView() {
   const [threatHistory,setThreatHistory]= useState<TensionPoint[]>([]);
   const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
   const [satMode,      setSatMode]      = useState<SatMode>('satellite');
+  const [theater,      setTheater]      = useState<TheaterKey>('iran-israel');
+  const [newsActiveIds,setNewsActiveIds]= useState<string[]>([]);
+  const [theaterAct,   setTheaterAct]   = useState<Record<string,number>>({});
   const [liveNews,     setLiveNews]     = useState<Array<{title:string;source:string;age:number|null}>>([]);
   const [volBuckets,   setVolBuckets]   = useState<Array<{hour:number;label:string;value:number}>>([]);
   const [imgItems,     setImgItems]     = useState<ImgItem[]>([]);
@@ -1109,6 +1158,15 @@ export function WarRoomView() {
       try {
         const imgRes = await apiFetch<any>('/api/gdelt-images');
         if (imgRes?.items?.length > 0) setImgItems(imgRes.items);
+      } catch {}
+
+      /* GDELT 군사 자산 동적 활성화 */
+      try {
+        const milRes = await apiFetch<any>('/api/mil-activity');
+        if (milRes?.activeIds?.length >= 0) {
+          setNewsActiveIds(milRes.activeIds);
+          setTheaterAct(milRes.theaterActivity ?? {});
+        }
       } catch {}
 
       /* 실시간 뉴스 (Reuters/AJ/BBC RSS) */
@@ -1239,7 +1297,23 @@ export function WarRoomView() {
         <div style={{ display:'flex', alignItems:'center', gap:8, color:'#00d4ff' }}>
           <span className="wr-blink" style={{ color:'#ef4444', fontSize:10 }}>◉</span>
           <span style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:'#00d4ff', textShadow:'0 0 8px #00d4ff88' }}>CONFLICT WATCH SYSTEM</span>
-          <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2 }}>// IRAN-ISRAEL CORRIDOR</span>
+          {/* 전장 탭 */}
+          <div style={{ display:'flex', gap:2, marginLeft:4 }}>
+            {(Object.entries(THEATERS) as [TheaterKey, typeof THEATERS[TheaterKey]][]).map(([key, th]) => (
+              <button key={key} onClick={() => setTheater(key)} style={{
+                background: theater===key ? '#ef444422' : 'none',
+                border: `1px solid ${theater===key ? '#ef4444' : '#1a3a4a'}`,
+                borderRadius: 2, padding: '2px 8px', cursor: 'pointer',
+                fontSize: 9, color: theater===key ? '#ef4444' : '#4a7a9b',
+                fontFamily:"'Courier New',monospace", letterSpacing: 1,
+                display:'flex', alignItems:'center', gap:4, transition:'all 0.15s',
+              }}>
+                <span>{th.flag}</span>
+                <span>{th.label}</span>
+                {theaterAct[key] != null && <span style={{ color: theater===key?'#f97316':'#2d5a7a', fontSize:8 }}>{theaterAct[key]}</span>}
+              </button>
+            ))}
+          </div>
         </div>
         <div style={{ flex:1 }} />
 
@@ -1301,7 +1375,7 @@ export function WarRoomView() {
           </div>
 
           {/* 3D 지도 */}
-          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} imgItems={imgItems} />
+          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} imgItems={imgItems} theater={theater} newsActiveIds={newsActiveIds} />
 
           {/* 위성 레이어 토글 */}
           <div style={{ position:'absolute', top:36, right:8, zIndex:1001, display:'flex', flexDirection:'column', gap:3 }}>

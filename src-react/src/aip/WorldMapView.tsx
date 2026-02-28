@@ -2541,12 +2541,14 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
         })}
 
         {/* ── NASA FIRMS 위성 화재 레이어 ── */}
-        {layers.firms && (firmsLoading || firmsError) && (
+        {layers.firms && (firmsLoading || firmsError || (firmsLoaded && firmsEvents.length === 0)) && (
           <div style={{ position: 'absolute', top: 140, left: '50%', transform: 'translateX(-50%)', zIndex: 1001,
             background: firmsError ? 'rgba(239,68,68,0.15)' : 'rgba(10,15,30,0.9)',
             border: `1px solid ${firmsError ? '#ef4444' : '#334155'}`,
             borderRadius: 6, padding: '6px 14px', fontSize: 11, color: firmsError ? '#fca5a5' : '#94a3b8', pointerEvents: 'none' }}>
-            {firmsLoading ? '🔥 NASA FIRMS 로딩...' : `⚠️ FIRMS 오류: ${firmsError}`}
+            {firmsLoading ? '🔥 NASA FIRMS 위성 로딩...' :
+             firmsError ? `⚠️ FIRMS 오류: ${firmsError}` :
+             '🔥 FIRMS: 감지된 화재 없음 (분쟁지역 외 또는 야간)'}
           </div>
         )}
         {layers.firms && firmsEvents.map((ev: any) => {

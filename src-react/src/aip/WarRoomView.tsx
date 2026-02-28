@@ -123,6 +123,15 @@ const MARKET_CHAINS = [
   },
 ];
 
+/* ── 분쟁 활성 구역 (Active Conflict Zones) ────────────────────────── */
+const CONFLICT_ZONES = [
+  { name: 'GAZA',            coords: [[34.2,31.1],[34.6,31.1],[34.6,31.6],[34.2,31.6],[34.2,31.1]] as [number,number][], color: '#ef4444', severity: 'critical' },
+  { name: 'S.LEBANON',       coords: [[35.1,33.0],[36.7,33.0],[36.7,34.0],[35.1,34.0],[35.1,33.0]] as [number,number][], color: '#ef4444', severity: 'critical' },
+  { name: 'SYRIA-IRAQ',      coords: [[38.0,32.0],[46.5,32.0],[46.5,37.5],[38.0,37.5],[38.0,32.0]] as [number,number][], color: '#f97316', severity: 'high' },
+  { name: 'IRAN S.CORRIDOR', coords: [[50.0,26.0],[59.0,26.0],[59.0,30.0],[50.0,30.0],[50.0,26.0]] as [number,number][], color: '#f97316', severity: 'high' },
+  { name: 'WEST BANK',       coords: [[34.9,31.3],[35.6,31.3],[35.6,32.6],[34.9,32.6],[34.9,31.3]] as [number,number][], color: '#fbbf24', severity: 'elevated' },
+];
+
 /* ── 군용기 Callsign 패턴 ──────────────────────────────────────────── */
 const MIL_PREFIXES = ['RCH','FORTE','DUKE','DRAGN','JAKE','MOOSE','AZAZ','MYTCH','GRZLY','TOPSY','VIPER','GHOST','EAGLE','COBRA','HAVOC','FURY','RAVEN','REAPER','UAV','ISR','NATO','USAF','IDF'];
 const isMilitary = (cs: string) => cs && MIL_PREFIXES.some(p => cs.toUpperCase().startsWith(p));
@@ -235,6 +244,27 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
         });
         map.setTerrain({ source: 'terrain-dem', exaggeration: 2.2 });
         map.addLayer({ id: 'wr-sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0,45], 'sky-atmosphere-sun-intensity': 5, 'sky-atmosphere-color': 'rgba(0,8,30,1)', 'sky-atmosphere-halo-color': 'rgba(0,50,100,0.5)' } } as any);
+
+        /* ── 분쟁지역 해칭 패턴 ── */
+        const patternCanvas = document.createElement('canvas');
+        patternCanvas.width = 12; patternCanvas.height = 12;
+        const pc = patternCanvas.getContext('2d')!;
+        pc.clearRect(0,0,12,12);
+        pc.strokeStyle = '#ef4444'; pc.lineWidth = 0.9; pc.globalAlpha = 0.6;
+        pc.beginPath(); pc.moveTo(0,12); pc.lineTo(12,0); pc.moveTo(-3,9); pc.lineTo(9,-3); pc.moveTo(3,15); pc.lineTo(15,3); pc.stroke();
+        const imgData = pc.getImageData(0,0,12,12);
+        map.addImage('conflict-hatch', { width:12, height:12, data: new Uint8Array(imgData.data.buffer) });
+
+        const czGeoJSON = { type: 'FeatureCollection' as const, features: CONFLICT_ZONES.map(z => ({ type: 'Feature' as const, geometry: { type: 'Polygon' as const, coordinates: [z.coords] }, properties: { name: z.name, color: z.color } })) };
+        map.addSource('wr-conflict-zones', { type: 'geojson', data: czGeoJSON });
+        // 반투명 fill
+        map.addLayer({ id: 'wr-cz-fill', type: 'fill', source: 'wr-conflict-zones', paint: { 'fill-color': ['get','color'], 'fill-opacity': 0.07 } });
+        // 해칭 패턴
+        map.addLayer({ id: 'wr-cz-hatch', type: 'fill', source: 'wr-conflict-zones', paint: { 'fill-pattern': 'conflict-hatch', 'fill-opacity': 0.5 } });
+        // 경계선
+        map.addLayer({ id: 'wr-cz-border', type: 'line', source: 'wr-conflict-zones', paint: { 'line-color': ['get','color'], 'line-width': 1.5, 'line-opacity': 0.7, 'line-dasharray': [4, 3] } });
+        // 구역 레이블
+        map.addLayer({ id: 'wr-cz-label', type: 'symbol', source: 'wr-conflict-zones', layout: { 'text-field': ['get','name'], 'text-size': 9, 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-letter-spacing': 0.15 }, paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 1.5, 'text-opacity': 0.85 } });
 
         /* ── 해협 글로우 레이어 ── */
         const chopkGeoJSON = { type: 'FeatureCollection' as const, features: CHOKEPOINTS.map(c => ({ type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: c.coords }, properties: { name: c.name, color: c.color, width: c.width, critical: c.critical } })) };
@@ -356,6 +386,59 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
 }
 
 /* ══════════════════════════════════════════════════════
+   TENSION MINI CHART
+══════════════════════════════════════════════════════ */
+interface TensionPoint { time: number; score: number; }
+
+function TensionChart({ data, gdeltPoints }: { data: TensionPoint[]; gdeltPoints: {date:string;tone:number}[] }) {
+  const W = 240, H = 48;
+
+  // 로컬 threat 히스토리 차트
+  const localData = data.slice(-30);
+  if (localData.length < 2 && gdeltPoints.length < 2) {
+    return <div style={{ height: H, display:'flex', alignItems:'center', justifyContent:'center', color:'#1e3a5f', fontSize:9 }}>데이터 수집 중...</div>;
+  }
+
+  // GDELT tone 정규화 (tone은 보통 -20 ~ +20 범위, 위협 지수로 역변환)
+  const useGdelt = gdeltPoints.length >= 2;
+  const pts = useGdelt
+    ? gdeltPoints.map((p,i) => ({ x: i, y: Math.max(0, Math.min(100, 50 - p.tone * 3)) }))
+    : localData.map((p,i) => ({ x: i, y: p.score }));
+
+  const n = pts.length;
+  const minX = 0, maxX = n - 1;
+  const minY = Math.min(...pts.map(p=>p.y)) - 5;
+  const maxY = Math.max(...pts.map(p=>p.y)) + 5;
+  const scaleX = (x: number) => ((x - minX) / (maxX - minX || 1)) * (W - 20) + 10;
+  const scaleY = (y: number) => H - 6 - ((y - minY) / (maxY - minY || 1)) * (H - 12);
+
+  const polyline = pts.map(p => `${scaleX(p.x).toFixed(1)},${scaleY(p.y).toFixed(1)}`).join(' ');
+  const areaPath = `M${scaleX(pts[0].x).toFixed(1)},${H-6} ` + pts.map(p=>`L${scaleX(p.x).toFixed(1)},${scaleY(p.y).toFixed(1)}`).join(' ') + ` L${scaleX(pts[n-1].x).toFixed(1)},${H-6} Z`;
+
+  const lastY = pts[n-1]?.y ?? 0;
+  const lineColor = lastY > 70 ? '#ef4444' : lastY > 45 ? '#f97316' : '#fbbf24';
+
+  return (
+    <svg width={W} height={H} style={{ display:'block', width:'100%', height: H }}>
+      {/* 그리드 라인 */}
+      {[25, 50, 75].map(v => (
+        <line key={v} x1={10} x2={W-10} y1={scaleY(Math.min(v, maxY))} y2={scaleY(Math.min(v, maxY))} stroke="#0a1f2f" strokeWidth={1} />
+      ))}
+      {/* 영역 fill */}
+      <path d={areaPath} fill={lineColor} fillOpacity={0.08} />
+      {/* 라인 */}
+      <polyline points={polyline} fill="none" stroke={lineColor} strokeWidth={1.5} strokeLinejoin="round" />
+      {/* 현재 포인트 */}
+      <circle cx={scaleX(pts[n-1].x)} cy={scaleY(pts[n-1].y)} r={3} fill={lineColor} />
+      {/* 현재값 레이블 */}
+      <text x={scaleX(pts[n-1].x)+5} y={scaleY(pts[n-1].y)+4} fontSize={9} fill={lineColor} fontFamily="monospace">{lastY.toFixed(0)}</text>
+      {/* 소스 레이블 */}
+      <text x={12} y={H-2} fontSize={7} fill="#2d5a7a" fontFamily="monospace">{useGdelt?'GDELT TONE':'LOCAL THREAT'}</text>
+    </svg>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    CSS
 ══════════════════════════════════════════════════════ */
 const CSS = `
@@ -424,13 +507,16 @@ export function WarRoomView() {
   const [aircraft,  setAircraft]  = useState<any[]>([]);
   const [gdacs,     setGdacs]     = useState<any[]>([]);
   const [feed,      setFeed]      = useState<FeedItem[]>([]);
-  const [oil,       setOil]       = useState<Oil|null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [breaking,  setBreaking]  = useState<FeedItem|null>(null);
-  const [breakAnim, setBreakAnim] = useState<'in'|'out'>('in');
-  const [freshness, setFreshness] = useState<Record<string,number>>({});
-  const [tick,      setTick]      = useState(0);
-  const [audioOn,   setAudioOn]   = useState(true);
+  const [oil,          setOil]          = useState<Oil|null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [breaking,     setBreaking]     = useState<FeedItem|null>(null);
+  const [breakAnim,    setBreakAnim]    = useState<'in'|'out'>('in');
+  const [freshness,    setFreshness]    = useState<Record<string,number>>({});
+  const [tick,         setTick]         = useState(0);
+  const [audioOn,      setAudioOn]      = useState(true);
+  const [cinematic,    setCinematic]    = useState(false);
+  const [threatHistory,setThreatHistory]= useState<TensionPoint[]>([]);
+  const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
   const feedRef    = useRef<HTMLDivElement>(null);
   const prevCritRef = useRef<Set<string>>(new Set());
   const audioCtxRef = useRef<AudioContext|null>(null);
@@ -471,6 +557,12 @@ export function WarRoomView() {
       const gData = g.status==='fulfilled' ? (g.value?.events??[]) : [];
       if (oil.status==='fulfilled') setOil(oil.value as Oil);
 
+      /* GDELT 긴장 타임라인 */
+      try {
+        const tlRes = await apiFetch<any>('/api/gdelt-timeline');
+        if (tlRes?.points?.length > 0) setGdeltTimeline(tlRes.points);
+      } catch {}
+
       setAcled(aData); setQuakes(qData); setFirms(fData); setAircraft(oData); setGdacs(gData);
       setFreshness({ gdelt: t, usgs: t, firms: t, opensky: t, gdacs: t });
 
@@ -499,6 +591,17 @@ export function WarRoomView() {
   useEffect(() => { const id=setInterval(loadAll, 5*60_000); return ()=>clearInterval(id); }, [loadAll]);
   useEffect(() => { const id=setInterval(()=>setTick(t=>t+1), 1000); return ()=>clearInterval(id); }, []);
 
+  /* Threat 히스토리 누적 */
+  const threatScore = useMemo(()=>calcThreat(acled,quakes,firms,aircraft),[acled,quakes,firms,aircraft]);
+  useEffect(() => {
+    if (threatScore > 0) {
+      setThreatHistory(prev => {
+        const next = [...prev, { time: Date.now(), score: threatScore }];
+        return next.slice(-48);
+      });
+    }
+  }, [threatScore]);
+
   /* BREAKING 자동 해제 */
   useEffect(() => {
     if (!breaking) return;
@@ -511,7 +614,6 @@ export function WarRoomView() {
   const meFirms    = useMemo(()=>firms.filter(e=>inBBOX(e.lat,e.lng)),   [firms]);
   const meQuakes   = useMemo(()=>quakes.filter(q=>inBBOX(q.lat,q.lng)&&q.isSuspect), [quakes]);
   const meAircraft = useMemo(()=>aircraft.filter(a=>inBBOX(a.lat,a.lng)),[aircraft]);
-  const threatScore = useMemo(()=>calcThreat(acled,quakes,firms,aircraft),[acled,quakes,firms,aircraft]);
   const threat = threatMeta(threatScore);
 
   const siteScores = useMemo(()=>THREAT_SITES.map(site=>({
@@ -601,6 +703,11 @@ export function WarRoomView() {
           <span className="wr-count" style={{ fontSize:16, fontWeight:900, color:'#ef4444', textShadow:'0 0 8px #ef4444' }}>{meAcled.length+meQuakes.length}</span>
         </div>
 
+        {/* 시네마틱 모드 */}
+        <button onClick={()=>setCinematic(v=>!v)} title={cinematic?'패널 표시':'지도 집중 모드'} style={{ background:'none', border:`1px solid ${cinematic?'#22c55e33':'#1a3a4a'}`, borderRadius:2, padding:'3px 8px', cursor:'pointer', fontSize:10, color:cinematic?'#22c55e':'#4a7a9b', transition:'all 0.2s', letterSpacing:1 }}>
+          {cinematic ? '◧ PANEL' : '⛶ FOCUS'}
+        </button>
+
         {/* 오디오 토글 */}
         <button onClick={()=>setAudioOn(v=>!v)} title={audioOn?'경보음 ON (클릭=OFF)':'경보음 OFF (클릭=ON)'} style={{ background:'none', border:`1px solid ${audioOn?'#1a3a4a':'#2d1a1a'}`, borderRadius:2, padding:'3px 8px', cursor:'pointer', fontSize:12, color:audioOn?'#00d4ff':'#4a7a9b', transition:'all 0.2s' }}>
           {audioOn ? '🔊' : '🔇'}
@@ -617,7 +724,7 @@ export function WarRoomView() {
       <div style={{ flex:1, display:'flex', minHeight:0 }}>
 
         {/* ──────── LEFT: 전술 지도 ──────── */}
-        <div style={{ flex:'0 0 57%', position:'relative', borderRight:'1px solid #0a3050' }}>
+        <div style={{ flex: cinematic ? '1 1 100%' : '0 0 57%', position:'relative', borderRight: cinematic ? 'none' : '1px solid #0a3050', transition:'flex 0.4s ease' }}>
           <div style={{ position:'absolute', top:8, left:8, zIndex:1000, fontSize:9, color:'#00d4ff88', letterSpacing:3, fontWeight:700 }}>TACTICAL MAP 3D // IRAN-ISRAEL</div>
 
           {/* CRT 스캔라인 */}
@@ -633,14 +740,23 @@ export function WarRoomView() {
 
           {/* 레전드 */}
           <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:9, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
-            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['⚠','기지경보']].map(([i,l])=>(
+            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보']].map(([i,l])=>(
               <span key={l as string}>{i} {l}</span>
             ))}
           </div>
         </div>
 
         {/* ──────── RIGHT: 인텔 대시보드 ──────── */}
-        <div style={{ flex:1, display:'flex', flexDirection:'column', background:'#050f1a', minHeight:0, overflow:'hidden' }}>
+        <div style={{ flex:1, display: cinematic ? 'none' : 'flex', flexDirection:'column', background:'#050f1a', minHeight:0, overflow:'hidden' }}>
+
+          {/* 긴장지수 타임라인 차트 */}
+          <div style={{ padding:'6px 12px 4px', borderBottom:'1px solid #0a1f2f', flexShrink:0, background:'#020c18' }}>
+            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
+              ▸ TENSION INDEX
+              <span style={{ marginLeft:'auto', fontSize:8, color:'#2d5a7a' }}>24h</span>
+            </div>
+            <TensionChart data={threatHistory} gdeltPoints={gdeltTimeline} />
+          </div>
 
           {/* 스탯 그리드 */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:1, background:'#0a1f2f', padding:1, flexShrink:0 }}>

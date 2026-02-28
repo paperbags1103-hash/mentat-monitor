@@ -5,7 +5,7 @@
  * │ TopBar: 위협 | KOSPI | KRW | VIX | 공포탐욕 | 시간     │
  * ├────┬────────────────────────────────────┬───────────────┤
  * │    │                                    │               │
- * │ 사 │   메인 뷰 (지도/히트맵/차트)       │  LIVE FEED    │
+ * │ 사 │   메인 뷰 (지도/차트)              │  LIVE FEED    │
  * │ 이 │                                    │  (신호/테마/  │
  * │ 드 │                                    │   브리핑)     │
  * │ 바 │                                    │               │
@@ -18,7 +18,6 @@ import { useStore } from '@/store';
 import { Sidebar }      from './Sidebar';
 const WorldMapView = lazy(() => import('./WorldMapView').then(m => ({ default: m.WorldMapView })));
 import type { GeoEvent } from './WorldMapView';
-import { HeatMapView }  from './HeatMapView';
 import { ChartView }    from './ChartView';
 import { LiveTVPanel }  from '@/panels/LiveTVPanel';
 import { BottomStrip }  from './BottomStrip';
@@ -30,7 +29,7 @@ import WatchlistPanelWrapper from '@/panels/WatchlistPanelWrapper';
 import AutoBriefingPanel from '@/panels/AutoBriefingPanel';
 import { WarRoomView } from './WarRoomView';
 
-export type MainViewType = 'map' | 'heatmap' | 'charts' | 'grid' | 'portfolio' | 'warroom';
+export type MainViewType = 'map' | 'charts' | 'grid' | 'portfolio' | 'warroom';
 
 const RISK_COLOR: Record<string, string> = {
   '안정': 'text-risk-safe', '주의': 'text-risk-watch',
@@ -117,7 +116,7 @@ interface Props {
 
 export function AIPLayout({ onSwitchToGrid }: Props) {
   const { fetchAll, globalRiskScore } = useStore();
-  const [mainView, setMainView] = useState<MainViewType>('map');
+  const [mainView, setMainView] = useState<MainViewType>('warroom');
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
 
   useEffect(() => {
@@ -144,7 +143,6 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
           {/* Main view */}
           <div className="flex-1 min-h-0 overflow-hidden">
             {mainView === 'map'       && <Suspense fallback={<div className="flex items-center justify-center h-full text-muted">지도 로딩 중...</div>}><WorldMapView onGeoEventsChange={setGeoEvents} /></Suspense>}
-            {mainView === 'heatmap'   && <HeatMapView />}
             {mainView === 'charts'    && <ChartView />}
             {mainView === 'portfolio' && <PortfolioPanel />}
             {mainView === 'grid'      && <PanelGrid />}

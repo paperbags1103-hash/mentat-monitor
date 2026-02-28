@@ -16,7 +16,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { view: 'map',       icon: '🗺',  label: '세계 지도' },
   { view: 'warroom',   icon: '🎯',  label: '이란-이스라엘 전황 관제실' },
-  { view: 'heatmap',   icon: '🔥',  label: '리스크 히트맵' },
   { view: 'charts',    icon: '📊',  label: '멀티 차트' },
   { view: 'portfolio', icon: '💼',  label: '포트폴리오' },
   { divider: true,     icon: '',    label: '' },

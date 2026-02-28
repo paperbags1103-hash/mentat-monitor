@@ -265,7 +265,7 @@ const getGibsDate = () => {
   return d.toISOString().slice(0, 10);
 };
 
-interface ImgItem { id:string; title:string; image:string; url:string; domain:string; ageMin:number|null; lat:number; lng:number; region:string; }
+interface ImgItem { id:string; title:string; titleKo?:string; image:string; url:string; domain:string; ageMin:number|null; lat:number; lng:number; region:string; }
 
 interface Map3DProps {
   siteScores: Array<{ name: string; lat: number; lng: number; score: number }>;
@@ -601,7 +601,8 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
               <div style="background:#000810;color:#e2e8f0;font-family:monospace;border:1px solid #1a3a4a;border-radius:3px;overflow:hidden;width:260px">
                 <img src="${p.image}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none'" />
                 <div style="padding:8px 10px">
-                  <div style="font-size:10px;line-height:1.4;color:#c0d8e8;margin-bottom:6px">${p.title}</div>
+                  <div style="font-size:10px;line-height:1.5;color:#c0d8e8;margin-bottom:4px;font-weight:700">${p.titleKo || p.title}</div>
+                  ${p.titleKo ? `<div style="font-size:8px;line-height:1.3;color:#4a7a9b;margin-bottom:4px">${p.title}</div>` : ''}
                   <div style="display:flex;justify-content:space-between;align-items:center">
                     <span style="font-size:8px;color:#4a7a9b">${p.domain}</span>
                     <span style="font-size:8px;color:#4a7a9b">${age}</span>

@@ -120,6 +120,34 @@ export default async function handler(req, res) {
       if (items.length >= 20) break;
     }
 
+    /* Groq 배치 번역 (폴백: 영어 그대로) */
+    if (items.length > 0 && process.env.GROQ_API_KEY) {
+      try {
+        const titles = items.map(i => i.title);
+        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{
+              role: 'user',
+              content: `Translate these ${titles.length} news headlines to Korean. Return ONLY a valid JSON array of translated strings in the same order, no explanation, no markdown:
+${JSON.stringify(titles)}`,
+            }],
+            temperature: 0.1,
+            max_tokens: 1200,
+          }),
+          signal: AbortSignal.timeout(5000),
+        });
+        const gd = await groqRes.json();
+        const raw = gd?.choices?.[0]?.message?.content?.trim() ?? '[]';
+        const translations = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''));
+        if (Array.isArray(translations)) {
+          items.forEach((item, i) => { item.titleKo = translations[i] || null; });
+        }
+      } catch { /* 번역 실패 시 titleKo 없이 반환 */ }
+    }
+
     cache = { items, fetchedAt: Date.now() };
     cacheTime = Date.now();
     return res.json(cache);

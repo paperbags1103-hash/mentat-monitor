@@ -397,7 +397,7 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: 
             { id: 'dark-overlay', type: 'raster', source: 'darkgrid', paint: { 'raster-opacity': 0.30 } },
           ],
         },
-        center: [47, 32.5], zoom: 4.8, pitch: 62, bearing: -20,
+        center: [46, 32], zoom: 5.0, pitch: 45, bearing: 0,
       });
 
       map.on('load', () => {
@@ -412,6 +412,29 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: 
         });
         map.setTerrain({ source: 'terrain-dem', exaggeration: 2.2 });
         map.addLayer({ id: 'wr-sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0,45], 'sky-atmosphere-sun-intensity': 5, 'sky-atmosphere-color': 'rgba(0,8,30,1)', 'sky-atmosphere-halo-color': 'rgba(0,50,100,0.5)' } } as any);
+
+        /* ── 3D 건물 (OpenFreeMap 무료 벡터 타일, zoom 12+) ── */
+        map.addSource('ofm-buildings', {
+          type: 'vector',
+          tiles: ['https://t1.openfreemap.org/planet/{z}/{x}/{y}.mvt'],
+          minzoom: 8, maxzoom: 14,
+          attribution: '© OpenFreeMap',
+        });
+        map.addLayer({
+          id: 'wr-3d-buildings', type: 'fill-extrusion',
+          source: 'ofm-buildings', 'source-layer': 'building',
+          minzoom: 12,
+          filter: ['all', ['!=', ['get', 'hide_3d'], true]],
+          paint: {
+            'fill-extrusion-color': [
+              'interpolate', ['linear'], ['coalesce', ['get','render_height'], 0],
+              0, '#0a1828', 20, '#0d2038', 50, '#102844', 100, '#0f3060',
+            ],
+            'fill-extrusion-height':    ['coalesce', ['get','render_height'], ['get','height'], 4],
+            'fill-extrusion-base':      ['coalesce', ['get','render_min_height'], 0],
+            'fill-extrusion-opacity':   0.75,
+          },
+        });
 
         /* ── NASA GIBS 위성 레이어 ── */
         const gibsDate = getGibsDate();
@@ -735,12 +758,26 @@ const CSS = `
   from { transform: translateY(0);     opacity:1; }
   to   { transform: translateY(-100%); opacity:0; }
 }
+@keyframes wr-panel-in {
+  from { transform: translateX(100%); opacity:0; }
+  to   { transform: translateX(0);    opacity:1; }
+}
+@keyframes wr-panel-out {
+  from { transform: translateX(0);    opacity:1; }
+  to   { transform: translateX(100%); opacity:0; }
+}
+@keyframes wr-event-ring {
+  0%   { transform: scale(1);   opacity:0.9; }
+  100% { transform: scale(3.5); opacity:0; }
+}
 .wr-blink        { animation: wr-blink 1.1s step-start infinite; }
 .wr-threat-flash { animation: wr-pulse-border 1.2s ease-in-out infinite; }
 .wr-feed-item    { animation: wr-slide-in 0.35s ease-out; }
 .wr-count        { animation: wr-count 0.5s ease-out; }
 .wr-breaking-in  { animation: wr-breaking-in 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
 .wr-breaking-out { animation: wr-breaking-out 0.4s ease-in forwards; }
+.wr-panel-in     { animation: wr-panel-in  0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
+.wr-panel-out    { animation: wr-panel-out 0.25s ease-in forwards; }
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -791,7 +828,7 @@ export function WarRoomView() {
   const [freshness,    setFreshness]    = useState<Record<string,number>>({});
   const [tick,         setTick]         = useState(0);
   const [audioOn,      setAudioOn]      = useState(true);
-  const [cinematic,    setCinematic]    = useState(false);
+  const [cinematic,    setCinematic]    = useState(true); // 기본값: 패널 숨김, 지도 풀스크린
   const [threatHistory,setThreatHistory]= useState<TensionPoint[]>([]);
   const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
   const [satMode,      setSatMode]      = useState<SatMode>('satellite');
@@ -998,11 +1035,11 @@ export function WarRoomView() {
         </div>
       </div>
 
-      {/* ── 메인 2분할 ── */}
-      <div style={{ flex:1, display:'flex', minHeight:0 }}>
+      {/* ── 메인: 지도 풀스크린 ── */}
+      <div style={{ flex:1, position:'relative', minHeight:0 }}>
 
-        {/* ──────── LEFT: 전술 지도 ──────── */}
-        <div style={{ flex: cinematic ? '1 1 100%' : '0 0 57%', position:'relative', borderRight: cinematic ? 'none' : '1px solid #0a3050', transition:'flex 0.4s ease' }}>
+        {/* ──────── 지도 (항상 100%) ──────── */}
+        <div style={{ position:'absolute', inset:0 }}>
           <div style={{ position:'absolute', top:8, left:8, zIndex:1000, fontSize:9, color:'#00d4ff88', letterSpacing:3, fontWeight:700 }}>TACTICAL MAP 3D // IRAN-ISRAEL</div>
 
           {/* CRT 스캔라인 */}
@@ -1050,8 +1087,20 @@ export function WarRoomView() {
           </div>
         </div>
 
-        {/* ──────── RIGHT: 인텔 대시보드 ──────── */}
-        <div style={{ flex:1, display: cinematic ? 'none' : 'flex', flexDirection:'column', background:'#050f1a', minHeight:0, overflow:'hidden' }}>
+        {/* ──────── 패널 오픈 버튼 (지도 우측) ──────── */}
+        {cinematic && (
+          <button onClick={()=>setCinematic(false)} title="인텔 패널 열기"
+            style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', zIndex:1002, width:28, height:80, background:'rgba(2,12,24,0.85)', border:'1px solid #1a3a4a', borderRadius:'4px 0 0 4px', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, color:'#4a7a9b' }}>
+            <span style={{ fontSize:10 }}>◁</span>
+            <span style={{ fontSize:7, letterSpacing:1, writingMode:'vertical-lr', color:'#2d5a7a' }}>INTEL</span>
+          </button>
+        )}
+
+        {/* ──────── RIGHT: 인텔 대시보드 (floating overlay) ──────── */}
+        {!cinematic && (
+        <div className="wr-panel-in" style={{ position:'absolute', right:0, top:0, bottom:0, width:300, display:'flex', flexDirection:'column', background:'rgba(5,15,26,0.96)', borderLeft:'1px solid #0a3050', zIndex:1001, backdropFilter:'blur(8px)', overflow:'hidden' }}>
+          {/* 닫기 버튼 */}
+          <button onClick={()=>setCinematic(true)} style={{ position:'absolute', top:6, right:8, zIndex:10, background:'none', border:'none', color:'#4a7a9b', cursor:'pointer', fontSize:14, lineHeight:1 }} title="패널 닫기">✕</button>
 
           {/* 긴장지수 타임라인 차트 */}
           <div style={{ padding:'6px 12px 4px', borderBottom:'1px solid #0a1f2f', flexShrink:0, background:'#020c18' }}>
@@ -1261,6 +1310,7 @@ export function WarRoomView() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

@@ -5,10 +5,311 @@
  * GDELT + USGS + FIRMS + OpenSky + GDACS 통합
  */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Tooltip, Marker } from 'react-leaflet';
-import L from 'leaflet';
 import { apiFetch } from '@/store';
-import 'leaflet/dist/leaflet.css';
+
+/* ── 원형 폴리곤 생성 (3D 기둥용) ─────────────────────────────────── */
+function circlePoly(lng: number, lat: number, radiusKm = 18, sides = 16): number[][] {
+  const pts: number[][] = [];
+  for (let i = 0; i <= sides; i++) {
+    const a = (i * 2 * Math.PI) / sides;
+    const dlng = (radiusKm / 111) / Math.cos(lat * Math.PI / 180) * Math.sin(a);
+    const dlat = (radiusKm / 111) * Math.cos(a);
+    pts.push([lng + dlng, lat + dlat]);
+  }
+  return pts;
+}
+
+/* ── 3D 전술 지도 컴포넌트 ─────────────────────────────────────────── */
+interface Map3DProps {
+  siteScores: Array<{ name: string; lat: number; lng: number; score: number }>;
+  meAcled: any[];
+  meFirms: any[];
+  meQuakes: any[];
+  meAircraft: any[];
+}
+
+function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const dataRef = useRef({ siteScores, meAcled, meFirms, meQuakes, meAircraft });
+
+  /* 데이터 최신화 ref */
+  useEffect(() => {
+    dataRef.current = { siteScores, meAcled, meFirms, meQuakes, meAircraft };
+    updateLayers();
+  });
+
+  function buildGeoJSON() {
+    const d = dataRef.current;
+    /* 위협 지점 3D 기둥 */
+    const columns = {
+      type: 'FeatureCollection' as const,
+      features: d.siteScores.filter(s => s.score > 20).map(s => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Polygon' as const, coordinates: [circlePoly(s.lng, s.lat, 20)] },
+        properties: {
+          height: s.score * 800,
+          base: 0,
+          color: s.score > 70 ? '#ef4444' : s.score > 45 ? '#f97316' : '#fbbf24',
+          name: s.name,
+        },
+      })),
+    };
+    /* FIRMS 화재 포인트 */
+    const fires = {
+      type: 'FeatureCollection' as const,
+      features: d.meFirms.map(f => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [f.lng, f.lat] },
+        properties: { frp: f.frp, r: Math.min(f.frp / 30, 1) },
+      })),
+    };
+    /* GDELT 분쟁 포인트 */
+    const conflicts = {
+      type: 'FeatureCollection' as const,
+      features: d.meAcled.map(e => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] },
+        properties: {
+          severity: e.severity,
+          title: e.titleKo || e.eventType,
+          isRecent: e.isRecent || false,
+        },
+      })),
+    };
+    /* USGS 이상 지진 */
+    const seismic = {
+      type: 'FeatureCollection' as const,
+      features: d.meQuakes.map(q => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [q.lng, q.lat] },
+        properties: { mag: q.magnitude, title: q.titleKo },
+      })),
+    };
+    /* OpenSky 항공기 */
+    const acft = {
+      type: 'FeatureCollection' as const,
+      features: d.meAircraft.map(a => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [a.lng, a.lat] },
+        properties: { callsign: a.callsign, heading: a.heading, country: a.country },
+      })),
+    };
+    return { columns, fires, conflicts, seismic, acft };
+  }
+
+  function updateLayers() {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded?.()) return;
+    try {
+      const { columns, fires, conflicts, seismic, acft } = buildGeoJSON();
+      ['wr-columns','wr-fires','wr-conflicts','wr-seismic','wr-aircraft'].forEach(id => {
+        if (map.getSource(id)) (map.getSource(id) as any).setData(
+          id === 'wr-columns' ? columns :
+          id === 'wr-fires'   ? fires    :
+          id === 'wr-conflicts' ? conflicts :
+          id === 'wr-seismic' ? seismic : acft
+        );
+      });
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    let cancelled = false;
+
+    import('maplibre-gl').then(({ default: maplibregl }) => {
+      if (cancelled || !containerRef.current) return;
+      const map = new maplibregl.Map({
+        container: containerRef.current,
+        style: {
+          version: 8,
+          sources: {
+            carto: {
+              type: 'raster',
+              tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+              tileSize: 256,
+              attribution: '© CartoDB',
+            },
+          },
+          layers: [{ id: 'carto-tiles', type: 'raster', source: 'carto' }],
+        },
+        center: [47, 32.5],
+        zoom: 4.5,
+        pitch: 55,
+        bearing: -18,
+      });
+
+      map.on('load', () => {
+        if (cancelled) return;
+        const { columns, fires, conflicts, seismic, acft } = buildGeoJSON();
+
+        /* 3D 위협 기둥 */
+        map.addSource('wr-columns', { type: 'geojson', data: columns });
+        map.addLayer({
+          id: 'wr-columns-fill',
+          type: 'fill-extrusion',
+          source: 'wr-columns',
+          paint: {
+            'fill-extrusion-color': ['get', 'color'],
+            'fill-extrusion-height': ['get', 'height'],
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': 0.82,
+          },
+        });
+        /* 기둥 윤곽선 */
+        map.addLayer({
+          id: 'wr-columns-glow',
+          type: 'fill-extrusion',
+          source: 'wr-columns',
+          paint: {
+            'fill-extrusion-color': ['get', 'color'],
+            'fill-extrusion-height': ['*', ['get', 'height'], 1.05],
+            'fill-extrusion-base': ['get', 'height'],
+            'fill-extrusion-opacity': 0.3,
+          },
+        });
+
+        /* FIRMS 화재 */
+        map.addSource('wr-fires', { type: 'geojson', data: fires });
+        map.addLayer({
+          id: 'wr-fires-halo',
+          type: 'circle',
+          source: 'wr-fires',
+          paint: {
+            'circle-radius': 16,
+            'circle-color': '#ff6a00',
+            'circle-opacity': 0.12,
+            'circle-blur': 1,
+          },
+        });
+        map.addLayer({
+          id: 'wr-fires-dot',
+          type: 'circle',
+          source: 'wr-fires',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['get', 'frp'], 0, 3, 200, 9],
+            'circle-color': '#ff6a00',
+            'circle-opacity': 0.92,
+          },
+        });
+
+        /* GDELT 분쟁 */
+        map.addSource('wr-conflicts', { type: 'geojson', data: conflicts });
+        map.addLayer({
+          id: 'wr-conflicts-halo',
+          type: 'circle',
+          source: 'wr-conflicts',
+          paint: {
+            'circle-radius': 14,
+            'circle-color': ['match', ['get','severity'], 'critical','#ef4444','high','#f97316','#fbbf24'],
+            'circle-opacity': 0.15,
+            'circle-blur': 0.8,
+          },
+        });
+        map.addLayer({
+          id: 'wr-conflicts-dot',
+          type: 'circle',
+          source: 'wr-conflicts',
+          paint: {
+            'circle-radius': ['match', ['get','severity'], 'critical', 8, 'high', 6, 4],
+            'circle-color': ['match', ['get','severity'], 'critical','#ef4444','high','#f97316','#fbbf24'],
+            'circle-opacity': ['case', ['get','isRecent'], 1, 0.75],
+            'circle-stroke-width': ['case', ['get','isRecent'], 2, 0],
+            'circle-stroke-color': '#ffffff',
+          },
+        });
+
+        /* USGS 이상 지진 */
+        map.addSource('wr-seismic', { type: 'geojson', data: seismic });
+        map.addLayer({
+          id: 'wr-seismic-dot',
+          type: 'circle',
+          source: 'wr-seismic',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['get','mag'], 2.5, 5, 6, 14],
+            'circle-color': '#f97316',
+            'circle-opacity': 0.85,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#fff7ed',
+          },
+        });
+
+        /* 항공기 */
+        map.addSource('wr-aircraft', { type: 'geojson', data: acft });
+        map.addLayer({
+          id: 'wr-aircraft-dot',
+          type: 'circle',
+          source: 'wr-aircraft',
+          paint: {
+            'circle-radius': 4,
+            'circle-color': '#3b82f6',
+            'circle-opacity': 0.9,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#93c5fd',
+          },
+        });
+
+        /* 위협 지점 레이블 */
+        map.addSource('wr-labels', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: dataRef.current.siteScores.map(s => ({
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
+              properties: { name: `◈ ${s.name}`, score: s.score },
+            })),
+          },
+        });
+        map.addLayer({
+          id: 'wr-labels-text',
+          type: 'symbol',
+          source: 'wr-labels',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['literal', ['DIN Offc Pro Medium', 'Arial Unicode MS Bold']],
+            'text-size': 10,
+            'text-offset': [0, -1.5],
+            'text-anchor': 'bottom',
+          },
+          paint: {
+            'text-color': '#f97316',
+            'text-halo-color': '#000810',
+            'text-halo-width': 1.5,
+          },
+        });
+
+        mapRef.current = map;
+      });
+
+      /* 팝업 */
+      map.on('click', 'wr-conflicts-dot', (e: any) => {
+        const props = e.features?.[0]?.properties;
+        if (!props) return;
+        new maplibregl.Popup({ closeButton: false, maxWidth: '240px' })
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="background:#000810;color:#e2e8f0;padding:8px 12px;font-family:monospace;font-size:11px;border:1px solid #ef444444">
+            <b style="color:#ef4444">${props.severity?.toUpperCase()}</b><br/>${props.title || ''}
+          </div>`)
+          .addTo(map);
+      });
+      map.on('mouseenter', 'wr-conflicts-dot', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'wr-conflicts-dot', () => { map.getCanvas().style.cursor = ''; });
+
+      /* 네비게이션 컨트롤 */
+      map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+    });
+
+    return () => {
+      cancelled = true;
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, []); // 한 번만 초기화
+
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+}
 
 /* ── 중동 감시 구역 (이란-이스라엘 회랑) ────────────────────────────── */
 const BBOX = { s: 24, n: 40, w: 29, e: 66 };
@@ -306,106 +607,14 @@ export function WarRoomView() {
             }} />
           </div>
 
-          {/* 지도 */}
-          <MapContainer
-            center={[32.5, 46]}
-            zoom={5}
-            minZoom={4}
-            maxZoom={9}
-            zoomControl={false}
-            style={{ width: '100%', height: '100%', background: '#000810' }}
-            attributionControl={false}
-          >
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              attribution=""
-            />
-
-            {/* FIRMS 화재 */}
-            {meFirms.map((ev: any) => {
-              const intensity = Math.min(1, ev.frp / 150);
-              const r = Math.round(255);
-              const g = Math.round(30 + (1 - intensity) * 100);
-              return (
-                <CircleMarker key={ev.id} center={[ev.lat, ev.lng]}
-                  radius={Math.max(3, Math.min(7, 2 + ev.frp / 50))}
-                  pathOptions={{ color: `rgb(${r},${g},0)`, fillColor: `rgb(${r},${g},0)`, fillOpacity: 0.9, weight: 0.5 }}>
-                  <Tooltip direction="top" opacity={1}>
-                    <div style={{ background: '#000810', color: '#fca5a5', padding: '4px 8px', fontFamily: 'monospace', fontSize: 11 }}>
-                      🔥 {ev.zone} · {ev.frp}MW
-                    </div>
-                  </Tooltip>
-                </CircleMarker>
-              );
-            })}
-
-            {/* GDELT 이벤트 */}
-            {meAcled.map((ev: any) => {
-              const color = SEV_COLOR[ev.severity] ?? '#94a3b8';
-              const r = ev.severity === 'critical' ? 9 : ev.severity === 'high' ? 7 : 5;
-              return (
-                <React.Fragment key={ev.id}>
-                  {ev.isRecent && (
-                    <CircleMarker center={[ev.lat, ev.lng]} radius={r + 8}
-                      pathOptions={{ color, fillColor: color, fillOpacity: 0.08, weight: 0.8, dashArray: '3 2' }} />
-                  )}
-                  <CircleMarker center={[ev.lat, ev.lng]} radius={r}
-                    pathOptions={{ color, fillColor: color, fillOpacity: ev.isRecent ? 0.95 : 0.75, weight: 1.5 }}>
-                    <Tooltip direction="top" opacity={1}>
-                      <div style={{ background: '#000810', color: '#e2e8f0', padding: '6px 10px', fontFamily: 'monospace', fontSize: 11, maxWidth: 220, border: `1px solid ${color}44` }}>
-                        <div style={{ color, fontWeight: 700 }}>{ev.eventType}</div>
-                        <div>{ev.region}</div>
-                        {ev.actors && <div style={{ color: '#4a7a9b', fontSize: 10 }}>{ev.actors}</div>}
-                      </div>
-                    </Tooltip>
-                  </CircleMarker>
-                </React.Fragment>
-              );
-            })}
-
-            {/* USGS 이상 지진 */}
-            {meQuakes.map((q: any) => (
-              <React.Fragment key={q.id}>
-                <CircleMarker center={[q.lat, q.lng]} radius={12}
-                  pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.07, weight: 1, dashArray: '4 3' }} />
-                <CircleMarker center={[q.lat, q.lng]} radius={5}
-                  pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.85, weight: 1.5 }}>
-                  <Tooltip direction="top" opacity={1}>
-                    <div style={{ background: '#000810', color: '#fed7aa', padding: '6px 10px', fontFamily: 'monospace', fontSize: 11 }}>
-                      🌋 M{q.magnitude} · 깊이{q.depth}km<br/>
-                      <span style={{ color: '#f97316', fontWeight: 700 }}>⚠️ {q.zone}</span>
-                    </div>
-                  </Tooltip>
-                </CircleMarker>
-              </React.Fragment>
-            ))}
-
-            {/* OpenSky 항공기 */}
-            {meAircraft.map((ac: any) => {
-              const icon = L.divIcon({
-                html: `<div style="transform:rotate(${ac.heading}deg);font-size:11px;color:#3b82f6;filter:drop-shadow(0 0 3px #3b82f6);line-height:1">✈</div>`,
-                className: '', iconSize: [14, 14], iconAnchor: [7, 7],
-              });
-              return (
-                <Marker key={`wr-os-${ac.icao24}`} position={[ac.lat, ac.lng]} icon={icon}>
-                  <Tooltip direction="top" opacity={1}>
-                    <div style={{ background: '#000810', color: '#93c5fd', padding: '4px 8px', fontFamily: 'monospace', fontSize: 10 }}>
-                      ✈ {ac.callsign || ac.icao24} · {ac.country}
-                    </div>
-                  </Tooltip>
-                </Marker>
-              );
-            })}
-
-            {/* 주요 위협 지점 레이블 */}
-            {siteScores.filter(s => s.score > 25).map(site => {
-              const icon = L.divIcon({
-                html: `<div style="color:#f97316;font-size:9px;font-family:monospace;white-space:nowrap;text-shadow:0 0 6px #f97316;pointer-events:none">◈ ${site.name}</div>`,
-                className: '', iconSize: [100, 14], iconAnchor: [0, 7],
-              });
-              return <Marker key={`site-${site.name}`} position={[site.lat + 0.4, site.lng]} icon={icon} interactive={false} />;
-            })}
-          </MapContainer>
+          {/* 3D 전술 지도 */}
+          <Map3D
+            siteScores={siteScores}
+            meAcled={meAcled}
+            meFirms={meFirms}
+            meQuakes={meQuakes}
+            meAircraft={meAircraft}
+          />
 
           {/* 지도 하단 레전드 */}
           <div style={{

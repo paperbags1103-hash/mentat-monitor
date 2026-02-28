@@ -3,92 +3,74 @@
  *
  * Fetches recent global conflict events from GDELT 2.0 Events database.
  * GDELT is 100% free, no API key, updated every 15 minutes.
+ * Node.js runtime (uses built-in zlib for ZIP decompression).
  * Cache: 30 minutes.
  */
-import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
+import { inflateRawSync } from 'zlib';
 
-export const config = { runtime: 'edge' };
+// Node.js serverless handler (req, res) — not edge
+export const config = { maxDuration: 10 };
 
 const CACHE_TTL = 30 * 60_000;
 let cache   = null;
 let cacheTs = 0;
 
-/* ── GDELT 2.0 column indices (0-based, tab-separated, 61 cols total) ─
- *  Each Geo block = 8 fields: Type|FullName|CC|ADM1|ADM2|Lat|Long|FeatureID
+/* ── GDELT 2.0 column indices (0-based, TSV, 61 cols total) ─────────
+ *  Geo blocks = 8 fields each: Type|FullName|CC|ADM1|ADM2|Lat|Long|FeatureID
  *  Actor1Geo: 35-42, Actor2Geo: 43-50, ActionGeo: 51-58
- *  DATEADDED: 59, SOURCEURL: 60                                        */
+ *  DATEADDED: 59, SOURCEURL: 60                                       */
 const C = {
-  ACTOR1:      6,
-  ACTOR2:      16,
-  EVENT_CODE:  26,
-  EVENT_ROOT:  28,
-  QUAD_CLASS:  29,
-  GOLDSTEIN:   30,
-  MENTIONS:    31,
-  GEO_NAME:    52,   // ActionGeo_FullName
-  GEO_CC:      53,   // ActionGeo_CountryCode
-  GEO_LAT:     56,   // ActionGeo_Lat
-  GEO_LNG:     57,   // ActionGeo_Long
-  DATE:        59,   // DATEADDED
-  SOURCE_URL:  60,   // SOURCEURL
+  ACTOR1:     6,
+  ACTOR2:     16,
+  EVENT_CODE: 26,
+  EVENT_ROOT: 28,
+  QUAD_CLASS: 29,
+  GOLDSTEIN:  30,
+  MENTIONS:   31,
+  GEO_NAME:   52,  // ActionGeo_FullName
+  GEO_CC:     53,  // ActionGeo_CountryCode
+  GEO_LAT:    56,  // ActionGeo_Lat
+  GEO_LNG:    57,  // ActionGeo_Long
+  DATE:       59,  // DATEADDED
+  SOURCE_URL: 60,  // SOURCEURL
 };
 
-/* ── CAMEO conflict root codes ──────────────────────────────────────── */
+/* ── CAMEO labels (Korean) ──────────────────────────────────────────── */
 const CAMEO_KO = {
-  '14': '시위',      '141': '시위',     '145': '파업',
-  '18': '폭력행위',  '180': '공격',     '181': '납치',
-  '182': '고문',     '183': '부상',     '184': '살인',
+  '14': '시위',      '141': '시위',      '145': '파업',
+  '18': '폭력행위',  '180': '공격',      '181': '납치',
+  '182': '고문',     '183': '부상',      '184': '살인',
   '185': '자살공격', '186': '대중폭력',
-  '19': '전투',      '190': '교전',     '193': '공습',
+  '19': '전투',      '190': '교전',      '193': '공습',
   '194': '포격',     '195': '기뢰',
   '20': '군사력 사용', '201': '생화학무기', '202': '핵무기',
   '203': '대량살상무기', '204': '군사전략',
 };
 
-/* ── Decompress a single-file ZIP using Web Streams DecompressionStream */
-async function unzip(buf) {
-  const view = new DataView(buf);
-  if (view.getUint32(0, true) !== 0x04034b50) throw new Error('Not a ZIP');
-  const fnLen    = view.getUint16(26, true);
-  const extraLen = view.getUint16(28, true);
-  const method   = view.getUint16(8,  true);
-  const compSize = view.getUint32(18, true);
-  const dataOff  = 30 + fnLen + extraLen;
-  const comp     = buf.slice(dataOff, dataOff + compSize);
+/** Parse a single-file ZIP using Node's inflateRawSync */
+function unzipBuffer(buf) {
+  const fnLen    = buf.readUInt16LE(26);
+  const extraLen = buf.readUInt16LE(28);
+  const method   = buf.readUInt16LE(8);
+  const compSize = buf.readUInt32LE(18);
+  const offset   = 30 + fnLen + extraLen;
+  const compData = buf.slice(offset, offset + compSize);
 
-  if (method === 0) return new TextDecoder().decode(comp);
+  if (method === 0) return compData.toString('utf8');
   if (method !== 8) throw new Error(`Unsupported ZIP method: ${method}`);
-
-  const ds     = new DecompressionStream('deflate-raw');
-  const writer = ds.writable.getWriter();
-  const reader = ds.readable.getReader();
-  writer.write(new Uint8Array(comp));
-  writer.close();
-
-  const chunks = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    total += value.length;
-  }
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.length; }
-  return new TextDecoder().decode(out);
+  return inflateRawSync(compData).toString('utf8');
 }
 
-export default async function handler(req) {
-  const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
-  if (isDisallowedOrigin(req)) return new Response('Forbidden', { status: 403 });
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+export default async function handler(req, res) {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
   const now = Date.now();
   if (cache && now - cacheTs < CACHE_TTL) {
-    return new Response(JSON.stringify({ ...cache, cached: true }), {
-      headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT', ...corsHeaders },
-    });
+    res.setHeader('X-Cache', 'HIT');
+    return res.status(200).json({ ...cache, cached: true });
   }
 
   try {
@@ -97,19 +79,21 @@ export default async function handler(req) {
       signal: AbortSignal.timeout(4000),
     });
     if (!luRes.ok) throw new Error(`GDELT lastupdate ${luRes.status}`);
-    const luText   = await luRes.text();
-    let eventsUrl = luText.trim().split('\n')[0].trim().split(/\s+/)[2];
+    const luText    = await luRes.text();
+    let eventsUrl   = luText.trim().split('\n')[0].trim().split(/\s+/)[2];
     if (!eventsUrl) throw new Error('Cannot parse GDELT lastupdate.txt');
-    // Ensure HTTPS (lastupdate.txt returns http:// URLs)
     eventsUrl = eventsUrl.replace(/^http:\/\//, 'https://');
 
-    /* Step 2: download + decompress ZIP */
+    /* Step 2: download ZIP as Buffer */
     const zipRes = await fetch(eventsUrl, { signal: AbortSignal.timeout(6000) });
     if (!zipRes.ok) throw new Error(`GDELT file fetch ${zipRes.status}`);
-    const zipBuf = await zipRes.arrayBuffer();
-    const tsv    = await unzip(zipBuf);
+    const zipArrBuf = await zipRes.arrayBuffer();
+    const zipBuf    = Buffer.from(zipArrBuf);
 
-    /* Step 3: parse TSV and filter conflict events */
+    /* Step 3: decompress with Node zlib */
+    const tsv = unzipBuffer(zipBuf);
+
+    /* Step 4: parse TSV + filter conflict events */
     const lines  = tsv.split('\n');
     const seen   = new Set();
     const events = [];
@@ -123,7 +107,6 @@ export default async function handler(req) {
       const eventRoot = cols[C.EVENT_ROOT] || '';
       const goldstein = parseFloat(cols[C.GOLDSTEIN]) || 0;
 
-      /* Keep: material conflict (quadClass 4) OR assault/fight/military with negative Goldstein */
       const isConflict = quadClass === 4 ||
         (['18', '19', '20'].includes(eventRoot) && goldstein < -2);
       const isProtest  = eventRoot === '14';
@@ -133,7 +116,7 @@ export default async function handler(req) {
       const lng = parseFloat(cols[C.GEO_LNG]);
       if (!lat || !lng || isNaN(lat) || isNaN(lng)) continue;
 
-      /* Cluster dedup (0.5° grid) */
+      /* Cluster dedup (0.5° grid + event type) */
       const key = `${Math.round(lat * 2)},${Math.round(lng * 2)},${eventRoot}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -143,8 +126,7 @@ export default async function handler(req) {
       const label     = CAMEO_KO[eventCode] || CAMEO_KO[eventRoot] || eventRoot;
       const geoName   = cols[C.GEO_NAME] || '';
       const country   = cols[C.GEO_CC]   || '';
-
-      const severity =
+      const severity  =
         goldstein <= -8 ? 'critical' :
         goldstein <= -5 ? 'high'     :
         goldstein <= -2 ? 'medium'   : 'low';
@@ -168,10 +150,10 @@ export default async function handler(req) {
         mentions,
       });
 
-      if (events.length >= 300) break; // collect enough before sort
+      if (events.length >= 300) break;
     }
 
-    /* Sort by media coverage (NumMentions) → most significant first */
+    /* Sort by media coverage → most significant first */
     events.sort((a, b) => b.mentions - a.mentions);
     const top = events.slice(0, 100);
 
@@ -185,14 +167,10 @@ export default async function handler(req) {
     cache   = result;
     cacheTs = now;
 
-    return new Response(JSON.stringify(result), {
-      headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS', ...corsHeaders },
-    });
+    res.setHeader('X-Cache', 'MISS');
+    return res.status(200).json(result);
 
   } catch (err) {
-    return new Response(JSON.stringify({ events: [], error: err.message }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return res.status(200).json({ events: [], error: err.message });
   }
 }

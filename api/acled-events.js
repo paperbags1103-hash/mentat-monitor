@@ -13,7 +13,10 @@ const CACHE_TTL = 30 * 60_000;
 let cache   = null;
 let cacheTs = 0;
 
-/* ── GDELT column indices (0-based, tab-separated) ─────────────────── */
+/* ── GDELT 2.0 column indices (0-based, tab-separated, 61 cols total) ─
+ *  Each Geo block = 8 fields: Type|FullName|CC|ADM1|ADM2|Lat|Long|FeatureID
+ *  Actor1Geo: 35-42, Actor2Geo: 43-50, ActionGeo: 51-58
+ *  DATEADDED: 59, SOURCEURL: 60                                        */
 const C = {
   ACTOR1:      6,
   ACTOR2:      16,
@@ -22,12 +25,12 @@ const C = {
   QUAD_CLASS:  29,
   GOLDSTEIN:   30,
   MENTIONS:    31,
-  GEO_NAME:    50,
-  GEO_CC:      51,
-  GEO_LAT:     53,
-  GEO_LNG:     54,
-  DATE:        56,
-  SOURCE_URL:  57,
+  GEO_NAME:    52,   // ActionGeo_FullName
+  GEO_CC:      53,   // ActionGeo_CountryCode
+  GEO_LAT:     56,   // ActionGeo_Lat
+  GEO_LNG:     57,   // ActionGeo_Long
+  DATE:        59,   // DATEADDED
+  SOURCE_URL:  60,   // SOURCEURL
 };
 
 /* ── CAMEO conflict root codes ──────────────────────────────────────── */
@@ -95,8 +98,10 @@ export default async function handler(req) {
     });
     if (!luRes.ok) throw new Error(`GDELT lastupdate ${luRes.status}`);
     const luText   = await luRes.text();
-    const eventsUrl = luText.trim().split('\n')[0].trim().split(/\s+/)[2];
+    let eventsUrl = luText.trim().split('\n')[0].trim().split(/\s+/)[2];
     if (!eventsUrl) throw new Error('Cannot parse GDELT lastupdate.txt');
+    // Ensure HTTPS (lastupdate.txt returns http:// URLs)
+    eventsUrl = eventsUrl.replace(/^http:\/\//, 'https://');
 
     /* Step 2: download + decompress ZIP */
     const zipRes = await fetch(eventsUrl, { signal: AbortSignal.timeout(6000) });
@@ -112,7 +117,7 @@ export default async function handler(req) {
     for (const line of lines) {
       if (!line) continue;
       const cols = line.split('\t');
-      if (cols.length < 58) continue;
+      if (cols.length < 61) continue;
 
       const quadClass = parseInt(cols[C.QUAD_CLASS])  || 0;
       const eventRoot = cols[C.EVENT_ROOT] || '';

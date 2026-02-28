@@ -1,87 +1,85 @@
 /**
- * /api/acled-events
+ * /api/acled-events  (powered by GDELT 2.0 — no auth needed)
  *
- * Fetches recent armed conflict events from ACLED API.
- * Uses OAuth Bearer token authentication (programmatic method).
+ * Fetches recent global conflict events from GDELT 2.0 Events database.
+ * GDELT is 100% free, no API key, updated every 15 minutes.
  * Cache: 30 minutes.
- *
- * Required env vars:
- *   ACLED_EMAIL    — myACLED account email
- *   ACLED_PASSWORD — myACLED account password
  */
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = { runtime: 'edge' };
 
-const CACHE_TTL   = 30 * 60_000;   // data cache: 30 min
-const TOKEN_TTL   = 23 * 60 * 60_000; // token cache: 23h (token valid 24h)
+const CACHE_TTL = 30 * 60_000;
+let cache   = null;
+let cacheTs = 0;
 
-let cache     = null;
-let cacheTs   = 0;
-let bearerToken    = null;
-let tokenExpiry    = 0;
-
-const EVENT_TYPE_MAP = {
-  'Battles':                      'conflict',
-  'Explosions/Remote violence':   'conflict',
-  'Violence against civilians':   'conflict',
-  'Protests':                     'social',
-  'Riots':                        'social',
-  'Strategic developments':       'politics',
+/* ── GDELT column indices (0-based, tab-separated) ─────────────────── */
+const C = {
+  ACTOR1:      6,
+  ACTOR2:      16,
+  EVENT_CODE:  26,
+  EVENT_ROOT:  28,
+  QUAD_CLASS:  29,
+  GOLDSTEIN:   30,
+  MENTIONS:    31,
+  GEO_NAME:    50,
+  GEO_CC:      51,
+  GEO_LAT:     53,
+  GEO_LNG:     54,
+  DATE:        56,
+  SOURCE_URL:  57,
 };
 
-function getSeverity(eventType, fatalities) {
-  const fat = parseInt(fatalities) || 0;
-  if (eventType === 'Battles' || eventType === 'Explosions/Remote violence') {
-    return fat >= 10 ? 'critical' : 'high';
+/* ── CAMEO conflict root codes ──────────────────────────────────────── */
+const CAMEO_KO = {
+  '14': '시위',      '141': '시위',     '145': '파업',
+  '18': '폭력행위',  '180': '공격',     '181': '납치',
+  '182': '고문',     '183': '부상',     '184': '살인',
+  '185': '자살공격', '186': '대중폭력',
+  '19': '전투',      '190': '교전',     '193': '공습',
+  '194': '포격',     '195': '기뢰',
+  '20': '군사력 사용', '201': '생화학무기', '202': '핵무기',
+  '203': '대량살상무기', '204': '군사전략',
+};
+
+/* ── Decompress a single-file ZIP using Web Streams DecompressionStream */
+async function unzip(buf) {
+  const view = new DataView(buf);
+  if (view.getUint32(0, true) !== 0x04034b50) throw new Error('Not a ZIP');
+  const fnLen    = view.getUint16(26, true);
+  const extraLen = view.getUint16(28, true);
+  const method   = view.getUint16(8,  true);
+  const compSize = view.getUint32(18, true);
+  const dataOff  = 30 + fnLen + extraLen;
+  const comp     = buf.slice(dataOff, dataOff + compSize);
+
+  if (method === 0) return new TextDecoder().decode(comp);
+  if (method !== 8) throw new Error(`Unsupported ZIP method: ${method}`);
+
+  const ds     = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  const reader = ds.readable.getReader();
+  writer.write(new Uint8Array(comp));
+  writer.close();
+
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.length;
   }
-  if (eventType === 'Violence against civilians') {
-    return fat >= 5 ? 'critical' : 'high';
-  }
-  return fat >= 20 ? 'high' : 'medium';
-}
-
-async function getToken(email, password) {
-  if (bearerToken && Date.now() < tokenExpiry) return bearerToken;
-
-  const res = await fetch('https://acleddata.com/oauth/token', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body:    new URLSearchParams({
-      username:   email,
-      password:   password,
-      grant_type: 'password',
-      client_id:  'acled',
-    }),
-    signal: AbortSignal.timeout(6000),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`ACLED OAuth failed ${res.status}: ${body.slice(0, 100)}`);
-  }
-
-  const data = await res.json();
-  if (!data.access_token) throw new Error('ACLED OAuth: no access_token in response');
-
-  bearerToken = data.access_token;
-  tokenExpiry = Date.now() + TOKEN_TTL;
-  return bearerToken;
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return new TextDecoder().decode(out);
 }
 
 export default async function handler(req) {
   const corsHeaders = getCorsHeaders(req, 'GET, OPTIONS');
   if (isDisallowedOrigin(req)) return new Response('Forbidden', { status: 403 });
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
-
-  const email    = process.env.ACLED_EMAIL    || '';
-  const password = process.env.ACLED_PASSWORD || '';
-
-  if (!email || !password) {
-    return new Response(JSON.stringify({ events: [], error: 'ACLED credentials not configured' }), {
-      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-  }
 
   const now = Date.now();
   if (cache && now - cacheTs < CACHE_TTL) {
@@ -91,67 +89,94 @@ export default async function handler(req) {
   }
 
   try {
-    const token = await getToken(email, password);
-
-    const endDate   = new Date();
-    const startDate = new Date(endDate - 30 * 24 * 60 * 60 * 1000);
-    const fmt = (d) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-    const params = new URLSearchParams({
-      event_date:       `${fmt(startDate)}|${fmt(endDate)}`,
-      event_date_where: 'BETWEEN',
-      event_type:       'Battles:Explosions/Remote violence:Violence against civilians',
-      fields:           'event_id_cnty|event_date|event_type|sub_event_type|actor1|actor2|country|location|latitude|longitude|fatalities|notes',
-      limit:            '100',
-      order:            'event_date',
-      orderby:          'DESC',
+    /* Step 1: get latest GDELT events file URL */
+    const luRes = await fetch('https://data.gdeltproject.org/gdeltv2/lastupdate.txt', {
+      signal: AbortSignal.timeout(4000),
     });
+    if (!luRes.ok) throw new Error(`GDELT lastupdate ${luRes.status}`);
+    const luText   = await luRes.text();
+    const eventsUrl = luText.trim().split('\n')[0].trim().split(/\s+/)[2];
+    if (!eventsUrl) throw new Error('Cannot parse GDELT lastupdate.txt');
 
-    const res = await fetch(`https://acleddata.com/api/acled/read?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type':  'application/json',
-        'Accept':        'application/json',
-      },
-      signal: AbortSignal.timeout(7000),
-    });
+    /* Step 2: download + decompress ZIP */
+    const zipRes = await fetch(eventsUrl, { signal: AbortSignal.timeout(6000) });
+    if (!zipRes.ok) throw new Error(`GDELT file fetch ${zipRes.status}`);
+    const zipBuf = await zipRes.arrayBuffer();
+    const tsv    = await unzip(zipBuf);
 
-    if (!res.ok) {
-      bearerToken = null; // reset token on 401/403 so next call re-auths
-      const body = await res.text().catch(() => '');
-      throw new Error(`ACLED data ${res.status}: ${body.slice(0, 150)}`);
-    }
+    /* Step 3: parse TSV and filter conflict events */
+    const lines  = tsv.split('\n');
+    const seen   = new Set();
+    const events = [];
 
-    const data = await res.json();
-    if (!data.data || !Array.isArray(data.data)) {
-      throw new Error(`Unexpected ACLED format: ${JSON.stringify(data).slice(0, 100)}`);
-    }
+    for (const line of lines) {
+      if (!line) continue;
+      const cols = line.split('\t');
+      if (cols.length < 58) continue;
 
-    const events = data.data.map(ev => {
-      const lat = parseFloat(ev.latitude);
-      const lng = parseFloat(ev.longitude);
-      if (isNaN(lat) || isNaN(lng)) return null;
-      const fatalities = parseInt(ev.fatalities) || 0;
-      return {
-        id:           `acled-${ev.event_id_cnty}`,
+      const quadClass = parseInt(cols[C.QUAD_CLASS])  || 0;
+      const eventRoot = cols[C.EVENT_ROOT] || '';
+      const goldstein = parseFloat(cols[C.GOLDSTEIN]) || 0;
+
+      /* Keep: material conflict (quadClass 4) OR assault/fight/military with negative Goldstein */
+      const isConflict = quadClass === 4 ||
+        (['18', '19', '20'].includes(eventRoot) && goldstein < -2);
+      const isProtest  = eventRoot === '14';
+      if (!isConflict && !isProtest) continue;
+
+      const lat = parseFloat(cols[C.GEO_LAT]);
+      const lng = parseFloat(cols[C.GEO_LNG]);
+      if (!lat || !lng || isNaN(lat) || isNaN(lng)) continue;
+
+      /* Cluster dedup (0.5° grid) */
+      const key = `${Math.round(lat * 2)},${Math.round(lng * 2)},${eventRoot}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const mentions  = parseInt(cols[C.MENTIONS]) || 0;
+      const eventCode = cols[C.EVENT_CODE] || '';
+      const label     = CAMEO_KO[eventCode] || CAMEO_KO[eventRoot] || eventRoot;
+      const geoName   = cols[C.GEO_NAME] || '';
+      const country   = cols[C.GEO_CC]   || '';
+
+      const severity =
+        goldstein <= -8 ? 'critical' :
+        goldstein <= -5 ? 'high'     :
+        goldstein <= -2 ? 'medium'   : 'low';
+
+      events.push({
+        id:           `gdelt-${cols[C.DATE]}-${Math.round(lat * 100)}-${Math.round(lng * 100)}`,
         lat, lng,
-        region:       `${ev.location}, ${ev.country}`,
-        country:      ev.country,
-        category:     EVENT_TYPE_MAP[ev.event_type] || 'conflict',
-        severity:     getSeverity(ev.event_type, fatalities),
-        eventType:    ev.event_type,
-        subEventType: ev.sub_event_type,
-        actors:       [ev.actor1, ev.actor2].filter(Boolean).join(' vs '),
-        fatalities,
-        date:         ev.event_date,
-        notes:        (ev.notes || '').slice(0, 200),
-        titleKo:      `${ev.location}: ${ev.event_type}${fatalities > 0 ? ` (사망 ${fatalities}명)` : ''}`,
-        source:       'ACLED',
-      };
-    }).filter(Boolean);
+        region:       geoName,
+        country,
+        category:     isProtest ? 'social' : 'conflict',
+        severity,
+        eventType:    label,
+        subEventType: eventCode,
+        actors:       [cols[C.ACTOR1], cols[C.ACTOR2]].filter(Boolean).join(' vs '),
+        fatalities:   0,
+        date:         cols[C.DATE],
+        notes:        (cols[C.SOURCE_URL] || '').slice(0, 200),
+        titleKo:      `${geoName || country}: ${label}`,
+        source:       'GDELT',
+        goldstein,
+        mentions,
+      });
 
-    const result = { events, fetchedAt: new Date().toISOString(), count: events.length, cached: false };
+      if (events.length >= 300) break; // collect enough before sort
+    }
+
+    /* Sort by media coverage (NumMentions) → most significant first */
+    events.sort((a, b) => b.mentions - a.mentions);
+    const top = events.slice(0, 100);
+
+    const result = {
+      events: top,
+      fetchedAt: new Date().toISOString(),
+      count: top.length,
+      source: 'GDELT',
+      cached: false,
+    };
     cache   = result;
     cacheTs = now;
 
@@ -161,7 +186,8 @@ export default async function handler(req) {
 
   } catch (err) {
     return new Response(JSON.stringify({ events: [], error: err.message }), {
-      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 }

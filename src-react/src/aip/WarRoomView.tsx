@@ -1,10 +1,9 @@
 /**
- * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v2
+ * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v5
  *
- * 군사 작전 센터(NORAD) 스타일 · Phase 1+2 구현
- * - 3D 지형 + 군사기지 마커 + 미사일 사거리 원 + 해협 글로우
- * - BREAKING 오버레이 · Market Impact 연쇄 패널 · 유가 ticker
- * - 데이터 신선도 heartbeat dots
+ * MIL-STD-2525 스타일 군사 자산 배치 레이어 추가
+ * IRGC 미사일/드론/해군 · IDF 지상군/방공 · 미 항모타격단
+ * 헤즈볼라 · 후티 · 이라크PMF 프록시 세력
  */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { apiFetch } from '@/store';
@@ -37,6 +36,116 @@ const MILITARY_BASES = [
   // ── 헤즈볼라 ──
   { name: '다히에 (헤즈볼라)', lat: 33.84, lng: 35.53, type: 'military', country: 'lb' },
 ];
+
+/* ══════════════════════════════════════════════════════
+   MILITARY FORCE DEPLOYMENT (공개 정보 기반 큐레이션)
+   출처: Reuters, AP, IISS Military Balance, CSIS
+══════════════════════════════════════════════════════ */
+
+type ForceType = 'missile'|'drone'|'navy'|'ground'|'airdef'|'carrier'|'bomber'|'special'|'proxy_ground'|'proxy_rocket';
+type Side = 'iran'|'israel'|'us'|'hezbollah'|'houthi'|'pmf';
+
+interface MilAsset {
+  id: string;
+  name: string;      // 부대명/무기체계
+  detail: string;    // 상세 설명 (팝업용)
+  lat: number; lng: number;
+  type: ForceType;
+  side: Side;
+  strength: 'xl'|'lg'|'md'|'sm'; // 전력 크기 → 심볼 크기
+  active: boolean;   // 현재 활성 상태
+}
+
+const FORCE_ASSETS: MilAsset[] = [
+  // ══ 이란 IRGC 미사일 여단 ══
+  { id:'ir-m1', name:'IRGC 미사일여단 / 샤하브-3', detail:'Shahab-3 (1,300km) / Emad (1,700km) · 이스라엘 전역 사거리 내', lat:33.72, lng:51.73, type:'missile', side:'iran', strength:'xl', active:true },
+  { id:'ir-m2', name:'IRGC 미사일여단 / 하즈 카셈', detail:'Fateh-313 (500km) · 이라크/걸프 타격 가능', lat:34.35, lng:47.10, type:'missile', side:'iran', strength:'lg', active:true },
+  { id:'ir-m3', name:'IRGC 미사일여단 / 파즈르', detail:'Zolfaghar (700km) · 사우디/UAE 타격권', lat:30.10, lng:57.05, type:'missile', side:'iran', strength:'lg', active:true },
+  { id:'ir-m4', name:'IRGC 해안미사일', detail:'Noor ASM · 호르무즈 함정 봉쇄 전력', lat:27.10, lng:56.50, type:'missile', side:'iran', strength:'md', active:true },
+  { id:'ir-m5', name:'미르사드 미사일 기지', detail:'지대공 + 지대지 복합 시스템', lat:35.82, lng:50.61, type:'missile', side:'iran', strength:'md', active:false },
+
+  // ══ 이란 드론 전력 ══
+  { id:'ir-d1', name:'IRGC 드론기지 / Shahed-136', detail:'자폭드론 · 가자쿠/카르만 생산기지 · 헤즈볼라/후티에 공급', lat:33.98, lng:51.55, type:'drone', side:'iran', strength:'xl', active:true },
+  { id:'ir-d2', name:'IRGC 드론기지 / Mohajer-6', detail:'정찰/공격 복합 · 걸프 일대 작전 반경', lat:29.45, lng:60.80, type:'drone', side:'iran', strength:'md', active:true },
+  { id:'ir-d3', name:'드론 전진기지 (이라크)', detail:'이라크 민병대 통해 Shahed-136 전방 배치', lat:33.05, lng:44.20, type:'drone', side:'iran', strength:'md', active:true },
+
+  // ══ 이란 해군 (IRGC + 정규군) ══
+  { id:'ir-n1', name:'IRGC 해군 1함대 / 반다르아바스', detail:'쾌속정 200+ · 기뢰 · 잠수함 · 호르무즈 봉쇄 전력', lat:27.18, lng:56.27, type:'navy', side:'iran', strength:'xl', active:true },
+  { id:'ir-n2', name:'이란 해군 / 차바하르', detail:'구축함 · 잠수함 · 아라비아해 진출 거점', lat:25.30, lng:60.64, type:'navy', side:'iran', strength:'lg', active:false },
+  { id:'ir-n3', name:'IRGC 해군 / Abu Musa', detail:'페르시아만 중앙 도서 점령 · 기뢰 부설 거점', lat:25.87, lng:55.03, type:'navy', side:'iran', strength:'md', active:true },
+
+  // ══ 헤즈볼라 (이란 프록시) ══
+  { id:'hzb-1', name:'헤즈볼라 / 로켓여단', detail:'Khaibar-1 추정 100,000발+ · 남부 레바논 집중 배치', lat:33.22, lng:35.47, type:'proxy_rocket', side:'hezbollah', strength:'xl', active:true },
+  { id:'hzb-2', name:'헤즈볼라 / 정밀유도탄', detail:'Fateh-110 계열 · GPS 유도 · 하이파/텔아비브 타격 가능', lat:33.55, lng:35.71, type:'proxy_rocket', side:'hezbollah', strength:'lg', active:true },
+  { id:'hzb-3', name:'헤즈볼라 / 특수부대 (라드완)', detail:'엘리트 보병 · 갈릴리 침투 대기', lat:33.35, lng:35.62, type:'proxy_ground', side:'hezbollah', strength:'lg', active:true },
+  { id:'hzb-4', name:'헤즈볼라 / 대공미사일', detail:'SA-22 · 드론 요격 가능', lat:33.84, lng:35.85, type:'missile', side:'hezbollah', strength:'md', active:false },
+
+  // ══ 후티 (이란 프록시 / 예멘) ══
+  { id:'hth-1', name:'후티 / 탄도미사일여단', detail:'Burkan-3 (1,200km) · 이스라엘 남부 타격 가능', lat:15.35, lng:44.21, type:'missile', side:'houthi', strength:'lg', active:true },
+  { id:'hth-2', name:'후티 / 드론·순항미사일', detail:'Shahed 계열 · 홍해 선박 공격 / 이스라엘 방향 발사', lat:14.80, lng:42.95, type:'drone', side:'houthi', strength:'lg', active:true },
+  { id:'hth-3', name:'후티 / 잠수드론 (Toufan)', detail:'자폭형 수중드론 · 홍해 항로 위협', lat:13.50, lng:43.30, type:'navy', side:'houthi', strength:'md', active:true },
+
+  // ══ 이라크 PMF (이란 지원 민병대) ══
+  { id:'pmf-1', name:'카타이브헤즈볼라 / 드론부대', detail:'미군기지·이스라엘 방향 공격 · 이라크-시리아 축', lat:33.40, lng:42.70, type:'drone', side:'pmf', strength:'md', active:true },
+  { id:'pmf-2', name:'PMF / 로켓여단', detail:'122mm 로켓포 · 쿠르드·US 기지 사거리', lat:32.60, lng:44.05, type:'proxy_rocket', side:'pmf', strength:'md', active:false },
+
+  // ══ 이스라엘 IDF ══
+  { id:'il-g1', name:'IDF / 지상군 (가자 북부)', detail:'기갑+보병 사단급 · 가자시티 인근 전개', lat:31.53, lng:34.49, type:'ground', side:'israel', strength:'xl', active:true },
+  { id:'il-g2', name:'IDF / 지상군 (가자 남부)', detail:'제98사단 · 라파 작전 지속', lat:31.08, lng:34.27, type:'ground', side:'israel', strength:'lg', active:true },
+  { id:'il-g3', name:'IDF / 지상군 (북부 전선)', detail:'제36사단 · 레바논 국경 집결 · 대헤즈볼라', lat:33.07, lng:35.51, type:'ground', side:'israel', strength:'xl', active:true },
+  { id:'il-g4', name:'IDF / 특수부대 (사예렛맛칼)', detail:'엘리트 정찰 · 이란 내부 작전 가능성', lat:32.03, lng:34.83, type:'special', side:'israel', strength:'md', active:true },
+
+  // ══ 이스라엘 방공망 ══
+  { id:'il-ad1', name:'Iron Dome / 북부 포대', detail:'70km 요격반경 · 카티우샤/단거리 로켓 대응', lat:32.83, lng:35.01, type:'airdef', side:'israel', strength:'lg', active:true },
+  { id:'il-ad2', name:'Iron Dome / 중부 포대', detail:'텔아비브 방어권 · 40km 이내 요격', lat:32.07, lng:34.80, type:'airdef', side:'israel', strength:'xl', active:true },
+  { id:'il-ad3', name:'Iron Dome / 남부 포대', detail:'네게브 사막 · 베에르셰바 방어', lat:31.25, lng:34.80, type:'airdef', side:'israel', strength:'md', active:true },
+  { id:'il-ad4', name:"David's Sling (완드)", detail:'중거리 탄도미사일 요격 · 300~470km', lat:31.89, lng:34.97, type:'airdef', side:'israel', strength:'xl', active:true },
+  { id:'il-ad5', name:'Arrow-3 (체스)', detail:'대기권 밖 요격 · 이란 탄도미사일 대응', lat:32.10, lng:34.94, type:'airdef', side:'israel', strength:'xl', active:true },
+
+  // ══ 미국 군사자산 ══
+  { id:'us-cv1', name:'USS Gerald R. Ford (CVN-78)', detail:'항모타격단 · F/A-18E/F 72기 · 동지중해 배치', lat:34.20, lng:31.50, type:'carrier', side:'us', strength:'xl', active:true },
+  { id:'us-cv2', name:'USS Harry S. Truman (CVN-75)', detail:'항모타격단 · 홍해/아라비아해 교대 전개', lat:15.00, lng:52.00, type:'carrier', side:'us', strength:'xl', active:true },
+  { id:'us-dd1', name:'USS Ross (DDG-71) 이지스 구축함', detail:'SM-3 탄도미사일 요격 · 동지중해', lat:33.50, lng:31.00, type:'navy', side:'us', strength:'lg', active:true },
+  { id:'us-dd2', name:'USS Gravely (DDG-107)', detail:'SM-3 · 이란 미사일 요격 대기', lat:24.50, lng:56.80, type:'navy', side:'us', strength:'lg', active:true },
+  { id:'us-b1', name:'B-52H 폭격기 / Diego Garcia', detail:'장거리 폭격 대기 · 벙커버스터 GBU-57 운용 가능', lat:-7.31, lng:72.42, type:'bomber', side:'us', strength:'lg', active:false },
+  { id:'us-gnd1', name:'THAAD / UAE 알다프라', detail:'터미널 고고도 방어 · 사거리 200km', lat:24.24, lng:54.55, type:'airdef', side:'us', strength:'xl', active:true },
+  { id:'us-gnd2', name:'미 중부사령부 / 카타르', detail:'30,000+ 병력 · 항공전 지휘 · AWACS 운용', lat:25.12, lng:51.31, type:'ground', side:'us', strength:'xl', active:true },
+];
+
+// 진영별 색상
+const SIDE_COLOR: Record<Side, string> = {
+  iran:      '#dc2626',  // 빨강
+  israel:    '#2563eb',  // 파랑
+  us:        '#06b6d4',  // 시안
+  hezbollah: '#ea580c',  // 주황
+  houthi:    '#ca8a04',  // 앰버
+  pmf:       '#b45309',  // 브라운
+};
+
+// 전력 타입별 심볼 (MIL-STD 단순화)
+const TYPE_SYMBOL: Record<ForceType, string> = {
+  missile:      '◆',
+  drone:        '⬟',
+  navy:         '⬡',
+  ground:       '▲',
+  airdef:       '⌂',
+  carrier:      '★',
+  bomber:       '✦',
+  special:      '◉',
+  proxy_ground: '▲',
+  proxy_rocket: '◆',
+};
+
+const TYPE_LABEL: Record<ForceType, string> = {
+  missile: '미사일', drone: '드론', navy: '해군', ground: '지상군',
+  airdef: '방공망', carrier: '항모', bomber: '폭격기', special: '특수부대',
+  proxy_ground: '민병대', proxy_rocket: '로켓',
+};
+
+const SIDE_LABEL: Record<Side, string> = {
+  iran: '이란 IRGC', israel: 'IDF 이스라엘', us: '미국',
+  hezbollah: '헤즈볼라', houthi: '후티', pmf: '이라크 PMF',
+};
 
 const BASE_COLOR: Record<string,string> = {
   nuclear: '#ef4444', military: '#f97316', airbase: '#3b82f6',
@@ -331,6 +440,89 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
         map.addLayer({ id: 'wr-base-strike-ring2', type: 'circle', source: 'wr-base-strikes', paint: { 'circle-radius': 18, 'circle-color': '#ef4444', 'circle-opacity': 0.12, 'circle-blur': 0.5 } });
         map.addLayer({ id: 'wr-base-strike-dot', type: 'circle', source: 'wr-base-strikes', paint: { 'circle-radius': 8, 'circle-color': '#ef4444', 'circle-opacity': 1, 'circle-stroke-width': 2, 'circle-stroke-color': '#fca5a5' } });
         map.addLayer({ id: 'wr-base-strike-label', type: 'symbol', source: 'wr-base-strikes', layout: { 'text-field': ['concat', '⚠ ', ['get','name']], 'text-size': 10, 'text-offset': [0, -1.6], 'text-anchor': 'bottom', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']] }, paint: { 'text-color': '#fca5a5', 'text-halo-color': '#000810', 'text-halo-width': 2 } });
+
+        /* ══ 군사 자산 배치 레이어 (MIL-STD-2525 스타일) ══ */
+        const forceGJ = {
+          type: 'FeatureCollection' as const,
+          features: FORCE_ASSETS.map(a => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [a.lng, a.lat] },
+            properties: {
+              id: a.id, name: a.name, detail: a.detail,
+              side: a.side, type: a.type, active: a.active,
+              color:    SIDE_COLOR[a.side],
+              symbol:   TYPE_SYMBOL[a.type],
+              sideLabel: SIDE_LABEL[a.side],
+              typeLabel: TYPE_LABEL[a.type],
+              radius:   a.strength === 'xl' ? 11 : a.strength === 'lg' ? 8 : a.strength === 'md' ? 6 : 4,
+              opacity:  a.active ? 1 : 0.42,
+              strokeOpacity: a.active ? 0.9 : 0.3,
+            },
+          })),
+        };
+        map.addSource('wr-forces', { type: 'geojson', data: forceGJ });
+
+        // 비활성 자산: 점선 테두리만
+        map.addLayer({ id: 'wr-forces-inactive-ring', type: 'circle', source: 'wr-forces',
+          filter: ['==', ['get','active'], false],
+          paint: { 'circle-radius': ['get','radius'], 'circle-color': 'transparent', 'circle-opacity': 0.5, 'circle-stroke-width': 1.5, 'circle-stroke-color': ['get','color'], 'circle-stroke-opacity': 0.4 },
+        });
+
+        // 활성 자산: 외부 글로우 링
+        map.addLayer({ id: 'wr-forces-glow', type: 'circle', source: 'wr-forces',
+          filter: ['==', ['get','active'], true],
+          paint: { 'circle-radius': ['+', ['get','radius'], 10], 'circle-color': ['get','color'], 'circle-opacity': 0.08, 'circle-blur': 1 },
+        });
+        // 활성 자산: 내부 채움
+        map.addLayer({ id: 'wr-forces-fill', type: 'circle', source: 'wr-forces',
+          filter: ['==', ['get','active'], true],
+          paint: { 'circle-radius': ['get','radius'], 'circle-color': ['get','color'], 'circle-opacity': ['get','opacity'], 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff', 'circle-stroke-opacity': 0.6 },
+        });
+        // 심볼 텍스트 (TYPE_SYMBOL)
+        map.addLayer({ id: 'wr-forces-symbol', type: 'symbol', source: 'wr-forces',
+          layout: { 'text-field': ['get','symbol'], 'text-size': ['case', ['==',['get','active'],true], 11, 9], 'text-anchor': 'center', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-allow-overlap': true },
+          paint: { 'text-color': '#ffffff', 'text-opacity': ['get','opacity'], 'text-halo-color': '#000000', 'text-halo-width': 0.5 },
+        });
+        // 부대명 레이블 (호버/줌 시)
+        map.addLayer({ id: 'wr-forces-label', type: 'symbol', source: 'wr-forces',
+          minzoom: 5,
+          layout: { 'text-field': ['get','name'], 'text-size': 8, 'text-offset': [0, -1.8], 'text-anchor': 'bottom', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true, 'text-max-width': 12 },
+          paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 1.5, 'text-opacity': ['get','opacity'] },
+        });
+
+        // 클릭 팝업
+        map.on('click', 'wr-forces-fill', (e: any) => {
+          const p = e.features?.[0]?.properties;
+          if (!p) return;
+          const activeStr = p.active ? '<span style="color:#22c55e;font-weight:700">● ACTIVE</span>' : '<span style="color:#4a7a9b">○ STANDBY</span>';
+          new maplibregl.Popup({ closeButton: false, maxWidth: '280px' })
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div style="background:#000810;color:#e2e8f0;padding:10px 14px;font-family:monospace;font-size:11px;border:1px solid ${p.color}55;border-radius:2px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <span style="font-size:16px">${p.symbol}</span>
+                  <div>
+                    <div style="color:${p.color};font-weight:900;font-size:12px">${p.name}</div>
+                    <div style="color:#4a7a9b;font-size:9px;letter-spacing:2px">${p.sideLabel} · ${p.typeLabel}</div>
+                  </div>
+                  <div style="margin-left:auto">${activeStr}</div>
+                </div>
+                <div style="color:#8aa3ba;line-height:1.5">${p.detail}</div>
+              </div>`)
+            .addTo(map);
+        });
+        map.on('click', 'wr-forces-inactive-ring', (e: any) => {
+          const p = e.features?.[0]?.properties;
+          if (!p) return;
+          new maplibregl.Popup({ closeButton: false, maxWidth: '260px' })
+            .setLngLat(e.lngLat)
+            .setHTML(`<div style="background:#000810;color:#e2e8f0;padding:8px 12px;font-family:monospace;font-size:11px;border:1px solid ${p.color}33"><span style="color:${p.color}">${p.symbol} ${p.name}</span><br/><span style="color:#4a7a9b;font-size:9px">○ STANDBY · ${p.sideLabel}</span><br/><span style="color:#8aa3ba">${p.detail}</span></div>`)
+            .addTo(map);
+        });
+        ['wr-forces-fill','wr-forces-inactive-ring'].forEach(id => {
+          map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+          map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+        });
 
         /* ── 미사일 사거리 레이블 ── */
         const missileLabels = { type: 'FeatureCollection' as const, features: MISSILE_SYSTEMS.map(m => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [m.lng + (m.rangeKm / 111) * 0.7, m.lat] }, properties: { label: m.name, color: m.color } })) };
@@ -740,7 +932,7 @@ export function WarRoomView() {
 
           {/* 레전드 */}
           <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:9, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
-            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보']].map(([i,l])=>(
+            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보'],['◆','이란전력(red)'],['▲','IDF(blue)'],['★','미항모(cyan)']].map(([i,l])=>(
               <span key={l as string}>{i} {l}</span>
             ))}
           </div>
@@ -771,6 +963,37 @@ export function WarRoomView() {
                 <div className="wr-count" style={{ fontSize:24, fontWeight:900, color:stat.color, textShadow:`0 0 10px ${stat.color}66`, lineHeight:1 }}>{stat.val}</div>
               </div>
             ))}
+          </div>
+
+          {/* 전력 배치 요약 */}
+          <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
+            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:6 }}>▸ FORCE DEPLOYMENT</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+              {[
+                { label:'이란+프록시', sides:['iran','hezbollah','houthi','pmf'] as Side[], color:'#dc2626' },
+                { label:'IDF (이스라엘)', sides:['israel'] as Side[], color:'#2563eb' },
+                { label:'미국 자산',    sides:['us'] as Side[], color:'#06b6d4' },
+              ].map(group => {
+                const assets = FORCE_ASSETS.filter(a => (group.sides as string[]).includes(a.side));
+                const active = assets.filter(a => a.active).length;
+                return (
+                  <div key={group.label} style={{ padding:'6px 8px', border:`1px solid ${group.color}33`, borderRadius:2, background:`${group.color}08`, textAlign:'center' }}>
+                    <div style={{ fontSize:18, fontWeight:900, color:group.color, lineHeight:1, textShadow:`0 0 8px ${group.color}66` }}>{active}</div>
+                    <div style={{ fontSize:7, color:'#4a7a9b', letterSpacing:1, marginTop:2 }}>ACTIVE</div>
+                    <div style={{ fontSize:8, color:group.color, opacity:0.6 }}>/{assets.length}</div>
+                    <div style={{ fontSize:7, color:'#2d5a7a', marginTop:2, letterSpacing:0.5 }}>{group.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* 자산 타입별 미니 분류 */}
+            <div style={{ marginTop:6, display:'flex', flexWrap:'wrap', gap:3 }}>
+              {(['missile','drone','navy','ground','airdef','carrier'] as ForceType[]).map(t => {
+                const cnt = FORCE_ASSETS.filter(a=>a.type===t && a.active).length;
+                if (!cnt) return null;
+                return <span key={t} style={{ fontSize:8, padding:'1px 5px', border:'1px solid #0a1f2f', borderRadius:1, color:'#8aa3ba', background:'#020c18' }}>{TYPE_SYMBOL[t]} {TYPE_LABEL[t]} {cnt}</span>;
+              })}
+            </div>
           </div>
 
           {/* 영공 현황 */}

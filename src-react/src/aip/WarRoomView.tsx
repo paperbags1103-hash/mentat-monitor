@@ -795,6 +795,40 @@ function TensionChart({ data, gdeltPoints }: { data: TensionPoint[]; gdeltPoints
 }
 
 /* ══════════════════════════════════════════════════════
+   VOLUME HISTOGRAM — 24h 이벤트 볼륨 막대 차트
+══════════════════════════════════════════════════════ */
+function VolumeHistogram({ buckets, timeWindow }: { buckets: Array<{hour:number;label:string;value:number}>; timeWindow: number }) {
+  const W = 276, H = 52;
+  if (!buckets.length) {
+    return <div style={{ height:H, display:'flex', alignItems:'center', justifyContent:'center', color:'#2d5a7a', fontSize:9, fontFamily:"'Courier New',monospace" }}>LOADING...</div>;
+  }
+  const max = Math.max(...buckets.map(b => b.value), 1);
+  const barW = W / buckets.length;
+  const cutoff = 24 - timeWindow;
+  return (
+    <svg width={W} height={H} style={{ display:'block', width:'100%', height:H }}>
+      {buckets.map((b, i) => {
+        const bh = Math.max(2, Math.round((b.value / max) * (H - 12)));
+        const x = i * barW;
+        const inWin = i >= cutoff;
+        const col = inWin ? '#ef4444' : '#1a3a4a';
+        return (
+          <g key={i}>
+            <rect x={x + 0.5} y={H - 12 - bh} width={barW - 1} height={bh} fill={col} opacity={inWin ? 0.82 : 0.35} rx={0.5} />
+            {i % 6 === 0 && (
+              <text x={x + barW / 2} y={H - 1} fontSize={7} fill="#2d5a7a" textAnchor="middle" fontFamily="monospace">{b.label}</text>
+            )}
+          </g>
+        );
+      })}
+      {timeWindow < 24 && (
+        <line x1={cutoff * barW} x2={cutoff * barW} y1={0} y2={H - 10} stroke="#ef4444" strokeWidth={1} strokeDasharray="3,2" opacity={0.7} />
+      )}
+    </svg>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    CSS
 ══════════════════════════════════════════════════════ */
 const CSS = `
@@ -889,6 +923,8 @@ export function WarRoomView() {
   const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
   const [satMode,      setSatMode]      = useState<SatMode>('satellite');
   const [liveNews,     setLiveNews]     = useState<Array<{title:string;source:string;age:number|null}>>([]);
+  const [volBuckets,   setVolBuckets]   = useState<Array<{hour:number;label:string;value:number}>>([]);
+  const [timeWindow,   setTimeWindow]   = useState(24); // 최근 N시간
   const feedRef    = useRef<HTMLDivElement>(null);
   const prevCritRef = useRef<Set<string>>(new Set());
   const audioCtxRef = useRef<AudioContext|null>(null);
@@ -935,6 +971,12 @@ export function WarRoomView() {
         if (tlRes?.points?.length > 0) setGdeltTimeline(tlRes.points);
       } catch {}
 
+      /* GDELT 이벤트 볼륨 히스토그램 */
+      try {
+        const volRes = await apiFetch<any>('/api/gdelt-volume');
+        if (volRes?.buckets?.length > 0) setVolBuckets(volRes.buckets);
+      } catch {}
+
       /* 실시간 뉴스 (Reuters/AJ/BBC RSS) */
       try {
         const newsRes = await apiFetch<any>('/api/warroom-news');
@@ -971,6 +1013,17 @@ export function WarRoomView() {
 
   /* Threat 히스토리 누적 */
   const threatScore = useMemo(()=>calcThreat(acled,quakes,firms,aircraft),[acled,quakes,firms,aircraft]);
+
+  /* 시간창 필터 */
+  const filteredFeed = useMemo(() => {
+    if (timeWindow >= 24) return feed;
+    const cutoff = Date.now() - timeWindow * 3600_000;
+    return feed.filter(item => {
+      if (!item.time) return true;
+      const t = new Date(item.time).getTime();
+      return isNaN(t) || t >= cutoff;
+    });
+  }, [feed, timeWindow]);
   useEffect(() => {
     if (threatScore > 0) {
       setThreatHistory(prev => {
@@ -1142,6 +1195,17 @@ export function WarRoomView() {
             </div>
           )}
 
+          {/* ── Timeline Scrubber ── */}
+          <div style={{ position:'absolute', bottom: liveNews.length > 0 ? 66 : 36, left:0, right:0, zIndex:1000, padding:'0 10px 3px', background:'rgba(0,8,16,0.82)', backdropFilter:'blur(4px)', borderTop:'1px solid #0a1f2f', display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ fontSize:8, color:'#4a7a9b', letterSpacing:2, flexShrink:0, fontFamily:"'Courier New',monospace" }}>🕐 WINDOW</div>
+            <input
+              type="range" min={1} max={24} step={1} value={timeWindow}
+              onChange={e => setTimeWindow(+e.target.value)}
+              style={{ flex:1, accentColor:'#ef4444', height:3, cursor:'pointer', WebkitAppearance:'none', background:`linear-gradient(to right, #ef4444 ${(timeWindow/24)*100}%, #1a3a4a ${(timeWindow/24)*100}%)`, borderRadius:2 }}
+            />
+            <div style={{ fontSize:9, color:'#ef4444', fontWeight:700, letterSpacing:1, flexShrink:0, minWidth:28, textAlign:'right', fontFamily:"'Courier New',monospace" }}>{timeWindow}H</div>
+          </div>
+
           {/* LIVE 뉴스 티커 */}
           {liveNews.length > 0 && (
             <div style={{ position:'absolute', bottom:36, left:0, right:0, zIndex:1000, background:'rgba(0,8,16,0.88)', borderTop:'1px solid #1a3a4a', backdropFilter:'blur(4px)' }}>
@@ -1195,6 +1259,15 @@ export function WarRoomView() {
               <span style={{ marginLeft:'auto', fontSize:8, color:'#2d5a7a' }}>24h</span>
             </div>
             <TensionChart data={threatHistory} gdeltPoints={gdeltTimeline} />
+          </div>
+
+          {/* EVENT VOLUME 히스토그램 */}
+          <div style={{ padding:'5px 12px 4px', borderBottom:'1px solid #0a1f2f', flexShrink:0, background:'#020c18' }}>
+            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
+              ▸ EVENT VOLUME
+              <span style={{ marginLeft:'auto', fontSize:8, color:'#ef4444' }}>최근 {timeWindow}h</span>
+            </div>
+            <VolumeHistogram buckets={volBuckets} timeWindow={timeWindow} />
           </div>
 
           {/* 스탯 그리드 */}
@@ -1355,11 +1428,12 @@ export function WarRoomView() {
             <div style={{ padding:'5px 12px', borderBottom:'1px solid #0a1f2f', display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
               <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2 }}>▸ INTEL FEED</span>
               <span className="wr-blink" style={{ fontSize:9, color:'#ef4444', letterSpacing:1 }}>● LIVE</span>
-              <span style={{ marginLeft:'auto', fontSize:9, color:'#4a7a9b' }}>{feed.length}</span>
+              <span style={{ marginLeft:'auto', fontSize:9, color:'#4a7a9b' }}>{filteredFeed.length}</span>
+              {timeWindow < 24 && <span style={{ fontSize:8, color:'#ef4444', letterSpacing:1 }}>/{timeWindow}h</span>}
             </div>
             <div ref={feedRef} style={{ flex:1, overflowY:'auto', padding:'0 2px' }}>
-              {feed.length===0 && <div style={{ padding:20, textAlign:'center', color:'#4a7a9b', fontSize:11 }}>{loading?'인텔 수집 중...':'감지된 이벤트 없음'}</div>}
-              {feed.map((item,idx)=>{
+              {filteredFeed.length===0 && <div style={{ padding:20, textAlign:'center', color:'#4a7a9b', fontSize:11 }}>{loading?'인텔 수집 중...':'감지된 이벤트 없음'}</div>}
+              {filteredFeed.map((item,idx)=>{
                 const sevColor = SEV_COLOR[item.severity]??'#94a3b8';
                 return (
                   <div key={item.id} className="wr-feed-item" style={{ padding:'6px 12px', borderBottom:'1px solid #07131e', borderLeft:`2px solid ${sevColor}`, background:idx===0?`${sevColor}08`:'transparent', cursor:'default' }} onMouseEnter={e=>(e.currentTarget.style.background=`${sevColor}0f`)} onMouseLeave={e=>(e.currentTarget.style.background=idx===0?`${sevColor}08`:'transparent')}>

@@ -1084,7 +1084,7 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
       <div ref={containerRef} style={{ width:'100%', height:'100%' }} />
       {/* 진영 필터 토글 오버레이 */}
       <div style={{ position:'absolute', bottom:28, left:8, zIndex:20, display:'flex', flexDirection:'column', gap:3 }}>
-        <div style={{ fontSize:8, color:'#2d5a7a', letterSpacing:2, marginBottom:2, fontFamily:"'Courier New', monospace" }}>▸ FORCE FILTER</div>
+        <div style={{ fontSize:10, color:'#2d5a7a', letterSpacing:2, marginBottom:2, fontFamily:"'Courier New', monospace" }}>▸ FORCE FILTER</div>
         {SIDES.map(({ side, label, icon }) => {
           const active = !hiddenSides.has(side);
           const col = SIDE_COLOR[side];
@@ -1098,11 +1098,11 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
               background: active ? col+'22' : '#00000066',
               border: `1px solid ${active ? col+'88' : '#1a3a4a'}`,
               borderRadius:2, padding:'2px 7px', cursor:'pointer',
-              fontFamily:"'Courier New', monospace", fontSize:9,
+              fontFamily:"'Courier New', monospace", fontSize:11,
               color: active ? col : '#2d5a7a',
               letterSpacing:1, transition:'all 0.15s',
             }}>
-              <span style={{ fontSize:7, opacity: active ? 1 : 0.4 }}>{icon}</span>
+              <span style={{ fontSize:11, opacity: active ? 1 : 0.4 }}>{icon}</span>
               {label}
             </button>
           );
@@ -1123,7 +1123,7 @@ function TensionChart({ data, gdeltPoints }: { data: TensionPoint[]; gdeltPoints
   // 로컬 threat 히스토리 차트
   const localData = data.slice(-30);
   if (localData.length < 2 && gdeltPoints.length < 2) {
-    return <div style={{ height: H, display:'flex', alignItems:'center', justifyContent:'center', color:'#1e3a5f', fontSize:9 }}>데이터 수집 중...</div>;
+    return <div style={{ height: H, display:'flex', alignItems:'center', justifyContent:'center', color:'#1e3a5f', fontSize:11 }}>데이터 수집 중...</div>;
   }
 
   // GDELT tone 정규화 (tone은 보통 -20 ~ +20 범위, 위협 지수로 역변환)
@@ -1265,9 +1265,9 @@ function EscalationPanel({ data }: { data: EscalationData }) {
 
   return (
     <div style={{ padding:'8px 12px', borderBottom:'1px solid #0a1f2f', background:'#020c18', flexShrink:0 }}>
-      <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:6 }}>
+      <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:6 }}>
         ▸ ESCALATION INDEX
-        <span style={{ fontSize:8, color:col, fontWeight:900, letterSpacing:2, marginLeft:'auto',
+        <span style={{ fontSize:10, color:col, fontWeight:900, letterSpacing:2, marginLeft:'auto',
           ...(index >= 70 ? { animation:'wr-blink 1s infinite' } : {}) }}>{levelLabel}</span>
       </div>
 
@@ -1284,7 +1284,7 @@ function EscalationPanel({ data }: { data: EscalationData }) {
       </div>
 
       {/* 가장 유사한 과거 사건 */}
-      <div style={{ fontSize:9, color:'#8aa3ba', marginBottom:6, padding:'4px 8px', background:`${col}0d`, border:`1px solid ${col}22`, borderRadius:2 }}>
+      <div style={{ fontSize:11, color:'#8aa3ba', marginBottom:6, padding:'4px 8px', background:`${col}0d`, border:`1px solid ${col}22`, borderRadius:2 }}>
         <span style={{ color:'#4a7a9b' }}>최근접 패턴: </span>
         <span style={{ color:col, fontWeight:700 }}>{best.label}</span>
         <span style={{ color:'#4a7a9b' }}> ({best.date})</span>
@@ -1297,17 +1297,17 @@ function EscalationPanel({ data }: { data: EscalationData }) {
           const active = s.val >= s.threshold;
           const pct = Math.round(s.val * 100);
           return (
-            <div key={s.label} style={{ display:'flex', alignItems:'center', gap:4, fontSize:8 }}>
-              <span style={{ color: active ? col : '#1a3a4a', fontSize:9, fontWeight:900 }}>{active ? '◉' : '○'}</span>
+            <div key={s.label} style={{ display:'flex', alignItems:'center', gap:4, fontSize:10 }}>
+              <span style={{ color: active ? col : '#1a3a4a', fontSize:11, fontWeight:900 }}>{active ? '◉' : '○'}</span>
               <span style={{ color: active ? '#c0d8e8' : '#2d5a7a' }}>{s.label}</span>
-              <span style={{ color: active ? col : '#1a3a4a', marginLeft:'auto', fontSize:7 }}>{pct}%</span>
+              <span style={{ color: active ? col : '#1a3a4a', marginLeft:'auto', fontSize:11 }}>{pct}%</span>
             </div>
           );
         })}
       </div>
 
       {/* 요약 */}
-      <div style={{ fontSize:8, color:'#4a7a9b', textAlign:'right', letterSpacing:1 }}>
+      <div style={{ fontSize:10, color:'#4a7a9b', textAlign:'right', letterSpacing:1 }}>
         {hitCount}/{signals.length} 시그널 활성 · 벡터 유사도 분석
       </div>
     </div>
@@ -1320,7 +1320,7 @@ function EscalationPanel({ data }: { data: EscalationData }) {
 function VolumeHistogram({ buckets, timeWindow }: { buckets: Array<{hour:number;label:string;value:number}>; timeWindow: number }) {
   const W = 276, H = 52;
   if (!buckets.length) {
-    return <div style={{ height:H, display:'flex', alignItems:'center', justifyContent:'center', color:'#2d5a7a', fontSize:9, fontFamily:"'Courier New',monospace" }}>LOADING...</div>;
+    return <div style={{ height:H, display:'flex', alignItems:'center', justifyContent:'center', color:'#2d5a7a', fontSize:11, fontFamily:"'Courier New',monospace" }}>LOADING...</div>;
   }
   const max = Math.max(...buckets.map(b => b.value), 1);
   const barW = W / buckets.length;
@@ -1844,7 +1844,7 @@ export function WarRoomView() {
               }}>
                 <span>{th.flag}</span>
                 <span>{th.label}</span>
-                {theaterAct[key] != null && <span style={{ color: theater===key?'#f97316':'#2d5a7a', fontSize:8 }}>{theaterAct[key]}</span>}
+                {theaterAct[key] != null && <span style={{ color: theater===key?'#f97316':'#2d5a7a', fontSize:10 }}>{theaterAct[key]}</span>}
               </button>
             ))}
           </div>
@@ -1855,43 +1855,43 @@ export function WarRoomView() {
         <div style={{ display:'flex', gap:6 }}>
           {oil?.wti?.price && (
             <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:'1px solid #1a3a4a', borderRadius:2, background:'#020c18' }}>
-              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>WTI</span>
+              <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1 }}>WTI</span>
               <span style={{ fontSize:12, fontWeight:700, color:'#fbbf24' }}>${oil.wti.price.toFixed(2)}</span>
-              <span style={{ fontSize:9, fontWeight:700, color: oil.wti.change >= 0 ? '#22c55e' : '#ef4444' }}>{oil.wti.change >= 0 ? '▲' : '▼'}{Math.abs(oil.wti.change).toFixed(1)}%</span>
+              <span style={{ fontSize:11, fontWeight:700, color: oil.wti.change >= 0 ? '#22c55e' : '#ef4444' }}>{oil.wti.change >= 0 ? '▲' : '▼'}{Math.abs(oil.wti.change).toFixed(1)}%</span>
             </div>
           )}
           {geoSignals?.derived?.brentWtiSpread != null && (
             <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${geoSignals.derived.spreadNorm > 0.5 ? '#ef444455' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
-              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>B-W</span>
+              <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1 }}>B-W</span>
               <span style={{ fontSize:12, fontWeight:700, color: geoSignals.derived.spreadNorm > 0.5 ? '#ef4444' : '#fbbf24' }}>${geoSignals.derived.brentWtiSpread.toFixed(1)}</span>
             </div>
           )}
           {geoSignals?.ils?.change5d != null && (
             <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${geoSignals.derived.ilsNorm > 0.4 ? '#ef444455' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
-              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>ILS</span>
-              <span style={{ fontSize:9, fontWeight:700, color: geoSignals.derived.ilsNorm > 0.4 ? '#ef4444' : '#94a3b8' }}>{geoSignals.ils.change5d > 0 ? '▲' : '▼'}{Math.abs(geoSignals.ils.change5d).toFixed(2)}%</span>
+              <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1 }}>ILS</span>
+              <span style={{ fontSize:11, fontWeight:700, color: geoSignals.derived.ilsNorm > 0.4 ? '#ef4444' : '#94a3b8' }}>{geoSignals.ils.change5d > 0 ? '▲' : '▼'}{Math.abs(geoSignals.ils.change5d).toFixed(2)}%</span>
             </div>
           )}
           {geoSignals?.gold?.change5d != null && (
             <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${geoSignals.derived.goldNorm > 0.4 ? '#22c55e55' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
-              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>GOLD</span>
-              <span style={{ fontSize:9, fontWeight:700, color: geoSignals.derived.goldNorm > 0.4 ? '#22c55e' : '#94a3b8' }}>{geoSignals.gold.change5d > 0 ? '+' : ''}{geoSignals.gold.change5d.toFixed(2)}%</span>
+              <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1 }}>GOLD</span>
+              <span style={{ fontSize:11, fontWeight:700, color: geoSignals.derived.goldNorm > 0.4 ? '#22c55e' : '#94a3b8' }}>{geoSignals.gold.change5d > 0 ? '+' : ''}{geoSignals.gold.change5d.toFixed(2)}%</span>
             </div>
           )}
           {iranRial?.change7d != null && (
             <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${iranRial.rialNorm > 0.35 ? '#ef444455' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
-              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>IRR</span>
-              <span style={{ fontSize:9, fontWeight:700, color: iranRial.rialNorm > 0.35 ? '#ef4444' : '#94a3b8' }}>
+              <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1 }}>IRR</span>
+              <span style={{ fontSize:11, fontWeight:700, color: iranRial.rialNorm > 0.35 ? '#ef4444' : '#94a3b8' }}>
                 {iranRial.change7d > 0 ? '▲' : '▼'}{Math.abs(iranRial.change7d).toFixed(1)}%
               </span>
-              {iranRial.alert === 'CRITICAL' && <span className="wr-blink" style={{ fontSize:7, color:'#ef4444', fontWeight:900 }}>!</span>}
+              {iranRial.alert === 'CRITICAL' && <span className="wr-blink" style={{ fontSize:11, color:'#ef4444', fontWeight:900 }}>!</span>}
             </div>
           )}
         </div>
 
         {/* 위협 레벨 */}
         <div className={threat.flash ? 'wr-threat-flash' : ''} style={{ padding:'3px 14px', borderRadius:2, border:`1px solid ${threat.color}`, background:`${threat.color}18`, display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2 }}>THREAT</span>
+          <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2 }}>THREAT</span>
           <span style={{ fontSize:13, fontWeight:900, color:threat.color, letterSpacing:2, textShadow:`0 0 10px ${threat.glow}` }}>{threat.label}</span>
           <div style={{ width:60, height:6, background:'#0a1f2f', borderRadius:1, overflow:'hidden' }}>
             <div style={{ width:`${threatScore}%`, height:'100%', background:threat.color, boxShadow:`0 0 6px ${threat.color}`, transition:'width 1s ease' }} />
@@ -1901,7 +1901,7 @@ export function WarRoomView() {
 
         {/* 인시던트 */}
         <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 12px', border:'1px solid #1a3a4a', borderRadius:2, background:'#020c18' }}>
-          <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2 }}>INCIDENTS</span>
+          <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2 }}>INCIDENTS</span>
           <span className="wr-count" style={{ fontSize:16, fontWeight:900, color:'#ef4444', textShadow:'0 0 8px #ef4444' }}>{meAcled.length+meQuakes.length}</span>
         </div>
 
@@ -1918,7 +1918,7 @@ export function WarRoomView() {
         {/* 군용 시각 */}
         <div style={{ textAlign:'right' }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#00d4ff', letterSpacing:2, textShadow:'0 0 6px #00d4ff66' }}>{milTime}</div>
-          <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>UTC · {loading?'동기화 중...':'데이터 최신'}</div>
+          <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1 }}>UTC · {loading?'동기화 중...':'데이터 최신'}</div>
         </div>
       </div>
 
@@ -1927,9 +1927,9 @@ export function WarRoomView() {
 
         {/* ──────── 지도 (항상 100%) ──────── */}
         <div style={{ position:'absolute', inset:0 }}>
-          <div style={{ position:'absolute', top:8, left:8, zIndex:1000, fontSize:9, color:'#00d4ff88', letterSpacing:3, fontWeight:700 }}>TACTICAL MAP 3D // IRAN-ISRAEL</div>
+          <div style={{ position:'absolute', top:8, left:8, zIndex:1000, fontSize:11, color:'#00d4ff88', letterSpacing:3, fontWeight:700 }}>TACTICAL MAP 3D // IRAN-ISRAEL</div>
           {/* 우클릭 힌트 */}
-          <div style={{ position:'absolute', top:8, left:'50%', transform:'translateX(-50%)', zIndex:1000, fontSize:8, color:'#2d5a7a', letterSpacing:1, fontFamily:"'Courier New',monospace", pointerEvents:'none' }}>
+          <div style={{ position:'absolute', top:8, left:'50%', transform:'translateX(-50%)', zIndex:1000, fontSize:10, color:'#2d5a7a', letterSpacing:1, fontFamily:"'Courier New',monospace", pointerEvents:'none' }}>
             우클릭 → 타격 보고 &nbsp;|&nbsp; 🎯 {strikeReports.length}건
           </div>
 
@@ -1953,17 +1953,17 @@ export function WarRoomView() {
 
           {/* 야간 조명 모드 안내 */}
           {satMode === 'nightlights' && (
-            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #22c55e55', borderRadius:3, padding:'6px 14px', fontSize:9, color:'#22c55e', letterSpacing:1, whiteSpace:'nowrap' }}>
+            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #22c55e55', borderRadius:3, padding:'6px 14px', fontSize:11, color:'#22c55e', letterSpacing:1, whiteSpace:'nowrap' }}>
               🌙 NASA VIIRS 야간조명 — {getGibsDate()} 기준 · 어두운 지역 = 정전/피해
             </div>
           )}
           {satMode === 'truecolor' && (
-            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #fbbf2455', borderRadius:3, padding:'6px 14px', fontSize:9, color:'#fbbf24', letterSpacing:1, whiteSpace:'nowrap' }}>
+            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #fbbf2455', borderRadius:3, padding:'6px 14px', fontSize:11, color:'#fbbf24', letterSpacing:1, whiteSpace:'nowrap' }}>
               🎨 MODIS Terra 자연색 — {getGibsDate()} 기준 · 250m 해상도
             </div>
           )}
           {satMode === 'soar' && (
-            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(16,0,0,0.92)', border:'1px solid #ef444455', borderRadius:3, padding:'6px 16px', fontSize:9, color:'#ef4444', letterSpacing:1, whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(16,0,0,0.92)', border:'1px solid #ef444455', borderRadius:3, padding:'6px 16px', fontSize:11, color:'#ef4444', letterSpacing:1, whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:8 }}>
               <span className="wr-blink">●</span>
               SOAR Atlas 실시간 이란 전장 위성 · <a href="https://soaratlas.com/maps/15424" target="_blank" rel="noopener" style={{ color:'#f87171', textDecoration:'underline' }}>soaratlas.com/maps/15424</a>
             </div>
@@ -1972,7 +1972,7 @@ export function WarRoomView() {
           {/* ── Timeline Scrubber ── */}
           {/* ── 심각도 필터 슬라이더 ── */}
           <div style={{ position:'absolute', bottom: liveNews.length > 0 ? 66 : 36, left:0, right:0, zIndex:1000, padding:'3px 10px', background:'rgba(0,8,16,0.88)', backdropFilter:'blur(4px)', borderTop:'1px solid #0a1f2f', display:'flex', alignItems:'center', gap:8 }}>
-            <div style={{ fontSize:8, color:'#4a7a9b', letterSpacing:2, flexShrink:0, fontFamily:"'Courier New',monospace" }}>FILTER</div>
+            <div style={{ fontSize:10, color:'#4a7a9b', letterSpacing:2, flexShrink:0, fontFamily:"'Courier New',monospace" }}>FILTER</div>
             <input
               type="range" min={1} max={24} step={1} value={timeWindow}
               onChange={e => setTimeWindow(+e.target.value)}
@@ -1984,7 +1984,7 @@ export function WarRoomView() {
             {/* 현재 필터 레이블 */}
             {(() => {
               const [label,col] = timeWindow<=2 ? ['🔴 CRITICAL 전용','#ef4444'] : timeWindow<=6 ? ['🟠 HIGH+','#f97316'] : timeWindow<=12 ? ['🟡 MEDIUM+','#fbbf24'] : ['🟢 전체','#22c55e'];
-              return <div style={{ fontSize:9, color:col, fontWeight:700, letterSpacing:1, flexShrink:0, minWidth:70, textAlign:'right', fontFamily:"'Courier New',monospace" }}>{label}</div>;
+              return <div style={{ fontSize:11, color:col, fontWeight:700, letterSpacing:1, flexShrink:0, minWidth:70, textAlign:'right', fontFamily:"'Courier New',monospace" }}>{label}</div>;
             })()}
           </div>
 
@@ -1993,15 +1993,15 @@ export function WarRoomView() {
             <div style={{ position:'absolute', bottom:36, left:0, right:0, zIndex:1000, background:'rgba(0,8,16,0.88)', borderTop:'1px solid #1a3a4a', backdropFilter:'blur(4px)' }}>
               <div style={{ display:'flex', alignItems:'stretch', overflow:'hidden', height:28 }}>
                 <div style={{ background:'#ef4444', padding:'0 10px', display:'flex', alignItems:'center', flexShrink:0 }}>
-                  <span className="wr-blink" style={{ fontSize:9, color:'#fff', fontWeight:900, letterSpacing:2 }}>● LIVE</span>
+                  <span className="wr-blink" style={{ fontSize:11, color:'#fff', fontWeight:900, letterSpacing:2 }}>● LIVE</span>
                 </div>
                 <div style={{ flex:1, overflow:'hidden', display:'flex', alignItems:'center' }}>
                   <div style={{ whiteSpace:'nowrap', animation:'ticker-scroll 40s linear infinite', display:'flex', gap:48, paddingLeft:'100%' }}>
                     {[...liveNews, ...liveNews].map((n, i) => (
                       <span key={i} style={{ fontSize:10, color:'#c0d8e8', fontFamily:'monospace' }}>
-                        <span style={{ color:'#4a7a9b', fontSize:9 }}>[{n.source}]</span>{' '}
+                        <span style={{ color:'#4a7a9b', fontSize:11 }}>[{n.source}]</span>{' '}
                         {n.title}
-                        {n.age !== null && <span style={{ color:'#2d5a7a', fontSize:8 }}> · {n.age < 60 ? `${n.age}분 전` : `${Math.floor(n.age/60)}h`}</span>}
+                        {n.age !== null && <span style={{ color:'#2d5a7a', fontSize:10 }}> · {n.age < 60 ? `${n.age}분 전` : `${Math.floor(n.age/60)}h`}</span>}
                         <span style={{ color:'#1a3a4a', padding:'0 20px' }}>◈</span>
                       </span>
                     ))}
@@ -2012,7 +2012,7 @@ export function WarRoomView() {
           )}
 
           {/* 레전드 */}
-          <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:9, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
+          <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:11, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
             {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보'],['◆','이란전력(red)'],['▲','IDF(blue)'],['★','미항모(cyan)'],['📸','뉴스이미지'],['📡','라이브방송'],['- -','영공제한']].map(([i,l])=>(
               <span key={l as string}>{i} {l}</span>
             ))}
@@ -2024,7 +2024,7 @@ export function WarRoomView() {
           <button onClick={()=>setCinematic(false)} title="인텔 패널 열기"
             style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', zIndex:1002, width:28, height:80, background:'rgba(2,12,24,0.85)', border:'1px solid #1a3a4a', borderRadius:'4px 0 0 4px', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, color:'#4a7a9b' }}>
             <span style={{ fontSize:10 }}>◁</span>
-            <span style={{ fontSize:7, letterSpacing:1, writingMode:'vertical-lr', color:'#2d5a7a' }}>INTEL</span>
+            <span style={{ fontSize:11, letterSpacing:1, writingMode:'vertical-lr', color:'#2d5a7a' }}>INTEL</span>
           </button>
         )}
 
@@ -2039,18 +2039,18 @@ export function WarRoomView() {
 
           {/* 긴장지수 타임라인 차트 */}
           <div style={{ padding:'6px 12px 4px', borderBottom:'1px solid #0a1f2f', flexShrink:0, background:'#020c18' }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
               ▸ TENSION INDEX
-              <span style={{ marginLeft:'auto', fontSize:8, color:'#2d5a7a' }}>24h</span>
+              <span style={{ marginLeft:'auto', fontSize:10, color:'#2d5a7a' }}>24h</span>
             </div>
             <TensionChart data={threatHistory} gdeltPoints={gdeltTimeline} />
           </div>
 
           {/* EVENT VOLUME 히스토그램 */}
           <div style={{ padding:'5px 12px 4px', borderBottom:'1px solid #0a1f2f', flexShrink:0, background:'#020c18' }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
               ▸ EVENT VOLUME
-              <span style={{ marginLeft:'auto', fontSize:8, color:'#ef4444' }}>최근 24h</span>
+              <span style={{ marginLeft:'auto', fontSize:10, color:'#ef4444' }}>최근 24h</span>
             </div>
             <VolumeHistogram buckets={volBuckets} timeWindow={timeWindow} />
           </div>
@@ -2064,7 +2064,7 @@ export function WarRoomView() {
               { label:'SEISMIC',   val:meQuakes.length,                color:'#fbbf24', icon:'🌋' },
             ].map(stat=>(
               <div key={stat.label} style={{ background:'#050f1a', padding:'8px 12px' }}>
-                <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:3 }}>{stat.icon} {stat.label}</div>
+                <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:3 }}>{stat.icon} {stat.label}</div>
                 <div className="wr-count" style={{ fontSize:24, fontWeight:900, color:stat.color, textShadow:`0 0 10px ${stat.color}66`, lineHeight:1 }}>{stat.val}</div>
               </div>
             ))}
@@ -2073,9 +2073,9 @@ export function WarRoomView() {
           {/* 야간 조명 분석 패널 */}
           {satMode === 'nightlights' && (
             <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', background:'#020c18', flexShrink:0 }}>
-              <div style={{ fontSize:9, color:'#22c55e', letterSpacing:2, marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
+              <div style={{ fontSize:11, color:'#22c55e', letterSpacing:2, marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
                 🌙 NIGHT LIGHTS INTEL
-                <span style={{ fontSize:8, color:'#2d5a7a', marginLeft:'auto' }}>{getGibsDate()}</span>
+                <span style={{ fontSize:10, color:'#2d5a7a', marginLeft:'auto' }}>{getGibsDate()}</span>
               </div>
               {[
                 { city:'가자 시티',   status:'critical', pct: 8,  note:'전력망 완전 파괴' },
@@ -2088,22 +2088,22 @@ export function WarRoomView() {
                 const color = r.status==='critical'?'#ef4444':r.status==='high'?'#f97316':'#22c55e';
                 return (
                   <div key={r.city} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                    <span style={{ fontSize:9, color:'#8aa3ba', minWidth:75 }}>{r.city}</span>
+                    <span style={{ fontSize:11, color:'#8aa3ba', minWidth:75 }}>{r.city}</span>
                     <div style={{ flex:1, height:4, background:'#0a1f2f', borderRadius:1 }}>
                       <div style={{ width:`${r.pct}%`, height:'100%', background:color, borderRadius:1, boxShadow:`0 0 3px ${color}` }} />
                     </div>
-                    <span style={{ fontSize:9, color, fontWeight:700, minWidth:26 }}>{r.pct}%</span>
-                    <span style={{ fontSize:8, color:'#2d5a7a' }}>{r.note}</span>
+                    <span style={{ fontSize:11, color, fontWeight:700, minWidth:26 }}>{r.pct}%</span>
+                    <span style={{ fontSize:10, color:'#2d5a7a' }}>{r.note}</span>
                   </div>
                 );
               })}
-              <div style={{ fontSize:8, color:'#1e3a5f', marginTop:3 }}>* 2024 VIIRS 관측 기반. 실시간 아님.</div>
+              <div style={{ fontSize:10, color:'#1e3a5f', marginTop:3 }}>* 2024 VIIRS 관측 기반. 실시간 아님.</div>
             </div>
           )}
 
           {/* 전력 배치 요약 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:6 }}>▸ FORCE DEPLOYMENT</div>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:6 }}>▸ FORCE DEPLOYMENT</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
               {[
                 { label:'이란+프록시', sides:['iran','hezbollah','houthi','pmf'] as Side[], color:'#dc2626' },
@@ -2115,9 +2115,9 @@ export function WarRoomView() {
                 return (
                   <div key={group.label} style={{ padding:'6px 8px', border:`1px solid ${group.color}33`, borderRadius:2, background:`${group.color}08`, textAlign:'center' }}>
                     <div style={{ fontSize:18, fontWeight:900, color:group.color, lineHeight:1, textShadow:`0 0 8px ${group.color}66` }}>{active}</div>
-                    <div style={{ fontSize:7, color:'#4a7a9b', letterSpacing:1, marginTop:2 }}>ACTIVE</div>
-                    <div style={{ fontSize:8, color:group.color, opacity:0.6 }}>/{assets.length}</div>
-                    <div style={{ fontSize:7, color:'#2d5a7a', marginTop:2, letterSpacing:0.5 }}>{group.label}</div>
+                    <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1, marginTop:2 }}>ACTIVE</div>
+                    <div style={{ fontSize:10, color:group.color, opacity:0.6 }}>/{assets.length}</div>
+                    <div style={{ fontSize:11, color:'#2d5a7a', marginTop:2, letterSpacing:0.5 }}>{group.label}</div>
                   </div>
                 );
               })}
@@ -2127,17 +2127,17 @@ export function WarRoomView() {
               {(['missile','drone','navy','ground','airdef','carrier'] as ForceType[]).map(t => {
                 const cnt = FORCE_ASSETS.filter(a=>a.type===t && a.active).length;
                 if (!cnt) return null;
-                return <span key={t} style={{ fontSize:8, padding:'1px 5px', border:'1px solid #0a1f2f', borderRadius:1, color:'#8aa3ba', background:'#020c18' }}>{TYPE_SYMBOL[t]} {TYPE_LABEL[t]} {cnt}</span>;
+                return <span key={t} style={{ fontSize:10, padding:'1px 5px', border:'1px solid #0a1f2f', borderRadius:1, color:'#8aa3ba', background:'#020c18' }}>{TYPE_SYMBOL[t]} {TYPE_LABEL[t]} {cnt}</span>;
               })}
             </div>
           </div>
 
           {/* 영공 현황 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
               ▸ AIRSPACE STATUS
               {airspaceData?.summary?.closedFirs > 0 && (
-                <span className="wr-blink" style={{ fontSize:8, color:'#ef4444', fontWeight:700 }}>
+                <span className="wr-blink" style={{ fontSize:10, color:'#ef4444', fontWeight:700 }}>
                   ⛔ {airspaceData.summary.closedFirs}FIR 폐쇄
                 </span>
               )}
@@ -2151,9 +2151,9 @@ export function WarRoomView() {
                   return (
                     <div key={fir.id} title={`${fir.name}: ${fir.status}`}
                       style={{ padding:'2px 7px', border:`1px solid ${col}55`, borderRadius:2, background:`${col}08`, display:'flex', alignItems:'center', gap:4 }}>
-                      <span style={{ fontSize:9 }}>{icon}</span>
-                      <span style={{ fontSize:8, color:'#c0d8e8', letterSpacing:0.5 }}>{fir.id}</span>
-                      <span style={{ fontSize:8, color:col, fontWeight:700 }}>{fir.status}</span>
+                      <span style={{ fontSize:11 }}>{icon}</span>
+                      <span style={{ fontSize:10, color:'#c0d8e8', letterSpacing:0.5 }}>{fir.id}</span>
+                      <span style={{ fontSize:10, color:col, fontWeight:700 }}>{fir.status}</span>
                     </div>
                   );
                 })}
@@ -2165,9 +2165,9 @@ export function WarRoomView() {
                   return (
                     <div key={zone.name} style={{ padding:'2px 7px', border:`1px solid ${color}55`, borderRadius:2, background:`${color}08`, display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontSize:10 }}>{zone.flag}</span>
-                      <span style={{ fontSize:9, color:'#c0d8e8' }}>{zone.name}</span>
-                      <span style={{ fontSize:9 }}>{icon}</span>
-                      <span style={{ fontSize:9, color, fontWeight:700 }}>{status}</span>
+                      <span style={{ fontSize:11, color:'#c0d8e8' }}>{zone.name}</span>
+                      <span style={{ fontSize:11 }}>{icon}</span>
+                      <span style={{ fontSize:11, color, fontWeight:700 }}>{status}</span>
                     </div>
                   );
                 })}
@@ -2177,7 +2177,7 @@ export function WarRoomView() {
             {airspaceData?.restrictions?.slice(0, 3).map((r: any) => {
               const col = r.severity==='CLOSED'?'#ef4444':r.severity==='WARNING'?'#f97316':'#fbbf24';
               return (
-                <div key={r.id} style={{ display:'flex', alignItems:'center', gap:5, marginTop:3, fontSize:8, color:'#8aa3ba' }}>
+                <div key={r.id} style={{ display:'flex', alignItems:'center', gap:5, marginTop:3, fontSize:10, color:'#8aa3ba' }}>
                   <span style={{ color:col, fontWeight:700 }}>{r.severity}</span>
                   <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.name}</span>
                   <span style={{ color:'#2d5a7a', flexShrink:0 }}>{r.radius}km</span>
@@ -2191,7 +2191,7 @@ export function WarRoomView() {
                   const col = ap.status==='CLOSED'?'#ef4444':ap.status==='LIMITED'?'#f97316':'#22c55e';
                   return (
                     <div key={icao} title={`${ap.name}: ${ap.count}대 (착륙:${ap.landing} 출발:${ap.departing})`}
-                      style={{ padding:'1px 5px', border:`1px solid ${col}44`, borderRadius:2, fontSize:7.5, color:col, background:`${col}0a` }}>
+                      style={{ padding:'1px 5px', border:`1px solid ${col}44`, borderRadius:2, fontSize:11.5, color:col, background:`${col}0a` }}>
                       {icao} {ap.count > 0 ? `✈${ap.count}` : '⛔'}
                     </div>
                   );
@@ -2202,38 +2202,38 @@ export function WarRoomView() {
 
           {/* 군용기 감지 패널 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
               ▸ MILITARY AIRCRAFT
-              {milAircraft.length>0 && <span className="wr-blink" style={{ fontSize:9, color:'#facc15', fontWeight:700 }}>⚡ {milAircraft.length}기 탐지</span>}
-              {milAircraft.length===0 && <span style={{ fontSize:9, color:'#2d5a7a' }}>탐지 없음</span>}
+              {milAircraft.length>0 && <span className="wr-blink" style={{ fontSize:11, color:'#facc15', fontWeight:700 }}>⚡ {milAircraft.length}기 탐지</span>}
+              {milAircraft.length===0 && <span style={{ fontSize:11, color:'#2d5a7a' }}>탐지 없음</span>}
             </div>
             {milAircraft.length===0 ? (
-              <div style={{ fontSize:9, color:'#1e3a5f', fontStyle:'italic', textAlign:'center', padding:'4px 0' }}>— 군용기 신호 없음 —</div>
+              <div style={{ fontSize:11, color:'#1e3a5f', fontStyle:'italic', textAlign:'center', padding:'4px 0' }}>— 군용기 신호 없음 —</div>
             ) : milAircraft.slice(0,6).map((ac:any)=>(
               <div key={ac.icao24||ac.callsign} style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 0', borderBottom:'1px solid #0a1f2f' }}>
                 <span style={{ fontSize:10, color:'#facc15' }}>✦</span>
                 <span style={{ fontSize:10, fontWeight:700, color:'#fef08a' }}>{ac.callsign||'UNKNOWN'}</span>
-                <span style={{ fontSize:9, color:'#4a7a9b' }}>{ac.country||''}</span>
-                {ac.altitude && <span style={{ fontSize:9, color:'#2d5a7a', marginLeft:'auto' }}>{Math.round(ac.altitude)}m</span>}
+                <span style={{ fontSize:11, color:'#4a7a9b' }}>{ac.country||''}</span>
+                {ac.altitude && <span style={{ fontSize:11, color:'#2d5a7a', marginLeft:'auto' }}>{Math.round(ac.altitude)}m</span>}
               </div>
             ))}
           </div>
 
           {/* 기지 근접 화재 경보 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
               ▸ BASE STRIKE ALERTS
-              {baseAlerts.length>0 && <span className="wr-blink" style={{ fontSize:9, color:'#ef4444', fontWeight:700 }}>⚠ {baseAlerts.length}건</span>}
+              {baseAlerts.length>0 && <span className="wr-blink" style={{ fontSize:11, color:'#ef4444', fontWeight:700 }}>⚠ {baseAlerts.length}건</span>}
             </div>
             {baseAlerts.length===0 ? (
-              <div style={{ fontSize:9, color:'#1e3a5f', fontStyle:'italic', textAlign:'center', padding:'4px 0' }}>— 기지 근접 화재 없음 —</div>
+              <div style={{ fontSize:11, color:'#1e3a5f', fontStyle:'italic', textAlign:'center', padding:'4px 0' }}>— 기지 근접 화재 없음 —</div>
             ) : baseAlerts.map(alert=>{
               const color = BASE_COLOR[alert.type]??'#ef4444';
               return (
                 <div key={alert.name} style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', marginBottom:3, borderRadius:2, border:`1px solid ${color}44`, background:`${color}0a` }}>
                   <span style={{ fontSize:10 }}>{BASE_SYMBOL[alert.type]??'●'}</span>
                   <span style={{ fontSize:10, fontWeight:700, color }}>⚠ {alert.name}</span>
-                  <span style={{ fontSize:9, color:'#f97316', marginLeft:'auto' }}>🔥×{alert.fires}</span>
+                  <span style={{ fontSize:11, color:'#f97316', marginLeft:'auto' }}>🔥×{alert.fires}</span>
                 </div>
               );
             })}
@@ -2241,14 +2241,14 @@ export function WarRoomView() {
 
           {/* 위협 지점 바 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5 }}>▸ THREAT SITE INDEX</div>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:5 }}>▸ THREAT SITE INDEX</div>
             {siteScores.sort((a,b)=>b.score-a.score).slice(0,4).map(site=>{
               const color = site.score>70?'#ef4444':site.score>45?'#f97316':'#fbbf24';
               return (
                 <div key={site.name} style={{ marginBottom:4 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2 }}>
-                    <span style={{ fontSize:9, color:'#c0d8e8' }}>{site.name}</span>
-                    <span style={{ fontSize:9, color, fontWeight:700 }}>{site.score}</span>
+                    <span style={{ fontSize:11, color:'#c0d8e8' }}>{site.name}</span>
+                    <span style={{ fontSize:11, color, fontWeight:700 }}>{site.score}</span>
                   </div>
                   <div style={{ height:3, background:'#0a1f2f', borderRadius:1, overflow:'hidden' }}>
                     <div style={{ width:`${site.score}%`, height:'100%', background:color, boxShadow:`0 0 4px ${color}`, transition:'width 1.5s ease' }} />
@@ -2261,14 +2261,14 @@ export function WarRoomView() {
           {/* 타격 보고 */}
           {strikeReports.length > 0 && (
           <div style={{ padding:'6px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
               ▸ STRIKE REPORTS
-              <span style={{ fontSize:9, color:'#ef4444', fontWeight:700 }}>🎯 {strikeReports.length}</span>
+              <span style={{ fontSize:11, color:'#ef4444', fontWeight:700 }}>🎯 {strikeReports.length}</span>
               <button onClick={()=>{
                 if(window.confirm(`${strikeReports.length}개 타격 보고 전체 삭제?`)){
                   setStrikeReports([]); localStorage.removeItem('wr-strikes');
                 }
-              }} style={{ marginLeft:'auto', background:'none', border:'1px solid #1a3a4a', borderRadius:2, padding:'1px 6px', cursor:'pointer', fontSize:8, color:'#2d5a7a', fontFamily:"'Courier New',monospace" }}>초기화</button>
+              }} style={{ marginLeft:'auto', background:'none', border:'1px solid #1a3a4a', borderRadius:2, padding:'1px 6px', cursor:'pointer', fontSize:10, color:'#2d5a7a', fontFamily:"'Courier New',monospace" }}>초기화</button>
             </div>
             {strikeReports.slice(0,5).map(s => {
               const col = CONF_COLOR[s.confidence];
@@ -2276,23 +2276,23 @@ export function WarRoomView() {
                 <div key={s.id} style={{ display:'flex', alignItems:'flex-start', gap:5, padding:'3px 0', borderBottom:'1px solid #0a1f2f' }}>
                   <span style={{ fontSize:10, flexShrink:0 }}>🎯</span>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:col, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.title}</div>
-                    <div style={{ fontSize:8, color:'#4a7a9b' }}>{CONF_LABEL[s.confidence]} · {s.source}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:col, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.title}</div>
+                    <div style={{ fontSize:10, color:'#4a7a9b' }}>{CONF_LABEL[s.confidence]} · {s.source}</div>
                   </div>
                 </div>
               );
             })}
-            {strikeReports.length > 5 && <div style={{ fontSize:8, color:'#2d5a7a', textAlign:'center', marginTop:3 }}>+{strikeReports.length-5}개 더</div>}
+            {strikeReports.length > 5 && <div style={{ fontSize:10, color:'#2d5a7a', textAlign:'center', marginTop:3 }}>+{strikeReports.length-5}개 더</div>}
           </div>
           )}
 
           {/* 인텔 피드 */}
           <div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
             <div style={{ padding:'5px 12px', borderBottom:'1px solid #0a1f2f', display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2 }}>▸ INTEL FEED</span>
-              <span className="wr-blink" style={{ fontSize:9, color:'#ef4444', letterSpacing:1 }}>● LIVE</span>
-              <span style={{ marginLeft:'auto', fontSize:9, color:'#4a7a9b' }}>{filteredFeed.length}/{feed.length}</span>
-              {timeWindow < 13 && <span style={{ fontSize:8, color: timeWindow<=2?'#ef4444':timeWindow<=6?'#f97316':'#fbbf24', letterSpacing:1 }}>{timeWindow<=2?'CRITICAL':timeWindow<=6?'HIGH+':'MED+'}</span>}
+              <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2 }}>▸ INTEL FEED</span>
+              <span className="wr-blink" style={{ fontSize:11, color:'#ef4444', letterSpacing:1 }}>● LIVE</span>
+              <span style={{ marginLeft:'auto', fontSize:11, color:'#4a7a9b' }}>{filteredFeed.length}/{feed.length}</span>
+              {timeWindow < 13 && <span style={{ fontSize:10, color: timeWindow<=2?'#ef4444':timeWindow<=6?'#f97316':'#fbbf24', letterSpacing:1 }}>{timeWindow<=2?'CRITICAL':timeWindow<=6?'HIGH+':'MED+'}</span>}
             </div>
             <div ref={feedRef} style={{ flex:1, overflowY:'auto', padding:'0 2px' }}>
               {filteredFeed.length===0 && <div style={{ padding:20, textAlign:'center', color:'#4a7a9b', fontSize:11 }}>{loading?'인텔 수집 중...':'감지된 이벤트 없음'}</div>}
@@ -2303,11 +2303,11 @@ export function WarRoomView() {
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
                       <span style={{ fontSize:11 }}>{item.icon}</span>
                       <span style={{ fontSize:11, fontWeight:700, color:'#e2e8f0', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.title}</span>
-                      <span style={{ fontSize:9, color:'#4a7a9b', flexShrink:0 }}>{item.source}</span>
+                      <span style={{ fontSize:11, color:'#4a7a9b', flexShrink:0 }}>{item.source}</span>
                     </div>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <span style={{ fontSize:10, color:'#8aa3ba' }}>{item.region}</span>
-                      <span style={{ fontSize:9, color:sevColor, fontWeight:700 }}>{item.severity?.toUpperCase()}</span>
+                      <span style={{ fontSize:11, color:sevColor, fontWeight:700 }}>{item.severity?.toUpperCase()}</span>
                     </div>
                   </div>
                 );
@@ -2324,9 +2324,9 @@ export function WarRoomView() {
                 const stale = age !== null && age > 600;
                 return (
                   <div key={fi.key} style={{ display:'flex', alignItems:'center', gap:3 }}>
-                    <span className={fresh?'wr-blink':''} style={{ fontSize:7, color: stale?'#ef4444':fresh?'#22c55e':'#fbbf24' }}>●</span>
-                    <span style={{ fontSize:8, color:'#4a7a9b' }}>{fi.label}</span>
-                    {age!==null && <span style={{ fontSize:8, color: stale?'#ef4444':'#2d5a7a' }}>{age<60?`${age}s`:`${Math.floor(age/60)}m`}</span>}
+                    <span className={fresh?'wr-blink':''} style={{ fontSize:11, color: stale?'#ef4444':fresh?'#22c55e':'#fbbf24' }}>●</span>
+                    <span style={{ fontSize:10, color:'#4a7a9b' }}>{fi.label}</span>
+                    {age!==null && <span style={{ fontSize:10, color: stale?'#ef4444':'#2d5a7a' }}>{age<60?`${age}s`:`${Math.floor(age/60)}m`}</span>}
                   </div>
                 );
               })}

@@ -63,6 +63,8 @@ const FORCE_ASSETS: MilAsset[] = [
   { id:'ir-m3', name:'IRGC 미사일여단 / 파즈르', detail:'Zolfaghar (700km) · 사우디/UAE 타격권', lat:30.10, lng:57.05, type:'missile', side:'iran', strength:'lg', active:true },
   { id:'ir-m4', name:'IRGC 해안미사일', detail:'Noor ASM · 호르무즈 함정 봉쇄 전력', lat:27.10, lng:56.50, type:'missile', side:'iran', strength:'md', active:true },
   { id:'ir-m5', name:'미르사드 미사일 기지', detail:'지대공 + 지대지 복합 시스템', lat:35.82, lng:50.61, type:'missile', side:'iran', strength:'md', active:false },
+  { id:'ir-m6', name:'Fattah 극초음속 미사일', detail:'Mach 15+ · 이란 2023년 공개 · 현존 모든 방공망 돌파 주장 · 이스라엘 직타 가능', lat:35.65, lng:52.10, type:'missile', side:'iran', strength:'xl', active:true },
+  { id:'ir-m7', name:'Kheibar Shekan 중거리 미사일', detail:'2,000km 사거리 · 정밀유도 · 이스라엘 전역 타격 (2022년 공개)', lat:34.10, lng:49.40, type:'missile', side:'iran', strength:'lg', active:true },
 
   // ══ 이란 드론 전력 ══
   { id:'ir-d1', name:'IRGC 드론기지 / Shahed-136', detail:'자폭드론 · 가자쿠/카르만 생산기지 · 헤즈볼라/후티에 공급', lat:33.98, lng:51.55, type:'drone', side:'iran', strength:'xl', active:true },
@@ -103,8 +105,9 @@ const FORCE_ASSETS: MilAsset[] = [
   { id:'il-ad5', name:'Arrow-3 (체스)', detail:'대기권 밖 요격 · 이란 탄도미사일 대응', lat:32.10, lng:34.94, type:'airdef', side:'israel', strength:'xl', active:true },
 
   // ══ 미국 군사자산 ══
-  { id:'us-cv1', name:'USS Gerald R. Ford (CVN-78)', detail:'항모타격단 · F/A-18E/F 72기 · 동지중해 배치', lat:34.20, lng:31.50, type:'carrier', side:'us', strength:'xl', active:true },
-  { id:'us-cv2', name:'USS Harry S. Truman (CVN-75)', detail:'항모타격단 · 홍해/아라비아해 교대 전개', lat:15.00, lng:52.00, type:'carrier', side:'us', strength:'xl', active:true },
+  { id:'us-cv1', name:'USS Harry S. Truman (CVN-75)', detail:'항모타격단 · F/A-18E/F 72기 · 동지중해 배치 (2025 현재) · 이란 억지 역할', lat:34.80, lng:29.50, type:'carrier', side:'us', strength:'xl', active:true },
+  { id:'us-cv2', name:'B-2 Spirit (Diego Garcia)', detail:'스텔스 전략폭격기 · Whiteman AFB → Diego Garcia 전개 (2025 보도) · 이란 벙커버스터 임무 대기', lat:-7.31, lng:72.41, type:'bomber', side:'us', strength:'xl', active:true },
+  { id:'us-cv3', name:'USS Gerald R. Ford (CVN-78)', detail:'항모타격단 · 대서양/순환배치 (2024 귀환 후 재전개 중)', lat:36.95, lng:-76.35, type:'carrier', side:'us', strength:'xl', active:false },
   { id:'us-dd1', name:'USS Ross (DDG-71) 이지스 구축함', detail:'SM-3 탄도미사일 요격 · 동지중해', lat:33.50, lng:31.00, type:'navy', side:'us', strength:'lg', active:true },
   { id:'us-dd2', name:'USS Gravely (DDG-107)', detail:'SM-3 · 이란 미사일 요격 대기', lat:24.50, lng:56.80, type:'navy', side:'us', strength:'lg', active:true },
   { id:'us-b1', name:'B-52H 폭격기 / Diego Garcia', detail:'장거리 폭격 대기 · 벙커버스터 GBU-57 운용 가능', lat:-7.31, lng:72.42, type:'bomber', side:'us', strength:'lg', active:false },
@@ -293,7 +296,7 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
       map.setFilter('wr-forces-inactive-ring', ['all', ['==', ['get','active'], false], sf]);
       map.setFilter('wr-forces-glow',          ['all', ['==', ['get','active'], true],  sf]);
       map.setFilter('wr-forces-fill',          ['all', ['==', ['get','active'], true],  sf]);
-      map.setFilter('wr-forces-symbol', sf);
+      map.setFilter('wr-forces-icon',   sf);
       map.setFilter('wr-forces-label',  sf);
     } catch {}
   }, [hiddenSides]);
@@ -654,10 +657,18 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
           filter: ['==', ['get','active'], true],
           paint: { 'circle-radius': ['get','radius'], 'circle-color': ['get','color'], 'circle-opacity': ['get','opacity'], 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff', 'circle-stroke-opacity': 0.6 },
         });
-        // 심볼 텍스트 (TYPE_SYMBOL)
-        map.addLayer({ id: 'wr-forces-symbol', type: 'symbol', source: 'wr-forces',
-          layout: { 'text-field': ['get','symbol'], 'text-size': ['case', ['==',['get','active'],true], 11, 9], 'text-anchor': 'center', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-allow-overlap': true },
-          paint: { 'text-color': '#ffffff', 'text-opacity': ['get','opacity'], 'text-halo-color': '#000000', 'text-halo-width': 0.5 },
+        // SDF 아이콘 등록 (타입별 실루엣)
+        (['missile','drone','navy','ground','airdef','carrier','bomber','special','proxy_rocket','proxy_ground'] as ForceType[]).forEach(t => {
+          map.addImage(`force-icon-${t}`, makeSdfIcon(t, 24), { sdf: true } as any);
+        });
+        // SDF 아이콘 레이어 (진영색 자동 적용)
+        map.addLayer({ id: 'wr-forces-icon', type: 'symbol', source: 'wr-forces',
+          layout: {
+            'icon-image': ['concat', 'force-icon-', ['get','type']],
+            'icon-size': ['case',['==',['get','strength'],'xl'],1.35,['==',['get','strength'],'lg'],1.05,['==',['get','strength'],'md'],0.82,0.62],
+            'icon-allow-overlap': true, 'icon-rotation-alignment': 'map',
+          } as any,
+          paint: { 'icon-color': ['get','color'], 'icon-opacity': ['get','opacity'], 'icon-halo-color': '#000000', 'icon-halo-width': 0.8 } as any,
         });
         // 부대명 레이블 (호버/줌 시)
         map.addLayer({ id: 'wr-forces-label', type: 'symbol', source: 'wr-forces',
@@ -843,6 +854,71 @@ function TensionChart({ data, gdeltPoints }: { data: TensionPoint[]; gdeltPoints
       <text x={12} y={H-2} fontSize={7} fill="#2d5a7a" fontFamily="monospace">{useGdelt?'GDELT TONE':'LOCAL THREAT'}</text>
     </svg>
   );
+}
+
+/* ══════════════════════════════════════════════════════
+   SDF MILITARY ICON GENERATOR — 실루엣 아이콘 (24×24 canvas)
+   흰색으로 그려 MapLibre SDF color 적용
+══════════════════════════════════════════════════════ */
+function makeSdfIcon(type: ForceType, size = 24): { width: number; height: number; data: Uint8Array } {
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+  const s = size, cx = s / 2, cy = s / 2;
+  switch (type) {
+    case 'missile': {
+      ctx.beginPath(); ctx.moveTo(cx,1); ctx.lineTo(cx+3,s-5); ctx.lineTo(cx-3,s-5); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx-3,s*0.55); ctx.lineTo(cx-8,s-4); ctx.lineTo(cx-3,s-5); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx+3,s*0.55); ctx.lineTo(cx+8,s-4); ctx.lineTo(cx+3,s-5); ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'drone': {
+      ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(s-2,s-3); ctx.lineTo(cx+2,s-6); ctx.lineTo(cx,s-3); ctx.lineTo(cx-2,s-6); ctx.lineTo(2,s-3); ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'navy': {
+      ctx.beginPath(); ctx.ellipse(cx, cy+2, s*0.44, s*0.18, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillRect(cx-3, cy-5, 6, 6); ctx.fillRect(cx+2, cy-7, 2, 4);
+      break;
+    }
+    case 'ground': {
+      ctx.fillRect(3, cy-3, s-6, 6); ctx.fillRect(cx-4, cy-5, 8, 4); ctx.fillRect(cx-1, 2, 2, cy-3);
+      break;
+    }
+    case 'airdef': {
+      ctx.beginPath(); ctx.arc(cx, cy+3, s*0.32, Math.PI, 0); ctx.lineWidth=2; ctx.stroke();
+      ctx.fillRect(cx-1, cy-8, 2, 12); ctx.fillRect(cx-5, cy+2, 10, 2);
+      break;
+    }
+    case 'carrier': {
+      ctx.fillRect(2, cy-2, s-4, 5); ctx.fillRect(cx+2, cy-6, 4, 6); ctx.fillRect(cx-10, cy-4, 2, 4);
+      break;
+    }
+    case 'bomber': {
+      ctx.beginPath(); ctx.moveTo(cx,cy-1); ctx.lineTo(s-1,s-3); ctx.lineTo(cx+3,cy+3); ctx.lineTo(cx-3,cy+3); ctx.lineTo(1,s-3); ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'special': {
+      for (let i=0; i<5; i++) {
+        const a=(i*4*Math.PI/5)-Math.PI/2, a2=((i*4+2)*Math.PI/5)-Math.PI/2;
+        if(i===0){ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*s*0.44,cy+Math.sin(a)*s*0.44);}else{ctx.lineTo(cx+Math.cos(a)*s*0.44,cy+Math.sin(a)*s*0.44);}
+        ctx.lineTo(cx+Math.cos(a2)*s*0.18,cy+Math.sin(a2)*s*0.18);
+      }
+      ctx.closePath(); ctx.fill(); break;
+    }
+    case 'proxy_rocket': {
+      ctx.beginPath(); ctx.moveTo(cx,1); ctx.lineTo(cx+4,8); ctx.lineTo(cx+2,8); ctx.lineTo(cx+2,s-4); ctx.lineTo(cx-2,s-4); ctx.lineTo(cx-2,8); ctx.lineTo(cx-4,8); ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'proxy_ground': default: {
+      ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(s-3,cy); ctx.lineTo(cx,s-2); ctx.lineTo(3,cy); ctx.closePath(); ctx.fill();
+      break;
+    }
+  }
+  const d = ctx.getImageData(0,0,size,size);
+  return { width:size, height:size, data: new Uint8Array(d.data.buffer) };
 }
 
 /* ══════════════════════════════════════════════════════

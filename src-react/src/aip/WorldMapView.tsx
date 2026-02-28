@@ -825,6 +825,7 @@ interface LayerState {
   earthquakes: boolean;
   gdacs: boolean;
   firms: boolean;
+  opensky: boolean;
 }
 
 // ─── 북한 도발 이력 ───────────────────────────────────────────────────────────
@@ -1242,6 +1243,18 @@ function LayerControl({
           }}
         >
           🔥
+        </button>
+        <button
+          onClick={() => onToggle('opensky' as keyof LayerState)}
+          title="OpenSky 실시간 민항기 — 영공 폐쇄 시 비행기 사라짐 = 분쟁 신호"
+          style={{
+            background: layers.opensky ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${layers.opensky ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`,
+            color: layers.opensky ? '#93c5fd' : '#94a3b8',
+            borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          ✈️
         </button>
       </div>
       {layers.convergence && convergenceCount > 0 && (
@@ -1704,6 +1717,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
     earthquakes: false,
     gdacs: false,
     firms: false,
+    opensky: false,
   });
 
   // NK 도발 선택 상태
@@ -1781,6 +1795,41 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
       .catch(e => { setFirmsError(e?.message ?? '연결 실패'); setFirmsLoaded(true); })
       .finally(() => setFirmsLoading(false));
   }, [layers.firms]);
+
+  // OpenSky 실시간 민항기 (5분 자동갱신)
+  const [openskyCraft, setOpenskyCraft] = useState<any[]>([]);
+  const [openskyLoaded, setOpenskyLoaded] = useState(false);
+  const [openskyLoading, setOpenskyLoading] = useState(false);
+  const [openskyError, setOpenskyError] = useState<string | null>(null);
+  const [openskyFetchedAt, setOpenskyFetchedAt] = useState<string | null>(null);
+  const openskyFetch = () => {
+    setOpenskyLoading(true);
+    apiFetch<{ aircraft: any[]; fetchedAt?: string; error?: string }>('/api/opensky-aircraft')
+      .then(data => {
+        setOpenskyCraft(data?.aircraft ?? []);
+        setOpenskyLoaded(true);
+        if (data?.fetchedAt) setOpenskyFetchedAt(data.fetchedAt);
+        if (data?.error) setOpenskyError(data.error);
+      })
+      .catch(e => { setOpenskyError(e?.message ?? '연결 실패'); setOpenskyLoaded(true); })
+      .finally(() => setOpenskyLoading(false));
+  };
+  useEffect(() => {
+    if (!layers.opensky) return;
+    if (!openskyLoaded) openskyFetch();
+    const interval = setInterval(openskyFetch, 5 * 60_000);
+    return () => clearInterval(interval);
+  }, [layers.opensky]);
+
+  // 분쟁 이벤트 틱커용 — GDELT + GDACS 합산
+  const tickerEvents = useMemo(() => {
+    const items = [
+      ...acledEvents.filter(e => e.isRecent).map(e => ({ text: `⚔️ ${e.titleKo}`, key: e.id })),
+      ...gdacsEvents.filter(e => e.severity === 'critical' || e.severity === 'high').map(e => ({ text: `🚨 ${e.titleKo}`, key: e.id })),
+      ...quakeEvents.filter(e => e.isSuspect).map(e => ({ text: `🌋 ${e.titleKo}`, key: e.id })),
+    ];
+    return items.slice(0, 20);
+  }, [acledEvents, gdacsEvents, quakeEvents]);
 
   // 뉴스 기반 지리 이벤트
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
@@ -1936,6 +1985,24 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
 
   return (
     <div className="relative w-full h-full">
+      {/* ── CSS 애니메이션 ── */}
+      <style>{`
+        @keyframes conflict-pulse {
+          0%   { opacity: 1; stroke-width: 2; }
+          50%  { opacity: 0.3; stroke-width: 8; }
+          100% { opacity: 1; stroke-width: 2; }
+        }
+        @keyframes ticker-scroll {
+          0%   { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        @keyframes live-blink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.3; }
+        }
+        .gdelt-recent path { animation: conflict-pulse 2.2s ease-in-out infinite; }
+        .live-dot { animation: live-blink 1.5s ease-in-out infinite; }
+      `}</style>
       {/* ── Breaking News Ticker ── */}
       {breakingEvents.length > 0 && (
         <div style={{
@@ -2389,7 +2456,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
                   pathOptions={{ color, fillColor: color, fillOpacity: 0.12, weight: 1, opacity: 0.5, dashArray: '3 3' }} />
               )}
               <CircleMarker center={[ev.lat, ev.lng]} radius={radius}
-                pathOptions={{ color, fillColor: color, fillOpacity: ev.isRecent ? 0.95 : 0.7, weight: ev.isRecent ? 2 : 1.5 }}>
+                pathOptions={{ color, fillColor: color, fillOpacity: ev.isRecent ? 0.95 : 0.7, weight: ev.isRecent ? 2 : 1.5, className: ev.isRecent ? 'gdelt-recent' : '' }}>
                 <Tooltip direction="top" offset={[0, -radius - 4]} opacity={1}>
                   <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: 8, border: `1px solid ${color}55`, fontFamily: 'system-ui', maxWidth: 240 }}>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
@@ -2501,6 +2568,34 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
                 </div>
               </Tooltip>
             </CircleMarker>
+          );
+        })}
+
+        {/* ── OpenSky 실시간 민항기 레이어 ── */}
+        {layers.opensky && (openskyLoading && !openskyLoaded) && (
+          <div style={{ position: 'absolute', top: 170, left: '50%', transform: 'translateX(-50%)', zIndex: 1001,
+            background: 'rgba(10,15,30,0.9)', border: '1px solid #334155',
+            borderRadius: 6, padding: '6px 14px', fontSize: 11, color: '#93c5fd', pointerEvents: 'none' }}>
+            ✈️ OpenSky 항공기 데이터 로딩...
+          </div>
+        )}
+        {layers.opensky && openskyCraft.map((ac: any) => {
+          const icon = L.divIcon({
+            html: `<div style="transform:rotate(${ac.heading}deg);font-size:14px;line-height:1;filter:drop-shadow(0 0 2px rgba(0,100,255,0.8))">✈</div>`,
+            className: '',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          });
+          return (
+            <Marker key={`os-${ac.icao24}`} position={[ac.lat, ac.lng]} icon={icon}>
+              <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '6px 10px', borderRadius: 8, border: '1px solid #3b82f655', fontFamily: 'system-ui', maxWidth: 200 }}>
+                  <div style={{ fontWeight: 700, fontSize: 11 }}>{ac.callsign || ac.icao24}</div>
+                  <div style={{ fontSize: 10, color: '#93c5fd', marginTop: 2 }}>{ac.country} · {ac.zone}</div>
+                  {ac.altitude && <div style={{ fontSize: 10, color: '#94a3b8' }}>고도 {Math.round(ac.altitude / 100) / 10}km · {ac.speed}km/h</div>}
+                </div>
+              </Tooltip>
+            </Marker>
           );
         })}
 
@@ -2666,6 +2761,56 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
           );
         })}
       </MapContainer>
+
+      {/* ── 분쟁 이벤트 하단 틱커 (전황 자막) ── */}
+      {tickerEvents.length > 0 && (
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 1000,
+          background: 'rgba(10,15,30,0.92)', borderTop: '1px solid rgba(239,68,68,0.4)',
+          display: 'flex', alignItems: 'center', height: 30, overflow: 'hidden',
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            flexShrink: 0, background: '#dc2626', color: 'white',
+            padding: '0 10px', height: '100%', display: 'flex', alignItems: 'center',
+            fontSize: 10, fontWeight: 900, letterSpacing: 1, gap: 6,
+          }}>
+            <span className="live-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+            LIVE
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+            <div style={{
+              display: 'flex', gap: 40, alignItems: 'center',
+              animation: 'ticker-scroll 35s linear infinite',
+              whiteSpace: 'nowrap',
+            }}>
+              {[...tickerEvents, ...tickerEvents].map((item, i) => (
+                <span key={`${item.key}-${i}`} style={{ fontSize: 11, color: '#e2e8f0', flexShrink: 0 }}>
+                  {item.text}
+                </span>
+              ))}
+            </div>
+          </div>
+          {layers.acled && openskyFetchedAt && (
+            <div style={{ flexShrink: 0, padding: '0 10px', fontSize: 9, color: '#475569' }}>
+              {new Date(openskyFetchedAt).toLocaleTimeString('ko-KR')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── OpenSky LIVE 카운터 배지 ── */}
+      {layers.opensky && openskyLoaded && (
+        <div style={{
+          position: 'absolute', bottom: tickerEvents.length > 0 ? 36 : 8, right: 10, zIndex: 1000,
+          background: 'rgba(10,15,30,0.88)', border: '1px solid #3b82f655',
+          borderRadius: 6, padding: '4px 10px', fontSize: 10, color: '#93c5fd',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <span className="live-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#3b82f6' }} />
+          ✈️ {openskyCraft.length}기 추적 중
+        </div>
+      )}
 
       {/* ── 반도체 공급망 X-ray 패널 ── */}
       {layers.semiconductor && selectedSemiNodeId && (() => {

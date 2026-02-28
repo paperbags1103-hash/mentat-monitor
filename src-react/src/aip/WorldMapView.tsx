@@ -1194,7 +1194,7 @@ function LayerControl({
         </button>
         <button
           onClick={() => onToggle('acled' as keyof LayerState)}
-          title="ACLED 무력충돌 (30일)"
+          title="GDELT 분쟁이벤트 (실시간)"
           style={{
             background: layers.acled ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.05)',
             border: `1px solid ${layers.acled ? '#dc2626' : 'rgba(255,255,255,0.1)'}`,
@@ -2281,13 +2281,13 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
             border: `1px solid ${acledError ? '#ef4444' : '#334155'}`,
             borderRadius: 6, padding: '6px 14px', fontSize: 11, color: acledError ? '#fca5a5' : '#94a3b8',
             pointerEvents: 'none' }}>
-            {acledLoading ? '⚔️ ACLED 데이터 로딩 중...' :
-             acledError ? `⚠️ ACLED 오류: ${acledError}` :
-             '⚔️ ACLED: 해당 기간 이벤트 없음'}
+            {acledLoading ? '⚔️ GDELT 데이터 로딩 중...' :
+             acledError ? `⚠️ GDELT 오류: ${acledError}` :
+             '⚔️ GDELT: 이벤트 없음'}
           </div>
         )}
 
-        {/* ── ACLED 무력충돌 레이어 ── */}
+        {/* ── GDELT 분쟁이벤트 레이어 ── */}
         {layers.acled && acledEvents.map((ev: any) => {
           const SEV_COLOR: Record<string, string> = { critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#65a30d' };
           const color = SEV_COLOR[ev.severity] ?? '#94a3b8';
@@ -2304,7 +2304,7 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
                   <div style={{ fontSize: 11, color, fontWeight: 600, marginBottom: 3 }}>{ev.eventType}</div>
                   {ev.actors && <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 3 }}>{ev.actors}</div>}
                   {ev.fatalities > 0 && <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>사망 {ev.fatalities}명</div>}
-                  <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>{ev.date} · ACLED</div>
+                  <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>{ev.date} · {ev.source || 'GDELT'}</div>
                   {ev.notes && <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, lineHeight: 1.4 }}>{ev.notes.slice(0, 100)}{ev.notes.length > 100 ? '...' : ''}</div>}
                 </div>
               </Tooltip>

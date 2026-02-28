@@ -28,8 +28,9 @@ import { useLayoutStore } from '@/store';
 import { PortfolioPanel } from '@/panels/PortfolioPanel';
 import WatchlistPanelWrapper from '@/panels/WatchlistPanelWrapper';
 import AutoBriefingPanel from '@/panels/AutoBriefingPanel';
+import { WarRoomView } from './WarRoomView';
 
-export type MainViewType = 'map' | 'heatmap' | 'charts' | 'grid' | 'portfolio';
+export type MainViewType = 'map' | 'heatmap' | 'charts' | 'grid' | 'portfolio' | 'warroom';
 
 const RISK_COLOR: Record<string, string> = {
   '안정': 'text-risk-safe', '주의': 'text-risk-watch',
@@ -147,6 +148,7 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
             {mainView === 'charts'    && <ChartView />}
             {mainView === 'portfolio' && <PortfolioPanel />}
             {mainView === 'grid'      && <PanelGrid />}
+            {mainView === 'warroom'   && <WarRoomView />}
           </div>
 
           {/* Bottom strip */}

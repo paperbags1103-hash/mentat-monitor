@@ -135,14 +135,36 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
           layers: [{ id: 'carto-tiles', type: 'raster', source: 'carto' }],
         },
         center: [47, 32.5],
-        zoom: 4.5,
-        pitch: 55,
-        bearing: -18,
+        zoom: 4.8,
+        pitch: 62,
+        bearing: -20,
       });
 
       map.on('load', () => {
         if (cancelled) return;
         const { columns, fires, conflicts, seismic, acft } = buildGeoJSON();
+
+        /* ── 3D 지형 (DEM) ────────────────────────────────────────── */
+        map.addSource('terrain-dem', {
+          type: 'raster-dem',
+          tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          maxzoom: 14,
+          encoding: 'terrarium',
+        });
+        map.setTerrain({ source: 'terrain-dem', exaggeration: 2.2 });
+
+        /* 하늘 레이어 (군사 분위기 — 어두운 대기) */
+        map.addLayer({
+          id: 'wr-sky', type: 'sky',
+          paint: {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0, 45],
+            'sky-atmosphere-sun-intensity': 5,
+            'sky-atmosphere-color': 'rgba(0, 8, 30, 1)',
+            'sky-atmosphere-halo-color': 'rgba(0, 50, 100, 0.5)',
+          },
+        } as any);
 
         /* 3D 위협 기둥 */
         map.addSource('wr-columns', { type: 'geojson', data: columns });

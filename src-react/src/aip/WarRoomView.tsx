@@ -1542,6 +1542,7 @@ export function WarRoomView() {
   const [iranRial,     setIranRial]     = useState<any>(null);
   const [airspaceData, setAirspaceData] = useState<any>(null);
   const [adsbAirports, setAdsbAirports] = useState<Record<string,any>>({});
+  const [cryptoNews,   setCryptoNews]   = useState<any>(null);
   const [strikeReports,setStrikeReports]= useState<StrikeReport[]>(() => {
     try { return JSON.parse(localStorage.getItem('wr-strikes') ?? '[]'); } catch { return []; }
   });
@@ -1654,6 +1655,12 @@ export function WarRoomView() {
       try {
         const airRes = await apiFetch<any>('/api/airspace');
         if (airRes?.restrictions) setAirspaceData(airRes);
+      } catch {}
+
+      /* CryptoPanic 크립토 감성 뉴스 */
+      try {
+        const cpRes = await apiFetch<any>('/api/crypto-news');
+        if (cpRes && !cpRes.mock) setCryptoNews(cpRes);
       } catch {}
 
       /* 실시간 뉴스 (Reuters/AJ/BBC RSS) */
@@ -1885,6 +1892,15 @@ export function WarRoomView() {
                 {iranRial.change7d > 0 ? '▲' : '▼'}{Math.abs(iranRial.change7d).toFixed(1)}%
               </span>
               {iranRial.alert === 'CRITICAL' && <span className="wr-blink" style={{ fontSize:11, color:'#ef4444', fontWeight:900 }}>!</span>}
+            </div>
+          )}
+          {cryptoNews?.fearScore != null && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${cryptoNews.fearScore > 60 ? '#ef444455' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
+              <span style={{ fontSize:11, color:'#4a7a9b', letterSpacing:1 }}>CRYPTO</span>
+              <span style={{ fontSize:11, fontWeight:700, color: cryptoNews.fearScore > 60 ? '#ef4444' : cryptoNews.fearScore > 40 ? '#f97316' : '#22c55e' }}>
+                {cryptoNews.fearScore > 60 ? '공포' : cryptoNews.fearScore > 40 ? '중립' : '탐욕'}
+              </span>
+              {cryptoNews.geoRelevant > 0 && <span style={{ fontSize:11, color:'#a855f7' }}>⚡{cryptoNews.geoRelevant}</span>}
             </div>
           )}
         </div>
@@ -2283,6 +2299,30 @@ export function WarRoomView() {
               );
             })}
             {strikeReports.length > 5 && <div style={{ fontSize:10, color:'#2d5a7a', textAlign:'center', marginTop:3 }}>+{strikeReports.length-5}개 더</div>}
+          </div>
+          )}
+
+          {/* 크립토 감성 뉴스 */}
+          {cryptoNews?.posts?.length > 0 && (
+          <div style={{ padding:'6px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0, maxHeight:120, overflowY:'auto' }}>
+            <div style={{ fontSize:11, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+              ▸ CRYPTO SIGNAL
+              {cryptoNews.fearScore != null && (
+                <span style={{ fontSize:11, fontWeight:700, color: cryptoNews.fearScore > 60 ? '#ef4444' : cryptoNews.fearScore > 40 ? '#f97316' : '#22c55e' }}>
+                  공포 {cryptoNews.fearScore}
+                </span>
+              )}
+            </div>
+            {cryptoNews.posts.filter((p: any) => p.geoRelevant).slice(0, 4).map((p: any) => (
+              <a key={p.id} href={p.url} target="_blank" rel="noopener"
+                style={{ display:'block', marginBottom:4, fontSize:11, color: p.sentiment==='bearish'?'#f87171':p.sentiment==='bullish'?'#4ade80':'#94a3b8', textDecoration:'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.3 }}
+                title={p.title}>
+                {p.sentiment==='bearish'?'📉':p.sentiment==='bullish'?'📈':'📊'} {p.title}
+              </a>
+            ))}
+            {cryptoNews.posts.filter((p: any) => p.geoRelevant).length === 0 && (
+              <div style={{ fontSize:11, color:'#2d5a7a', fontStyle:'italic' }}>— 지정학 관련 크립토 뉴스 없음 —</div>
+            )}
           </div>
           )}
 

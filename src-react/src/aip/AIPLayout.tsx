@@ -155,8 +155,8 @@ export function AIPLayout({ onSwitchToGrid }: Props) {
           <BottomStrip />
         </div>
 
-        {/* Right panel — Briefing / Watchlist / Live News */}
-        <div className="w-72 shrink-0 min-h-0 overflow-hidden flex flex-col">
+        {/* Right panel — Briefing / Watchlist / Live News (워룸에서는 숨김) */}
+        <div className={`w-72 shrink-0 min-h-0 overflow-hidden flex flex-col${mainView === 'warroom' ? ' hidden' : ''}`}>
           {/* Auto Briefing — top (biggest section) */}
           <div className="h-[50%] min-h-0 overflow-hidden border-b border-border bg-appbase flex flex-col">
             <div className="h-8 shrink-0 flex items-center px-3 text-xs font-semibold text-accent border-b border-border">

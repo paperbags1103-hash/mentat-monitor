@@ -3,7 +3,7 @@
  * Reuters, Al Jazeera, BBC RSS 피드 파싱
  * 60초 캐시
  */
-export const config = { runtime: 'nodejs18.x' };
+export const config = { runtime: 'nodejs' };
 
 let cache = null;
 let cacheTime = 0;

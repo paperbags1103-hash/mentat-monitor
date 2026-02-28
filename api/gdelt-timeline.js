@@ -3,7 +3,7 @@
  * 음수 tone = 더 적대적 / 양수 = 우호적
  * 5분 캐시
  */
-export const config = { runtime: 'nodejs18.x' };
+export const config = { runtime: 'nodejs' };
 
 let cache = null;
 let cacheTime = 0;

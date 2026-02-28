@@ -256,6 +256,25 @@ const LIVE_STREAMS = [
   { id:'wion',         nameKo:'WION 인도',           emoji:'📡', lat:28.61, lng:77.23, url:'https://www.youtube.com/@wion/live',             flag:'🇮🇳' },
 ];
 
+/* ── 타격 보고 인터페이스 ──────────────────────────────────────────── */
+interface StrikeReport {
+  id:         string;
+  lat:        number;
+  lng:        number;
+  title:      string;
+  source:     string;
+  confidence: 'confirmed' | 'probable' | 'unconfirmed';
+  timestamp:  string;
+  desc:       string;
+  url?:       string;
+}
+const CONF_COLOR: Record<string,string> = {
+  confirmed: '#ef4444', probable: '#f97316', unconfirmed: '#fbbf24',
+};
+const CONF_LABEL: Record<string,string> = {
+  confirmed: '확인됨', probable: '개연성', unconfirmed: '미확인',
+};
+
 /* ── 군용기 Callsign 패턴 ──────────────────────────────────────────── */
 const MIL_PREFIXES = ['RCH','FORTE','DUKE','DRAGN','JAKE','MOOSE','AZAZ','MYTCH','GRZLY','TOPSY','VIPER','GHOST','EAGLE','COBRA','HAVOC','FURY','RAVEN','REAPER','UAV','ISR','NATO','USAF','IDF'];
 const isMilitary = (cs: string) => cs && MIL_PREFIXES.some(p => cs.toUpperCase().startsWith(p));
@@ -297,9 +316,11 @@ interface Map3DProps {
   theater: TheaterKey;
   newsActiveIds: string[];
   airspaceRestrictions?: Array<{id:string;name:string;lat:number;lng:number;radius:number;severity:string;desc:string}>;
+  strikeReports?: StrikeReport[];
+  onMapRightClick?: (lat: number, lng: number) => void;
 }
 
-function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, imgItems, theater, newsActiveIds, airspaceRestrictions = [] }: Map3DProps) {
+function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, imgItems, theater, newsActiveIds, airspaceRestrictions = [], strikeReports = [], onMapRightClick }: Map3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const rafRef       = useRef<number>(0);
@@ -374,6 +395,26 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
     };
     try { (map.getSource('wr-airspace') as any).setData(gj); } catch {}
   }, [airspaceRestrictions]);
+
+  /* 타격 보고 레이어 업데이트 */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getSource('wr-strikes')) return;
+    const gj = {
+      type: 'FeatureCollection' as const,
+      features: strikeReports.map(s => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+        properties: {
+          id: s.id, title: s.title, source: s.source, confidence: s.confidence,
+          timestamp: s.timestamp, desc: s.desc, url: s.url ?? '',
+          color: CONF_COLOR[s.confidence] ?? '#fbbf24',
+          label: CONF_LABEL[s.confidence] ?? '?',
+        },
+      })),
+    };
+    try { (map.getSource('wr-strikes') as any).setData(gj); } catch {}
+  }, [strikeReports]);
 
   /* 뉴스 이미지 마커 업데이트 */
   useEffect(() => {
@@ -837,6 +878,65 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
         map.on('mouseenter','wr-streams-dot',()=>{ map.getCanvas().style.cursor='pointer'; });
         map.on('mouseleave','wr-streams-dot',()=>{ map.getCanvas().style.cursor=''; });
 
+        /* ── 타격 보고 레이어 🎯 ── */
+        map.addSource('wr-strikes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        // 외부 글로우
+        map.addLayer({ id: 'wr-strikes-glow', type: 'circle', source: 'wr-strikes',
+          paint: { 'circle-radius': 22, 'circle-color': ['get','color'], 'circle-opacity': 0.12, 'circle-blur': 1.5 },
+        });
+        // 크로스헤어 inner
+        map.addLayer({ id: 'wr-strikes-ring', type: 'circle', source: 'wr-strikes',
+          paint: { 'circle-radius': 11, 'circle-color': 'transparent',
+            'circle-stroke-width': 2, 'circle-stroke-color': ['get','color'], 'circle-stroke-opacity': 0.85 },
+        });
+        map.addLayer({ id: 'wr-strikes-dot', type: 'circle', source: 'wr-strikes',
+          paint: { 'circle-radius': 4, 'circle-color': ['get','color'], 'circle-opacity': 1 },
+        });
+        // 🎯 이모지 + 라벨
+        map.addLayer({ id: 'wr-strikes-icon', type: 'symbol', source: 'wr-strikes',
+          layout: { 'text-field': '🎯', 'text-size': 14, 'text-offset': [0,-1.4], 'text-allow-overlap': true,
+            'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']] },
+          paint: { 'text-opacity': 1 },
+        });
+        map.addLayer({ id: 'wr-strikes-label', type: 'symbol', source: 'wr-strikes',
+          minzoom: 7,
+          layout: { 'text-field': ['get','title'], 'text-size': 8.5, 'text-offset': [0, 1.8], 'text-anchor': 'top',
+            'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-max-width': 14, 'text-optional': true },
+          paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 2 },
+        });
+        // 클릭 팝업
+        map.on('click', 'wr-strikes-dot', (e: any) => {
+          const p = e.features?.[0]?.properties;
+          if (!p) return;
+          const tStr = p.timestamp ? new Date(p.timestamp).toLocaleString('ko-KR', { timeZone:'Asia/Seoul' }) : '';
+          new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div style="background:#000810;color:#e2e8f0;padding:10px 14px;font-family:monospace;border:1px solid ${p.color}55;border-radius:2px">
+                <div style="display:flex;align-items:center;gap:6;margin-bottom:6px">
+                  <span style="font-size:18px">🎯</span>
+                  <div style="flex:1">
+                    <div style="font-size:12px;font-weight:900;color:${p.color}">${p.title}</div>
+                    <div style="font-size:9px;color:#4a7a9b;letter-spacing:1px">${p.label} · ${p.source}</div>
+                  </div>
+                </div>
+                ${p.desc ? `<div style="font-size:10px;color:#8aa3ba;line-height:1.5;margin-bottom:6px">${p.desc}</div>` : ''}
+                <div style="font-size:8px;color:#2d5a7a">${tStr}</div>
+                ${p.url ? `<a href="${p.url}" target="_blank" rel="noopener" style="display:block;margin-top:5px;font-size:9px;color:#60a5fa;letter-spacing:1px">소스 링크 →</a>` : ''}
+              </div>`)
+            .addTo(map);
+        });
+        map.on('mouseenter','wr-strikes-dot',()=>{ map.getCanvas().style.cursor='crosshair'; });
+        map.on('mouseleave','wr-strikes-dot',()=>{ map.getCanvas().style.cursor=''; });
+
+        /* ── 우클릭 → 타격 보고 ── */
+        map.on('contextmenu', (e: any) => {
+          if (onMapRightClick) {
+            e.preventDefault?.();
+            onMapRightClick(e.lngLat.lat, e.lngLat.lng);
+          }
+        });
+
         /* ── 영공 제한 구역 circles (초기 로드 시 비어있으면 로드 후 업데이트) ── */
         map.addSource('wr-airspace', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id: 'wr-airspace-fill', type: 'fill', source: 'wr-airspace',
@@ -1245,6 +1345,99 @@ function airspaceStatus(aircraft: any[], zone: typeof AIRSPACE_ZONES[0]) {
 }
 
 /* ══════════════════════════════════════════════════════
+   STRIKE REPORT MODAL
+══════════════════════════════════════════════════════ */
+function StrikeModal({ lat, lng, onSave, onClose }: { lat:number; lng:number; onSave:(r:StrikeReport)=>void; onClose:()=>void }) {
+  const [title,      setTitle]      = React.useState('');
+  const [source,     setSource]     = React.useState('');
+  const [confidence, setConfidence] = React.useState<StrikeReport['confidence']>('unconfirmed');
+  const [desc,       setDesc]       = React.useState('');
+  const [url,        setUrl]        = React.useState('');
+
+  const inputStyle: React.CSSProperties = {
+    background: '#020c18', border: '1px solid #0a3050', borderRadius: 2, padding: '4px 8px',
+    color: '#c0d8e8', fontSize: 10, fontFamily: "'Courier New', monospace", width: '100%',
+    outline: 'none', boxSizing: 'border-box',
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: 8, color: '#4a7a9b', letterSpacing: 1, marginBottom: 2, display: 'block',
+  };
+
+  const save = () => {
+    if (!title.trim()) return;
+    onSave({
+      id: `strike-${Date.now()}`, lat, lng,
+      title: title.trim(), source: source.trim() || 'UNKNOWN',
+      confidence, desc: desc.trim(), url: url.trim(),
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', zIndex: 3000, inset: 0,
+      background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: '#000d1a', border: '1px solid #ef444488', borderRadius: 4,
+        padding: '16px 20px', width: 340, fontFamily: "'Courier New', monospace",
+        boxShadow: '0 0 40px rgba(239,68,68,0.15)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 18 }}>🎯</span>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 900, color: '#ef4444', letterSpacing: 2 }}>STRIKE REPORT</div>
+            <div style={{ fontSize: 8, color: '#4a7a9b' }}>{lat.toFixed(4)}°N · {lng.toFixed(4)}°E</div>
+          </div>
+          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#4a7a9b', cursor: 'pointer', fontSize: 14 }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div>
+            <label style={labelStyle}>타격 위치/내용 *</label>
+            <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="예: 알우데이드 창고 건물 피격" style={inputStyle} autoFocus />
+          </div>
+          <div>
+            <label style={labelStyle}>소스</label>
+            <input value={source} onChange={e=>setSource(e.target.value)} placeholder="Twitter/Telegram/영상/뉴스" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>신뢰도</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['confirmed','probable','unconfirmed'] as const).map(c => (
+                <button key={c} onClick={()=>setConfidence(c)} style={{
+                  flex: 1, padding: '4px 0', fontSize: 8, letterSpacing: 1, borderRadius: 2, cursor: 'pointer',
+                  background: confidence===c ? CONF_COLOR[c]+'33' : '#020c18',
+                  border: `1px solid ${confidence===c ? CONF_COLOR[c] : '#0a3050'}`,
+                  color: confidence===c ? CONF_COLOR[c] : '#4a7a9b',
+                  fontFamily: "'Courier New', monospace",
+                }}>{CONF_LABEL[c]}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>상세 설명</label>
+            <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="추가 정보..." rows={2}
+              style={{ ...inputStyle, resize: 'none', verticalAlign: 'top' }} />
+          </div>
+          <div>
+            <label style={labelStyle}>소스 URL (선택)</label>
+            <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
+          </div>
+          <button onClick={save} disabled={!title.trim()} style={{
+            background: title.trim() ? '#ef444422' : '#0a1f2f', border: `1px solid ${title.trim() ? '#ef4444' : '#1a3a4a'}`,
+            color: title.trim() ? '#ef4444' : '#2d5a7a', padding: '7px 0', borderRadius: 2,
+            cursor: title.trim() ? 'pointer' : 'default', fontFamily: "'Courier New', monospace",
+            fontSize: 10, letterSpacing: 2, fontWeight: 700, marginTop: 2,
+          }}>📍 타격 위치 등록</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════ */
 interface FeedItem { id:string; time:string; icon:string; title:string; region:string; severity:string; source:string; lat?:number; lng?:number; }
@@ -1276,6 +1469,11 @@ export function WarRoomView() {
   const [theaterAct,   setTheaterAct]   = useState<Record<string,number>>({});
   const [iranRial,     setIranRial]     = useState<any>(null);
   const [airspaceData, setAirspaceData] = useState<any>(null);
+  const [adsbAirports, setAdsbAirports] = useState<Record<string,any>>({});
+  const [strikeReports,setStrikeReports]= useState<StrikeReport[]>(() => {
+    try { return JSON.parse(localStorage.getItem('wr-strikes') ?? '[]'); } catch { return []; }
+  });
+  const [newStrikePos, setNewStrikePos] = useState<{lat:number;lng:number}|null>(null);
   const [liveNews,     setLiveNews]     = useState<Array<{title:string;source:string;age:number|null}>>([]);
   const [volBuckets,   setVolBuckets]   = useState<Array<{hour:number;label:string;value:number}>>([]);
   const [imgItems,     setImgItems]     = useState<ImgItem[]>([]);
@@ -1305,20 +1503,35 @@ export function WarRoomView() {
     setLoading(true);
     const t = Date.now();
     try {
-      const [a,q,f,o,g,oil] = await Promise.allSettled([
+      const [a,q,f,o,g,oil,adsbRes] = await Promise.allSettled([
         apiFetch<any>('/api/acled-events'),
         apiFetch<any>('/api/usgs-quakes'),
         apiFetch<any>('/api/firms-fires'),
         apiFetch<any>('/api/opensky-aircraft'),
         apiFetch<any>('/api/gdacs-alerts'),
         apiFetch<any>('/api/oil-price'),
+        apiFetch<any>('/api/adsb-live'),
       ]);
       const aData = a.status==='fulfilled' ? (a.value?.events??[]) : [];
       const qData = q.status==='fulfilled' ? (q.value?.events??[]) : [];
       const fData = f.status==='fulfilled' ? (f.value?.events??[]) : [];
-      const oData = o.status==='fulfilled' ? (o.value?.aircraft??[]) : [];
+      // adsb-live 우선, opensky 폴백
+      const adsbData = adsbRes.status==='fulfilled' ? (adsbRes.value?.aircraft??[]) : [];
+      const oData = adsbData.length > 0 ? adsbData : (o.status==='fulfilled' ? (o.value?.aircraft??[]) : []);
       const gData = g.status==='fulfilled' ? (g.value?.events??[]) : [];
       if (oil.status==='fulfilled') setOil(oil.value as Oil);
+      // 공항 disruption 데이터
+      if (adsbRes.status==='fulfilled' && adsbRes.value?.airports) {
+        setAdsbAirports(adsbRes.value.airports);
+      }
+      // 비상 스쿼크
+      if (adsbRes.status==='fulfilled' && adsbRes.value?.emergency?.length > 0) {
+        const emList = adsbRes.value.emergency;
+        emList.forEach((em: any) => {
+          const item: FeedItem = { id: `em-${em.callsign}`, time: new Date().toISOString(), icon:'🆘', title:`비상 스쿼크: ${em.callsign} (${em.emergency})`, region:'항공', severity:'critical', source:'ADS-B' };
+          setFeed(prev => [item, ...prev.slice(0, 79)]);
+        });
+      }
 
       /* GDELT 긴장 타임라인 */
       try {
@@ -1378,7 +1591,7 @@ export function WarRoomView() {
       } catch {}
 
       setAcled(aData); setQuakes(qData); setFirms(fData); setAircraft(oData); setGdacs(gData);
-      setFreshness({ gdelt: t, usgs: t, firms: t, opensky: t, gdacs: t });
+      setFreshness({ gdelt: t, usgs: t, firms: t, adsb: t, gdacs: t });
 
       /* 이벤트 피드 */
       const items: FeedItem[] = [
@@ -1500,16 +1713,30 @@ export function WarRoomView() {
 
   /* Freshness 표시 */
   const freshnessItems = [
-    { key:'gdelt', label:'GDELT' },
-    { key:'usgs',  label:'USGS'  },
-    { key:'firms', label:'FIRMS' },
-    { key:'opensky', label:'OPENSKY' },
-    { key:'gdacs', label:'GDACS' },
+    { key:'gdelt',  label:'GDELT'  },
+    { key:'usgs',   label:'USGS'   },
+    { key:'firms',  label:'FIRMS'  },
+    { key:'adsb',   label:'ADS-B'  },
+    { key:'gdacs',  label:'GDACS'  },
   ];
 
   return (
     <div style={{ width:'100%', height:'100%', background:'#000810', display:'flex', flexDirection:'column', fontFamily:"'Courier New', monospace", overflow:'hidden', position:'relative' }}>
       <style>{CSS}</style>
+
+      {/* ── 타격 보고 모달 ── */}
+      {newStrikePos && (
+        <StrikeModal
+          lat={newStrikePos.lat} lng={newStrikePos.lng}
+          onSave={(report) => {
+            const updated = [report, ...strikeReports];
+            setStrikeReports(updated);
+            localStorage.setItem('wr-strikes', JSON.stringify(updated));
+            setNewStrikePos(null);
+          }}
+          onClose={() => setNewStrikePos(null)}
+        />
+      )}
 
       {/* ── BREAKING 오버레이 ── */}
       {breaking && (
@@ -1629,6 +1856,10 @@ export function WarRoomView() {
         {/* ──────── 지도 (항상 100%) ──────── */}
         <div style={{ position:'absolute', inset:0 }}>
           <div style={{ position:'absolute', top:8, left:8, zIndex:1000, fontSize:9, color:'#00d4ff88', letterSpacing:3, fontWeight:700 }}>TACTICAL MAP 3D // IRAN-ISRAEL</div>
+          {/* 우클릭 힌트 */}
+          <div style={{ position:'absolute', top:8, left:'50%', transform:'translateX(-50%)', zIndex:1000, fontSize:8, color:'#2d5a7a', letterSpacing:1, fontFamily:"'Courier New',monospace", pointerEvents:'none' }}>
+            우클릭 → 타격 보고 &nbsp;|&nbsp; 🎯 {strikeReports.length}건
+          </div>
 
           {/* CRT 스캔라인 */}
           <div style={{ position:'absolute', inset:0, zIndex:999, pointerEvents:'none', backgroundImage:'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px)' }} />
@@ -1639,7 +1870,7 @@ export function WarRoomView() {
           </div>
 
           {/* 3D 지도 */}
-          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} imgItems={imgItems} theater={theater} newsActiveIds={newsActiveIds} airspaceRestrictions={airspaceData?.restrictions ?? []} />
+          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} imgItems={imgItems} theater={theater} newsActiveIds={newsActiveIds} airspaceRestrictions={airspaceData?.restrictions ?? []} strikeReports={strikeReports} onMapRightClick={(lat,lng)=>setNewStrikePos({lat,lng})} />
 
           {/* 위성 레이어 토글 */}
           <div style={{ position:'absolute', top:36, right:8, zIndex:1001, display:'flex', flexDirection:'column', gap:3 }}>
@@ -1874,6 +2105,20 @@ export function WarRoomView() {
                 </div>
               );
             })}
+            {/* 공항 실시간 트래픽 (ADS-B 기반) */}
+            {Object.keys(adsbAirports).length > 0 && (
+              <div style={{ marginTop:6, display:'flex', flexWrap:'wrap', gap:3 }}>
+                {Object.entries(adsbAirports).map(([icao, ap]: [string, any]) => {
+                  const col = ap.status==='CLOSED'?'#ef4444':ap.status==='LIMITED'?'#f97316':'#22c55e';
+                  return (
+                    <div key={icao} title={`${ap.name}: ${ap.count}대 (착륙:${ap.landing} 출발:${ap.departing})`}
+                      style={{ padding:'1px 5px', border:`1px solid ${col}44`, borderRadius:2, fontSize:7.5, color:col, background:`${col}0a` }}>
+                      {icao} {ap.count > 0 ? `✈${ap.count}` : '⛔'}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* 군용기 감지 패널 */}
@@ -1933,6 +2178,34 @@ export function WarRoomView() {
               );
             })}
           </div>
+
+          {/* 타격 보고 */}
+          {strikeReports.length > 0 && (
+          <div style={{ padding:'6px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
+            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+              ▸ STRIKE REPORTS
+              <span style={{ fontSize:9, color:'#ef4444', fontWeight:700 }}>🎯 {strikeReports.length}</span>
+              <button onClick={()=>{
+                if(window.confirm(`${strikeReports.length}개 타격 보고 전체 삭제?`)){
+                  setStrikeReports([]); localStorage.removeItem('wr-strikes');
+                }
+              }} style={{ marginLeft:'auto', background:'none', border:'1px solid #1a3a4a', borderRadius:2, padding:'1px 6px', cursor:'pointer', fontSize:8, color:'#2d5a7a', fontFamily:"'Courier New',monospace" }}>초기화</button>
+            </div>
+            {strikeReports.slice(0,5).map(s => {
+              const col = CONF_COLOR[s.confidence];
+              return (
+                <div key={s.id} style={{ display:'flex', alignItems:'flex-start', gap:5, padding:'3px 0', borderBottom:'1px solid #0a1f2f' }}>
+                  <span style={{ fontSize:10, flexShrink:0 }}>🎯</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:col, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.title}</div>
+                    <div style={{ fontSize:8, color:'#4a7a9b' }}>{CONF_LABEL[s.confidence]} · {s.source}</div>
+                  </div>
+                </div>
+              );
+            })}
+            {strikeReports.length > 5 && <div style={{ fontSize:8, color:'#2d5a7a', textAlign:'center', marginTop:3 }}>+{strikeReports.length-5}개 더</div>}
+          </div>
+          )}
 
           {/* 인텔 피드 */}
           <div style={{ flex:1, minHeight:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>

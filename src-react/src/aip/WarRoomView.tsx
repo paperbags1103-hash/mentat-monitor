@@ -968,6 +968,89 @@ function makeSdfIcon(type: ForceType, size = 24): { width: number; height: numbe
 }
 
 /* ══════════════════════════════════════════════════════
+   ESCALATION INDEX — 리버스 리얼리티 엔진
+   과거 4개 전쟁 직전 패턴 벡터와 코사인 유사도 계산
+══════════════════════════════════════════════════════ */
+const REF_EVENTS = [
+  { id:'hamas-oct7',   label:'하마스 10/7',     date:'2023-10-07', vec:[0.08,0.62,0.75,0.45,0.70] },
+  { id:'iran-apr24',   label:'이란 직공 4/13',  date:'2024-04-13', vec:[0.12,0.71,0.85,0.55,0.60] },
+  { id:'iran-oct24',   label:'이란 2차 10/1',   date:'2024-10-01', vec:[0.09,0.58,0.72,0.40,0.65] },
+  { id:'ukraine-feb22',label:'우크라 침공',      date:'2022-02-24', vec:[0.14,0.80,0.90,0.65,0.50] },
+  { id:'israel-leb06', label:'레바논 전쟁',      date:'2006-07-12', vec:[0.06,0.55,0.80,0.38,0.60] },
+];
+// 벡터 차원: [WTI변화율, GDELT긴장도, 군사활동, VIX, FIRMS화재]
+
+function cosine(a: number[], b: number[]) {
+  const dot = a.reduce((s,x,i) => s + x * b[i], 0);
+  const ma  = Math.sqrt(a.reduce((s,x) => s + x*x, 0));
+  const mb  = Math.sqrt(b.reduce((s,x) => s + x*x, 0));
+  return (ma && mb) ? dot / (ma * mb) : 0;
+}
+
+interface EscalationData {
+  index: number;
+  best: typeof REF_EVENTS[number] & { score: number };
+  signals: Array<{ label:string; val:number; threshold:number }>;
+}
+
+function EscalationPanel({ data }: { data: EscalationData }) {
+  const { index, best, signals } = data;
+  const col = index >= 70 ? '#ef4444' : index >= 45 ? '#f97316' : index >= 25 ? '#fbbf24' : '#22c55e';
+  const levelLabel = index >= 70 ? 'CRITICAL' : index >= 45 ? 'ELEVATED' : index >= 25 ? 'WATCH' : 'NORMAL';
+  const hitCount = signals.filter(s => s.val >= s.threshold).length;
+
+  return (
+    <div style={{ padding:'8px 12px', borderBottom:'1px solid #0a1f2f', background:'#020c18', flexShrink:0 }}>
+      <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:6 }}>
+        ▸ ESCALATION INDEX
+        <span style={{ fontSize:8, color:col, fontWeight:900, letterSpacing:2, marginLeft:'auto',
+          ...(index >= 70 ? { animation:'wr-blink 1s infinite' } : {}) }}>{levelLabel}</span>
+      </div>
+
+      {/* 복합 게이지 */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+        <div style={{ flex:1, height:8, background:'#0a1f2f', borderRadius:1, overflow:'hidden', position:'relative' }}>
+          <div style={{ width:`${index}%`, height:'100%', background:`linear-gradient(90deg, #22c55e, #fbbf24 50%, ${col})`, transition:'width 1.2s ease', boxShadow:`0 0 8px ${col}88` }} />
+          {/* 과거 사건 임계치 마커 */}
+          {[25, 45, 70].map(t => (
+            <div key={t} style={{ position:'absolute', left:`${t}%`, top:0, bottom:0, width:1, background:'#1a3a4a', opacity:0.6 }} />
+          ))}
+        </div>
+        <span style={{ fontSize:14, fontWeight:900, color:col, minWidth:32, textAlign:'right', textShadow:`0 0 8px ${col}` }}>{index}</span>
+      </div>
+
+      {/* 가장 유사한 과거 사건 */}
+      <div style={{ fontSize:9, color:'#8aa3ba', marginBottom:6, padding:'4px 8px', background:`${col}0d`, border:`1px solid ${col}22`, borderRadius:2 }}>
+        <span style={{ color:'#4a7a9b' }}>최근접 패턴: </span>
+        <span style={{ color:col, fontWeight:700 }}>{best.label}</span>
+        <span style={{ color:'#4a7a9b' }}> ({best.date})</span>
+        <span style={{ color:col, fontWeight:900, marginLeft:6 }}>{Math.round(best.score * 100)}%</span>
+      </div>
+
+      {/* 시그널 체크리스트 */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'3px 0', marginBottom:4 }}>
+        {signals.map(s => {
+          const active = s.val >= s.threshold;
+          const pct = Math.round(s.val * 100);
+          return (
+            <div key={s.label} style={{ display:'flex', alignItems:'center', gap:4, fontSize:8 }}>
+              <span style={{ color: active ? col : '#1a3a4a', fontSize:9, fontWeight:900 }}>{active ? '◉' : '○'}</span>
+              <span style={{ color: active ? '#c0d8e8' : '#2d5a7a' }}>{s.label}</span>
+              <span style={{ color: active ? col : '#1a3a4a', marginLeft:'auto', fontSize:7 }}>{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 요약 */}
+      <div style={{ fontSize:8, color:'#4a7a9b', textAlign:'right', letterSpacing:1 }}>
+        {hitCount}/{signals.length} 시그널 활성 · 벡터 유사도 분석
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    VOLUME HISTOGRAM — 24h 이벤트 볼륨 막대 차트
 ══════════════════════════════════════════════════════ */
 function VolumeHistogram({ buckets, timeWindow }: { buckets: Array<{hour:number;label:string;value:number}>; timeWindow: number }) {
@@ -1095,6 +1178,7 @@ export function WarRoomView() {
   const [threatHistory,setThreatHistory]= useState<TensionPoint[]>([]);
   const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
   const [satMode,      setSatMode]      = useState<SatMode>('satellite');
+  const [vixPrice,     setVixPrice]     = useState(0);
   const [theater,      setTheater]      = useState<TheaterKey>('iran-israel');
   const [newsActiveIds,setNewsActiveIds]= useState<string[]>([]);
   const [theaterAct,   setTheaterAct]   = useState<Record<string,number>>({});
@@ -1158,6 +1242,12 @@ export function WarRoomView() {
       try {
         const imgRes = await apiFetch<any>('/api/gdelt-images');
         if (imgRes?.items?.length > 0) setImgItems(imgRes.items);
+      } catch {}
+
+      /* VIX */
+      try {
+        const macroRes = await apiFetch<any>('/api/global-macro');
+        if (macroRes?.vix?.price) setVixPrice(macroRes.vix.price);
       } catch {}
 
       /* GDELT 군사 자산 동적 활성화 */
@@ -1248,6 +1338,31 @@ export function WarRoomView() {
 
   /* 군용기 */
   const milAircraft = useMemo(()=>meAircraft.filter(a=>isMilitary(a.callsign)), [meAircraft]);
+
+  /* 에스컬레이션 인덱스 계산 (리버스 리얼리티 엔진) */
+  const escalationScore = useMemo((): EscalationData => {
+    const v0 = Math.min(Math.abs(oil?.wti?.change ?? 0) / 15, 1);
+    const lastTone = gdeltTimeline.length > 0 ? gdeltTimeline[gdeltTimeline.length - 1].tone : 0;
+    const v1 = Math.min(Math.abs(Math.min(lastTone, 0)) / 80, 1);
+    const milAct = meAircraft.filter((a:any) => a.mil).length;
+    const v2 = Math.min((milAct * 3 + newsActiveIds.length * 2) / 60, 1);
+    const v3 = Math.min(vixPrice / 35, 1);
+    const v4 = Math.min(meFirms.length / 20, 1);
+    const current = [v0, v1, v2, v3, v4];
+    const scored = REF_EVENTS.map(r => ({ ...r, score: cosine(current, r.vec) }));
+    scored.sort((a, b) => b.score - a.score);
+    const best = scored[0];
+    const avg  = scored.reduce((s, r) => s + r.score, 0) / scored.length;
+    const signals = [
+      { label:'WTI 유가 이상', val:v0, threshold:0.35 },
+      { label:'GDELT 긴장도', val:v1, threshold:0.45 },
+      { label:'군사 활동',    val:v2, threshold:0.35 },
+      { label:'VIX 급등',     val:v3, threshold:0.55 },
+      { label:'화재/폭발',    val:v4, threshold:0.40 },
+      { label:'뉴스 언급',    val:Math.min(newsActiveIds.length / 10, 1), threshold:0.30 },
+    ];
+    return { index: Math.min(Math.round(avg * 140), 100), best, signals };
+  }, [oil, gdeltTimeline, meAircraft, meFirms, vixPrice, newsActiveIds]);
 
   /* 기지 근접 화재 경보 */
   const baseAlerts = useMemo(()=>MILITARY_BASES.map(base=>{
@@ -1459,6 +1574,9 @@ export function WarRoomView() {
         <div className="wr-panel-in" style={{ position:'absolute', right:0, top:0, bottom:0, width:300, display:'flex', flexDirection:'column', background:'rgba(5,15,26,0.96)', borderLeft:'1px solid #0a3050', zIndex:1001, backdropFilter:'blur(8px)', overflow:'hidden' }}>
           {/* 닫기 버튼 */}
           <button onClick={()=>setCinematic(true)} style={{ position:'absolute', top:6, right:8, zIndex:10, background:'none', border:'none', color:'#4a7a9b', cursor:'pointer', fontSize:14, lineHeight:1 }} title="패널 닫기">✕</button>
+
+          {/* 에스컬레이션 인덱스 */}
+          <EscalationPanel data={escalationScore} />
 
           {/* 긴장지수 타임라인 차트 */}
           <div style={{ padding:'6px 12px 4px', borderBottom:'1px solid #0a1f2f', flexShrink:0, background:'#020c18' }}>

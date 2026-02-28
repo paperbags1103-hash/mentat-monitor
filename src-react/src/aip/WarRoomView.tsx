@@ -265,13 +265,16 @@ const getGibsDate = () => {
   return d.toISOString().slice(0, 10);
 };
 
+interface ImgItem { id:string; title:string; image:string; url:string; domain:string; ageMin:number|null; lat:number; lng:number; region:string; }
+
 interface Map3DProps {
   siteScores: Array<{ name: string; lat: number; lng: number; score: number }>;
   meAcled: any[]; meFirms: any[]; meQuakes: any[]; meAircraft: any[];
   satMode: SatMode;
+  imgItems: ImgItem[];
 }
 
-function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: Map3DProps) {
+function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, imgItems }: Map3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const rafRef       = useRef<number>(0);
@@ -294,6 +297,21 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: 
       map.setFilter('wr-forces-label',  sf);
     } catch {}
   }, [hiddenSides]);
+
+  /* 뉴스 이미지 마커 업데이트 */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getSource('wr-images')) return;
+    const gj = {
+      type: 'FeatureCollection' as const,
+      features: imgItems.map(img => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [img.lng, img.lat] },
+        properties: { id: img.id, title: img.title, image: img.image, url: img.url, domain: img.domain, ageMin: img.ageMin, region: img.region },
+      })),
+    };
+    try { (map.getSource('wr-images') as any).setData(gj); } catch {}
+  }, [imgItems]);
 
   /* 위성 모드 전환 */
   useEffect(() => {
@@ -565,6 +583,38 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode }: 
         map.addLayer({ id: 'wr-base-strike-ring2', type: 'circle', source: 'wr-base-strikes', paint: { 'circle-radius': 18, 'circle-color': '#ef4444', 'circle-opacity': 0.12, 'circle-blur': 0.5 } });
         map.addLayer({ id: 'wr-base-strike-dot', type: 'circle', source: 'wr-base-strikes', paint: { 'circle-radius': 8, 'circle-color': '#ef4444', 'circle-opacity': 1, 'circle-stroke-width': 2, 'circle-stroke-color': '#fca5a5' } });
         map.addLayer({ id: 'wr-base-strike-label', type: 'symbol', source: 'wr-base-strikes', layout: { 'text-field': ['concat', '⚠ ', ['get','name']], 'text-size': 10, 'text-offset': [0, -1.6], 'text-anchor': 'bottom', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']] }, paint: { 'text-color': '#fca5a5', 'text-halo-color': '#000810', 'text-halo-width': 2 } });
+
+        /* ── 뉴스 이미지 마커 ── */
+        const emptyGJ = { type: 'FeatureCollection' as const, features: [] };
+        map.addSource('wr-images', { type: 'geojson', data: emptyGJ });
+        map.addLayer({ id: 'wr-img-halo', type: 'circle', source: 'wr-images', paint: { 'circle-radius': 14, 'circle-color': '#60a5fa', 'circle-opacity': 0.12, 'circle-blur': 1 } });
+        map.addLayer({ id: 'wr-img-dot', type: 'circle', source: 'wr-images', paint: { 'circle-radius': 7, 'circle-color': '#1e40af', 'circle-opacity': 0.92, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#93c5fd' } });
+        map.addLayer({ id: 'wr-img-icon', type: 'symbol', source: 'wr-images', layout: { 'text-field': '📸', 'text-size': 13, 'text-allow-overlap': true, 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']] }, paint: { 'text-opacity': 0.95 } });
+
+        map.on('click', 'wr-img-dot', (e: any) => {
+          const p = e.features?.[0]?.properties;
+          if (!p) return;
+          const age = p.ageMin != null ? (p.ageMin < 60 ? `${p.ageMin}분 전` : `${Math.floor(p.ageMin/60)}h 전`) : '';
+          new maplibregl.Popup({ closeButton: true, maxWidth: '280px', className: 'wr-img-popup' })
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div style="background:#000810;color:#e2e8f0;font-family:monospace;border:1px solid #1a3a4a;border-radius:3px;overflow:hidden;width:260px">
+                <img src="${p.image}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none'" />
+                <div style="padding:8px 10px">
+                  <div style="font-size:10px;line-height:1.4;color:#c0d8e8;margin-bottom:6px">${p.title}</div>
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-size:8px;color:#4a7a9b">${p.domain}</span>
+                    <span style="font-size:8px;color:#4a7a9b">${age}</span>
+                  </div>
+                  <a href="${p.url}" target="_blank" rel="noopener" style="display:block;margin-top:6px;text-align:center;font-size:9px;color:#60a5fa;text-decoration:none;border:1px solid #1a3a4a;padding:3px;border-radius:2px;letter-spacing:1px">기사 전문 →</a>
+                </div>
+              </div>`)
+            .addTo(map);
+        });
+        ['wr-img-dot','wr-img-icon'].forEach(id => {
+          map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+          map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+        });
 
         /* ══ 군사 자산 배치 레이어 (MIL-STD-2525 스타일) ══ */
         const forceGJ = {
@@ -924,6 +974,7 @@ export function WarRoomView() {
   const [satMode,      setSatMode]      = useState<SatMode>('satellite');
   const [liveNews,     setLiveNews]     = useState<Array<{title:string;source:string;age:number|null}>>([]);
   const [volBuckets,   setVolBuckets]   = useState<Array<{hour:number;label:string;value:number}>>([]);
+  const [imgItems,     setImgItems]     = useState<ImgItem[]>([]);
   const [timeWindow,   setTimeWindow]   = useState(24); // 최근 N시간
   const feedRef    = useRef<HTMLDivElement>(null);
   const prevCritRef = useRef<Set<string>>(new Set());
@@ -975,6 +1026,12 @@ export function WarRoomView() {
       try {
         const volRes = await apiFetch<any>('/api/gdelt-volume');
         if (volRes?.buckets?.length > 0) setVolBuckets(volRes.buckets);
+      } catch {}
+
+      /* GDELT 뉴스 이미지 마커 */
+      try {
+        const imgRes = await apiFetch<any>('/api/gdelt-images');
+        if (imgRes?.items?.length > 0) setImgItems(imgRes.items);
       } catch {}
 
       /* 실시간 뉴스 (Reuters/AJ/BBC RSS) */
@@ -1167,7 +1224,7 @@ export function WarRoomView() {
           </div>
 
           {/* 3D 지도 */}
-          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} />
+          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} imgItems={imgItems} />
 
           {/* 위성 레이어 토글 */}
           <div style={{ position:'absolute', top:36, right:8, zIndex:1001, display:'flex', flexDirection:'column', gap:3 }}>
@@ -1231,7 +1288,7 @@ export function WarRoomView() {
 
           {/* 레전드 */}
           <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:9, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
-            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보'],['◆','이란전력(red)'],['▲','IDF(blue)'],['★','미항모(cyan)']].map(([i,l])=>(
+            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보'],['◆','이란전력(red)'],['▲','IDF(blue)'],['★','미항모(cyan)'],['📸','뉴스이미지']].map(([i,l])=>(
               <span key={l as string}>{i} {l}</span>
             ))}
           </div>

@@ -832,6 +832,7 @@ export function WarRoomView() {
   const [threatHistory,setThreatHistory]= useState<TensionPoint[]>([]);
   const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
   const [satMode,      setSatMode]      = useState<SatMode>('satellite');
+  const [liveNews,     setLiveNews]     = useState<Array<{title:string;source:string;age:number|null}>>([]);
   const feedRef    = useRef<HTMLDivElement>(null);
   const prevCritRef = useRef<Set<string>>(new Set());
   const audioCtxRef = useRef<AudioContext|null>(null);
@@ -878,6 +879,12 @@ export function WarRoomView() {
         if (tlRes?.points?.length > 0) setGdeltTimeline(tlRes.points);
       } catch {}
 
+      /* 실시간 뉴스 (Reuters/AJ/BBC RSS) */
+      try {
+        const newsRes = await apiFetch<any>('/api/warroom-news');
+        if (newsRes?.items?.length > 0) setLiveNews(newsRes.items);
+      } catch {}
+
       setAcled(aData); setQuakes(qData); setFirms(fData); setAircraft(oData); setGdacs(gData);
       setFreshness({ gdelt: t, usgs: t, firms: t, opensky: t, gdacs: t });
 
@@ -903,7 +910,7 @@ export function WarRoomView() {
   }, [playBeep]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
-  useEffect(() => { const id=setInterval(loadAll, 5*60_000); return ()=>clearInterval(id); }, [loadAll]);
+  useEffect(() => { const id=setInterval(loadAll, 2*60_000); return ()=>clearInterval(id); }, [loadAll]); // 2분 갱신
   useEffect(() => { const id=setInterval(()=>setTick(t=>t+1), 1000); return ()=>clearInterval(id); }, []);
 
   /* Threat 히스토리 누적 */
@@ -1076,6 +1083,29 @@ export function WarRoomView() {
           {satMode === 'truecolor' && (
             <div style={{ position:'absolute', bottom:40, left:'50%', transform:'translateX(-50%)', zIndex:1001, background:'rgba(0,8,16,0.9)', border:'1px solid #fbbf2455', borderRadius:3, padding:'6px 14px', fontSize:9, color:'#fbbf24', letterSpacing:1, whiteSpace:'nowrap' }}>
               🎨 MODIS Terra 자연색 — {getGibsDate()} 기준 · 250m 해상도
+            </div>
+          )}
+
+          {/* LIVE 뉴스 티커 */}
+          {liveNews.length > 0 && (
+            <div style={{ position:'absolute', bottom:36, left:0, right:0, zIndex:1000, background:'rgba(0,8,16,0.88)', borderTop:'1px solid #1a3a4a', backdropFilter:'blur(4px)' }}>
+              <div style={{ display:'flex', alignItems:'stretch', overflow:'hidden', height:28 }}>
+                <div style={{ background:'#ef4444', padding:'0 10px', display:'flex', alignItems:'center', flexShrink:0 }}>
+                  <span className="wr-blink" style={{ fontSize:9, color:'#fff', fontWeight:900, letterSpacing:2 }}>● LIVE</span>
+                </div>
+                <div style={{ flex:1, overflow:'hidden', display:'flex', alignItems:'center' }}>
+                  <div style={{ whiteSpace:'nowrap', animation:'ticker-scroll 40s linear infinite', display:'flex', gap:48, paddingLeft:'100%' }}>
+                    {[...liveNews, ...liveNews].map((n, i) => (
+                      <span key={i} style={{ fontSize:10, color:'#c0d8e8', fontFamily:'monospace' }}>
+                        <span style={{ color:'#4a7a9b', fontSize:9 }}>[{n.source}]</span>{' '}
+                        {n.title}
+                        {n.age !== null && <span style={{ color:'#2d5a7a', fontSize:8 }}> · {n.age < 60 ? `${n.age}분 전` : `${Math.floor(n.age/60)}h`}</span>}
+                        <span style={{ color:'#1a3a4a', padding:'0 20px' }}>◈</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

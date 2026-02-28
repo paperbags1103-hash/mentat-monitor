@@ -22,11 +22,20 @@ const ZONES = [
   { name: '한반도',              bbox: [34, 123, 44, 132] },
 ];
 
+function getAuthHeader() {
+  const user = process.env.OPENSKY_USER || '';
+  const pass = process.env.OPENSKY_PASS || '';
+  if (user && pass) {
+    return { 'Authorization': 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64') };
+  }
+  return {};
+}
+
 async function fetchZone(zone) {
   const [lamin, lomin, lamax, lomax] = zone.bbox;
   const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
   const res = await fetch(url, {
-    headers: { 'Accept': 'application/json' },
+    headers: { 'Accept': 'application/json', ...getAuthHeader() },
     signal: AbortSignal.timeout(6000),
   });
   if (!res.ok) throw new Error(`OpenSky ${res.status}`);

@@ -972,13 +972,14 @@ function makeSdfIcon(type: ForceType, size = 24): { width: number; height: numbe
    과거 4개 전쟁 직전 패턴 벡터와 코사인 유사도 계산
 ══════════════════════════════════════════════════════ */
 const REF_EVENTS = [
-  { id:'hamas-oct7',   label:'하마스 10/7',     date:'2023-10-07', vec:[0.08,0.62,0.75,0.45,0.70] },
-  { id:'iran-apr24',   label:'이란 직공 4/13',  date:'2024-04-13', vec:[0.12,0.71,0.85,0.55,0.60] },
-  { id:'iran-oct24',   label:'이란 2차 10/1',   date:'2024-10-01', vec:[0.09,0.58,0.72,0.40,0.65] },
-  { id:'ukraine-feb22',label:'우크라 침공',      date:'2022-02-24', vec:[0.14,0.80,0.90,0.65,0.50] },
-  { id:'israel-leb06', label:'레바논 전쟁',      date:'2006-07-12', vec:[0.06,0.55,0.80,0.38,0.60] },
+  // [WTI, GDELT, MIL, VIX, FIRMS, Brent-WTI스프레드, ILS(셰켈약세), Gold]
+  { id:'hamas-oct7',   label:'하마스 10/7',     date:'2023-10-07', vec:[0.08,0.62,0.75,0.45,0.70, 0.60,0.75,0.40] },
+  { id:'iran-apr24',   label:'이란 직공 4/13',  date:'2024-04-13', vec:[0.12,0.71,0.85,0.55,0.60, 0.80,0.85,0.55] },
+  { id:'iran-oct24',   label:'이란 2차 10/1',   date:'2024-10-01', vec:[0.09,0.58,0.72,0.40,0.65, 0.65,0.70,0.45] },
+  { id:'ukraine-feb22',label:'우크라 침공',      date:'2022-02-24', vec:[0.14,0.80,0.90,0.65,0.50, 0.50,0.20,0.70] },
+  { id:'israel-leb06', label:'레바논 전쟁',      date:'2006-07-12', vec:[0.06,0.55,0.80,0.38,0.60, 0.55,0.65,0.35] },
 ];
-// 벡터 차원: [WTI변화율, GDELT긴장도, 군사활동, VIX, FIRMS화재]
+// 벡터 차원: [WTI, GDELT tone, 군사활동, VIX, FIRMS, Brent-WTI스프레드, ILS변화, Gold변화]
 
 function cosine(a: number[], b: number[]) {
   const dot = a.reduce((s,x,i) => s + x * b[i], 0);
@@ -1179,6 +1180,7 @@ export function WarRoomView() {
   const [gdeltTimeline,setGdeltTimeline]= useState<{date:string;tone:number}[]>([]);
   const [satMode,      setSatMode]      = useState<SatMode>('satellite');
   const [vixPrice,     setVixPrice]     = useState(0);
+  const [geoSignals,   setGeoSignals]   = useState<{derived:{spreadNorm:number;ilsNorm:number;goldNorm:number;geoRiskScore:number;brentWtiSpread:number|null};ils:any;gold:any}|null>(null);
   const [theater,      setTheater]      = useState<TheaterKey>('iran-israel');
   const [newsActiveIds,setNewsActiveIds]= useState<string[]>([]);
   const [theaterAct,   setTheaterAct]   = useState<Record<string,number>>({});
@@ -1248,6 +1250,12 @@ export function WarRoomView() {
       try {
         const macroRes = await apiFetch<any>('/api/global-macro');
         if (macroRes?.vix?.price) setVixPrice(macroRes.vix.price);
+      } catch {}
+
+      /* 지정학 선행지표 (ILS/Gold/Brent-WTI) */
+      try {
+        const geoRes = await apiFetch<any>('/api/geo-signals');
+        if (geoRes?.derived) setGeoSignals(geoRes);
       } catch {}
 
       /* GDELT 군사 자산 동적 활성화 */
@@ -1348,21 +1356,27 @@ export function WarRoomView() {
     const v2 = Math.min((milAct * 3 + newsActiveIds.length * 2) / 60, 1);
     const v3 = Math.min(vixPrice / 35, 1);
     const v4 = Math.min(meFirms.length / 20, 1);
-    const current = [v0, v1, v2, v3, v4];
+    const v5 = geoSignals?.derived?.spreadNorm ?? 0;    // Brent-WTI 스프레드
+    const v6 = geoSignals?.derived?.ilsNorm    ?? 0;    // USD/ILS (셰켈 약세)
+    const v7 = geoSignals?.derived?.goldNorm   ?? 0;    // 금 급등
+    const current = [v0, v1, v2, v3, v4, v5, v6, v7];
     const scored = REF_EVENTS.map(r => ({ ...r, score: cosine(current, r.vec) }));
     scored.sort((a, b) => b.score - a.score);
     const best = scored[0];
     const avg  = scored.reduce((s, r) => s + r.score, 0) / scored.length;
     const signals = [
-      { label:'WTI 유가 이상', val:v0, threshold:0.35 },
-      { label:'GDELT 긴장도', val:v1, threshold:0.45 },
-      { label:'군사 활동',    val:v2, threshold:0.35 },
-      { label:'VIX 급등',     val:v3, threshold:0.55 },
-      { label:'화재/폭발',    val:v4, threshold:0.40 },
-      { label:'뉴스 언급',    val:Math.min(newsActiveIds.length / 10, 1), threshold:0.30 },
+      { label:'WTI 유가 이상',      val:v0, threshold:0.35 },
+      { label:'GDELT 긴장도',       val:v1, threshold:0.45 },
+      { label:'군사 활동',          val:v2, threshold:0.35 },
+      { label:'VIX 급등',           val:v3, threshold:0.55 },
+      { label:'화재/폭발',          val:v4, threshold:0.40 },
+      { label:'Brent-WTI 스프레드', val:v5, threshold:0.50 },
+      { label:'셰켈(ILS) 약세',     val:v6, threshold:0.50 },
+      { label:'금 현물 급등',       val:v7, threshold:0.45 },
+      { label:'뉴스 언급',          val:Math.min(newsActiveIds.length / 10, 1), threshold:0.30 },
     ];
     return { index: Math.min(Math.round(avg * 140), 100), best, signals };
-  }, [oil, gdeltTimeline, meAircraft, meFirms, vixPrice, newsActiveIds]);
+  }, [oil, gdeltTimeline, meAircraft, meFirms, vixPrice, geoSignals, newsActiveIds]);
 
   /* 기지 근접 화재 경보 */
   const baseAlerts = useMemo(()=>MILITARY_BASES.map(base=>{
@@ -1432,14 +1446,34 @@ export function WarRoomView() {
         </div>
         <div style={{ flex:1 }} />
 
-        {/* 유가 ticker */}
-        {oil?.wti?.price && (
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'3px 12px', border:'1px solid #1a3a4a', borderRadius:2, background:'#020c18' }}>
-            <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>WTI</span>
-            <span style={{ fontSize:13, fontWeight:700, color:'#fbbf24', textShadow:'0 0 6px #fbbf2466' }}>${oil.wti.price.toFixed(2)}</span>
-            <span style={{ fontSize:10, fontWeight:700, color: oil.wti.change >= 0 ? '#22c55e' : '#ef4444' }}>{oil.wti.change >= 0 ? '▲' : '▼'}{Math.abs(oil.wti.change).toFixed(2)}%</span>
-          </div>
-        )}
+        {/* 지정학 선행지표 ticker */}
+        <div style={{ display:'flex', gap:6 }}>
+          {oil?.wti?.price && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:'1px solid #1a3a4a', borderRadius:2, background:'#020c18' }}>
+              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>WTI</span>
+              <span style={{ fontSize:12, fontWeight:700, color:'#fbbf24' }}>${oil.wti.price.toFixed(2)}</span>
+              <span style={{ fontSize:9, fontWeight:700, color: oil.wti.change >= 0 ? '#22c55e' : '#ef4444' }}>{oil.wti.change >= 0 ? '▲' : '▼'}{Math.abs(oil.wti.change).toFixed(1)}%</span>
+            </div>
+          )}
+          {geoSignals?.derived?.brentWtiSpread != null && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${geoSignals.derived.spreadNorm > 0.5 ? '#ef444455' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
+              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>B-W</span>
+              <span style={{ fontSize:12, fontWeight:700, color: geoSignals.derived.spreadNorm > 0.5 ? '#ef4444' : '#fbbf24' }}>${geoSignals.derived.brentWtiSpread.toFixed(1)}</span>
+            </div>
+          )}
+          {geoSignals?.ils?.change5d != null && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${geoSignals.derived.ilsNorm > 0.4 ? '#ef444455' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
+              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>ILS</span>
+              <span style={{ fontSize:9, fontWeight:700, color: geoSignals.derived.ilsNorm > 0.4 ? '#ef4444' : '#94a3b8' }}>{geoSignals.ils.change5d > 0 ? '▲' : '▼'}{Math.abs(geoSignals.ils.change5d).toFixed(2)}%</span>
+            </div>
+          )}
+          {geoSignals?.gold?.change5d != null && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${geoSignals.derived.goldNorm > 0.4 ? '#22c55e55' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
+              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>GOLD</span>
+              <span style={{ fontSize:9, fontWeight:700, color: geoSignals.derived.goldNorm > 0.4 ? '#22c55e' : '#94a3b8' }}>{geoSignals.gold.change5d > 0 ? '+' : ''}{geoSignals.gold.change5d.toFixed(2)}%</span>
+            </div>
+          )}
+        </div>
 
         {/* 위협 레벨 */}
         <div className={threat.flash ? 'wr-threat-flash' : ''} style={{ padding:'3px 14px', borderRadius:2, border:`1px solid ${threat.color}`, background:`${threat.color}18`, display:'flex', alignItems:'center', gap:8 }}>

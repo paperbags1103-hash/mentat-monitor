@@ -335,8 +335,36 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
         container: containerRef.current,
         style: {
           version: 8,
-          sources: { carto: { type: 'raster', tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'], tileSize: 256, attribution: '© CartoDB' } },
-          layers: [{ id: 'carto-tiles', type: 'raster', source: 'carto' }],
+          sources: {
+            // 위성 이미지 (Esri World Imagery — 무료, 키 없음)
+            satellite: {
+              type: 'raster',
+              tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+              tileSize: 256,
+              attribution: 'Esri World Imagery',
+            },
+            // 군사 그리드 다크 오버레이 (위성 위에 반투명 blending)
+            darkgrid: {
+              type: 'raster',
+              tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+              tileSize: 256,
+            },
+          },
+          layers: [
+            // 위성 기반 — 채도 낮추고 약간 어둡게 (군사 열상 느낌)
+            {
+              id: 'satellite-base', type: 'raster', source: 'satellite',
+              paint: {
+                'raster-opacity': 0.88,
+                'raster-saturation': -0.35,
+                'raster-brightness-min': 0.02,
+                'raster-brightness-max': 0.72,
+                'raster-contrast': 0.05,
+              },
+            },
+            // 다크 오버레이 (레이블·도로 살리면서 군사 분위기 유지)
+            { id: 'dark-overlay', type: 'raster', source: 'darkgrid', paint: { 'raster-opacity': 0.30 } },
+          ],
         },
         center: [47, 32.5], zoom: 4.8, pitch: 62, bearing: -20,
       });
@@ -373,7 +401,7 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
         // 경계선
         map.addLayer({ id: 'wr-cz-border', type: 'line', source: 'wr-conflict-zones', paint: { 'line-color': ['get','color'], 'line-width': 1.5, 'line-opacity': 0.7, 'line-dasharray': [4, 3] } });
         // 구역 레이블
-        map.addLayer({ id: 'wr-cz-label', type: 'symbol', source: 'wr-conflict-zones', layout: { 'text-field': ['get','name'], 'text-size': 9, 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-letter-spacing': 0.15 }, paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 1.5, 'text-opacity': 0.85 } });
+        map.addLayer({ id: 'wr-cz-label', type: 'symbol', source: 'wr-conflict-zones', layout: { 'text-field': ['get','name'], 'text-size': 9, 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-letter-spacing': 0.15 }, paint: { 'text-color': ['get','color'], 'text-halo-color': '#000000', 'text-halo-width': 2.5, 'text-opacity': 0.92 } });
 
         /* ── 해협 글로우 레이어 ── */
         const chopkGeoJSON = { type: 'FeatureCollection' as const, features: CHOKEPOINTS.map(c => ({ type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: c.coords }, properties: { name: c.name, color: c.color, width: c.width, critical: c.critical } })) };

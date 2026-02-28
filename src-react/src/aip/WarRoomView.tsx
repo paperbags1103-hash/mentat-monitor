@@ -1,9 +1,9 @@
 /**
- * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v5
+ * WarRoomView — 이란-이스라엘 전황 실시간 관제실  v6
  *
- * MIL-STD-2525 스타일 군사 자산 배치 레이어 추가
- * IRGC 미사일/드론/해군 · IDF 지상군/방공 · 미 항모타격단
- * 헤즈볼라 · 후티 · 이라크PMF 프록시 세력
+ * v6 추가: 이란 리알(IRR) 선행지표, 영공제한 레이어, YouTube 라이브 마커
+ * 에스컬레이션 인덱스 9차원 벡터 (IRR 추가)
+ * api/iran-rial, api/airspace 연동
  */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { apiFetch } from '@/store';
@@ -244,6 +244,18 @@ const CONFLICT_ZONES = [
   { name: 'WEST BANK',       coords: [[34.9,31.3],[35.6,31.3],[35.6,32.6],[34.9,32.6],[34.9,31.3]] as [number,number][], color: '#fbbf24', severity: 'elevated' },
 ];
 
+/* ── 전장 라이브스트림 채널 (지도 마커) ─────────────────────────────── */
+const LIVE_STREAMS = [
+  { id:'aljazeera-ar', nameKo:'알자지라 Arabic',    emoji:'📡', lat:25.27, lng:51.48, url:'https://www.youtube.com/@AlJazeeraArabic/live',  flag:'🇶🇦' },
+  { id:'bbc-arabic',   nameKo:'BBC Arabic',         emoji:'🎙️', lat:32.08, lng:34.78, url:'https://www.youtube.com/@BBCArabic/live',        flag:'🇬🇧' },
+  { id:'ch12-il',      nameKo:'채널12 이스라엘',    emoji:'📺', lat:32.09, lng:34.80, url:'https://www.youtube.com/c/channel12news/live',   flag:'🇮🇱' },
+  { id:'kan11-il',     nameKo:'Kan 11 이스라엘',    emoji:'📺', lat:31.77, lng:35.22, url:'https://www.youtube.com/@kann/live',             flag:'🇮🇱' },
+  { id:'france24-ar',  nameKo:'France 24 Arabic',   emoji:'📡', lat:33.51, lng:36.28, url:'https://www.youtube.com/@France24Arabic/live',   flag:'🇸🇾' },
+  { id:'sky-arabia',   nameKo:'Sky News Arabia',    emoji:'📡', lat:24.44, lng:54.46, url:'https://www.youtube.com/@skynewsarabia/live',    flag:'🇦🇪' },
+  { id:'press-tv',     nameKo:'Press TV 이란',      emoji:'📡', lat:35.68, lng:51.38, url:'https://www.youtube.com/@presstv/live',          flag:'🇮🇷' },
+  { id:'wion',         nameKo:'WION 인도',           emoji:'📡', lat:28.61, lng:77.23, url:'https://www.youtube.com/@wion/live',             flag:'🇮🇳' },
+];
+
 /* ── 군용기 Callsign 패턴 ──────────────────────────────────────────── */
 const MIL_PREFIXES = ['RCH','FORTE','DUKE','DRAGN','JAKE','MOOSE','AZAZ','MYTCH','GRZLY','TOPSY','VIPER','GHOST','EAGLE','COBRA','HAVOC','FURY','RAVEN','REAPER','UAV','ISR','NATO','USAF','IDF'];
 const isMilitary = (cs: string) => cs && MIL_PREFIXES.some(p => cs.toUpperCase().startsWith(p));
@@ -284,9 +296,10 @@ interface Map3DProps {
   imgItems: ImgItem[];
   theater: TheaterKey;
   newsActiveIds: string[];
+  airspaceRestrictions?: Array<{id:string;name:string;lat:number;lng:number;radius:number;severity:string;desc:string}>;
 }
 
-function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, imgItems, theater, newsActiveIds }: Map3DProps) {
+function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, imgItems, theater, newsActiveIds, airspaceRestrictions = [] }: Map3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const rafRef       = useRef<number>(0);
@@ -340,6 +353,27 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
     };
     try { (map.getSource('wr-forces') as any).setData(gj); } catch {}
   }, [newsActiveIds]);
+
+  /* 영공 제한 레이어 업데이트 */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getSource('wr-airspace')) return;
+    const sevColor: Record<string,string> = {
+      CLOSED: '#ef4444', WARNING: '#f97316', CAUTION: '#fbbf24',
+    };
+    const gj = {
+      type: 'FeatureCollection' as const,
+      features: airspaceRestrictions.map(r => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Polygon' as const, coordinates: [circlePoly(r.lng, r.lat, r.radius)] },
+        properties: {
+          id: r.id, label: `${r.severity} ${r.name.slice(0, 12)}`,
+          color: sevColor[r.severity] ?? '#94a3b8',
+        },
+      })),
+    };
+    try { (map.getSource('wr-airspace') as any).setData(gj); } catch {}
+  }, [airspaceRestrictions]);
 
   /* 뉴스 이미지 마커 업데이트 */
   useEffect(() => {
@@ -762,6 +796,62 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft, satMode, im
         map.addSource('wr-missile-labels', { type: 'geojson', data: missileLabels });
         map.addLayer({ id: 'wr-missile-label-txt', type: 'symbol', source: 'wr-missile-labels', layout: { 'text-field': ['get','label'], 'text-size': 8, 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true }, paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 1.5, 'text-opacity': 0.7 } });
 
+        /* ── 라이브스트림 채널 마커 (📺/📡) ── */
+        const streamGJ = {
+          type: 'FeatureCollection' as const,
+          features: LIVE_STREAMS.map(s => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+            properties: { id: s.id, nameKo: s.nameKo, emoji: s.emoji, url: s.url, flag: s.flag },
+          })),
+        };
+        map.addSource('wr-streams', { type: 'geojson', data: streamGJ });
+        map.addLayer({ id: 'wr-streams-halo', type: 'circle', source: 'wr-streams',
+          paint: { 'circle-radius': 14, 'circle-color': '#9333ea', 'circle-opacity': 0.10, 'circle-blur': 1 },
+        });
+        map.addLayer({ id: 'wr-streams-dot', type: 'circle', source: 'wr-streams',
+          paint: { 'circle-radius': 7, 'circle-color': '#581c87', 'circle-opacity': 0.88,
+            'circle-stroke-width': 1.5, 'circle-stroke-color': '#a855f7' },
+        });
+        map.addLayer({ id: 'wr-streams-icon', type: 'symbol', source: 'wr-streams',
+          layout: { 'text-field': ['get','emoji'], 'text-size': 12, 'text-allow-overlap': true,
+            'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']] },
+          paint: { 'text-opacity': 0.95 },
+        });
+        map.on('click', 'wr-streams-dot', (e: any) => {
+          const p = e.features?.[0]?.properties;
+          if (!p) return;
+          new maplibregl.Popup({ closeButton: true, maxWidth: '240px' })
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div style="background:#0c0a1a;color:#e2e8f0;padding:10px 14px;font-family:monospace;border:1px solid #7e22ce55;border-radius:3px">
+                <div style="font-size:11px;font-weight:700;color:#c084fc;margin-bottom:6px">${p.flag} ${p.nameKo}</div>
+                <div style="font-size:9px;color:#6d28d9;margin-bottom:8px;letter-spacing:1px">📡 LIVE BROADCAST</div>
+                <a href="${p.url}" target="_blank" rel="noopener"
+                   style="display:block;text-align:center;background:#581c87;color:#e9d5ff;font-size:10px;padding:5px;border-radius:2px;text-decoration:none;letter-spacing:1px;border:1px solid #7c3aed">
+                  ▶ YouTube LIVE 열기
+                </a>
+              </div>`)
+            .addTo(map);
+        });
+        map.on('mouseenter','wr-streams-dot',()=>{ map.getCanvas().style.cursor='pointer'; });
+        map.on('mouseleave','wr-streams-dot',()=>{ map.getCanvas().style.cursor=''; });
+
+        /* ── 영공 제한 구역 circles (초기 로드 시 비어있으면 로드 후 업데이트) ── */
+        map.addSource('wr-airspace', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({ id: 'wr-airspace-fill', type: 'fill', source: 'wr-airspace',
+          paint: { 'fill-color': ['get','color'], 'fill-opacity': 0.06 },
+        });
+        map.addLayer({ id: 'wr-airspace-border', type: 'line', source: 'wr-airspace',
+          paint: { 'line-color': ['get','color'], 'line-width': 1.5, 'line-opacity': 0.55,
+            'line-dasharray': [6, 4] },
+        });
+        map.addLayer({ id: 'wr-airspace-label', type: 'symbol', source: 'wr-airspace',
+          layout: { 'text-field': ['get','label'], 'text-size': 8.5,
+            'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true },
+          paint: { 'text-color': ['get','color'], 'text-halo-color': '#000810', 'text-halo-width': 2, 'text-opacity': 0.9 },
+        });
+
         /* ── 애니메이션: 미사일 사거리 펄스 ── */
         let phase = 0;
         const animate = () => {
@@ -972,14 +1062,14 @@ function makeSdfIcon(type: ForceType, size = 24): { width: number; height: numbe
    과거 4개 전쟁 직전 패턴 벡터와 코사인 유사도 계산
 ══════════════════════════════════════════════════════ */
 const REF_EVENTS = [
-  // [WTI, GDELT, MIL, VIX, FIRMS, Brent-WTI스프레드, ILS(셰켈약세), Gold]
-  { id:'hamas-oct7',   label:'하마스 10/7',     date:'2023-10-07', vec:[0.08,0.62,0.75,0.45,0.70, 0.60,0.75,0.40] },
-  { id:'iran-apr24',   label:'이란 직공 4/13',  date:'2024-04-13', vec:[0.12,0.71,0.85,0.55,0.60, 0.80,0.85,0.55] },
-  { id:'iran-oct24',   label:'이란 2차 10/1',   date:'2024-10-01', vec:[0.09,0.58,0.72,0.40,0.65, 0.65,0.70,0.45] },
-  { id:'ukraine-feb22',label:'우크라 침공',      date:'2022-02-24', vec:[0.14,0.80,0.90,0.65,0.50, 0.50,0.20,0.70] },
-  { id:'israel-leb06', label:'레바논 전쟁',      date:'2006-07-12', vec:[0.06,0.55,0.80,0.38,0.60, 0.55,0.65,0.35] },
+  // [WTI, GDELT, MIL, VIX, FIRMS, Brent-WTI스프레드, ILS(셰켈약세), Gold, IRR(리알약세)]
+  { id:'hamas-oct7',   label:'하마스 10/7',     date:'2023-10-07', vec:[0.08,0.62,0.75,0.45,0.70, 0.60,0.75,0.40, 0.55] },
+  { id:'iran-apr24',   label:'이란 직공 4/13',  date:'2024-04-13', vec:[0.12,0.71,0.85,0.55,0.60, 0.80,0.85,0.55, 0.65] },
+  { id:'iran-oct24',   label:'이란 2차 10/1',   date:'2024-10-01', vec:[0.09,0.58,0.72,0.40,0.65, 0.65,0.70,0.45, 0.60] },
+  { id:'ukraine-feb22',label:'우크라 침공',      date:'2022-02-24', vec:[0.14,0.80,0.90,0.65,0.50, 0.50,0.20,0.70, 0.10] },
+  { id:'israel-leb06', label:'레바논 전쟁',      date:'2006-07-12', vec:[0.06,0.55,0.80,0.38,0.60, 0.55,0.65,0.35, 0.45] },
 ];
-// 벡터 차원: [WTI, GDELT tone, 군사활동, VIX, FIRMS, Brent-WTI스프레드, ILS변화, Gold변화]
+// 벡터 차원: [WTI, GDELT tone, 군사활동, VIX, FIRMS, Brent-WTI스프레드, ILS변화, Gold변화, IRR리알]
 
 function cosine(a: number[], b: number[]) {
   const dot = a.reduce((s,x,i) => s + x * b[i], 0);
@@ -1184,6 +1274,8 @@ export function WarRoomView() {
   const [theater,      setTheater]      = useState<TheaterKey>('iran-israel');
   const [newsActiveIds,setNewsActiveIds]= useState<string[]>([]);
   const [theaterAct,   setTheaterAct]   = useState<Record<string,number>>({});
+  const [iranRial,     setIranRial]     = useState<any>(null);
+  const [airspaceData, setAirspaceData] = useState<any>(null);
   const [liveNews,     setLiveNews]     = useState<Array<{title:string;source:string;age:number|null}>>([]);
   const [volBuckets,   setVolBuckets]   = useState<Array<{hour:number;label:string;value:number}>>([]);
   const [imgItems,     setImgItems]     = useState<ImgItem[]>([]);
@@ -1265,6 +1357,18 @@ export function WarRoomView() {
           setNewsActiveIds(milRes.activeIds);
           setTheaterAct(milRes.theaterActivity ?? {});
         }
+      } catch {}
+
+      /* 이란 리알 환율 (지정학 선행지표) */
+      try {
+        const rialRes = await apiFetch<any>('/api/iran-rial');
+        if (rialRes?.price) setIranRial(rialRes);
+      } catch {}
+
+      /* 영공 제한 구역 (SIGMET + 분쟁 기반) */
+      try {
+        const airRes = await apiFetch<any>('/api/airspace');
+        if (airRes?.restrictions) setAirspaceData(airRes);
       } catch {}
 
       /* 실시간 뉴스 (Reuters/AJ/BBC RSS) */
@@ -1359,7 +1463,8 @@ export function WarRoomView() {
     const v5 = geoSignals?.derived?.spreadNorm ?? 0;    // Brent-WTI 스프레드
     const v6 = geoSignals?.derived?.ilsNorm    ?? 0;    // USD/ILS (셰켈 약세)
     const v7 = geoSignals?.derived?.goldNorm   ?? 0;    // 금 급등
-    const current = [v0, v1, v2, v3, v4, v5, v6, v7];
+    const v8 = iranRial?.rialNorm               ?? 0;    // 이란 리알 약세 (암시장)
+    const current = [v0, v1, v2, v3, v4, v5, v6, v7, v8];
     const scored = REF_EVENTS.map(r => ({ ...r, score: cosine(current, r.vec) }));
     scored.sort((a, b) => b.score - a.score);
     const best = scored[0];
@@ -1373,10 +1478,11 @@ export function WarRoomView() {
       { label:'Brent-WTI 스프레드', val:v5, threshold:0.50 },
       { label:'셰켈(ILS) 약세',     val:v6, threshold:0.50 },
       { label:'금 현물 급등',       val:v7, threshold:0.45 },
+      { label:'이란 리알 약세',     val:v8, threshold:0.40 },
       { label:'뉴스 언급',          val:Math.min(newsActiveIds.length / 10, 1), threshold:0.30 },
     ];
     return { index: Math.min(Math.round(avg * 140), 100), best, signals };
-  }, [oil, gdeltTimeline, meAircraft, meFirms, vixPrice, geoSignals, newsActiveIds]);
+  }, [oil, gdeltTimeline, meAircraft, meFirms, vixPrice, geoSignals, newsActiveIds, iranRial]);
 
   /* 기지 근접 화재 경보 */
   const baseAlerts = useMemo(()=>MILITARY_BASES.map(base=>{
@@ -1473,6 +1579,15 @@ export function WarRoomView() {
               <span style={{ fontSize:9, fontWeight:700, color: geoSignals.derived.goldNorm > 0.4 ? '#22c55e' : '#94a3b8' }}>{geoSignals.gold.change5d > 0 ? '+' : ''}{geoSignals.gold.change5d.toFixed(2)}%</span>
             </div>
           )}
+          {iranRial?.change7d != null && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 10px', border:`1px solid ${iranRial.rialNorm > 0.35 ? '#ef444455' : '#1a3a4a'}`, borderRadius:2, background:'#020c18' }}>
+              <span style={{ fontSize:9, color:'#4a7a9b', letterSpacing:1 }}>IRR</span>
+              <span style={{ fontSize:9, fontWeight:700, color: iranRial.rialNorm > 0.35 ? '#ef4444' : '#94a3b8' }}>
+                {iranRial.change7d > 0 ? '▲' : '▼'}{Math.abs(iranRial.change7d).toFixed(1)}%
+              </span>
+              {iranRial.alert === 'CRITICAL' && <span className="wr-blink" style={{ fontSize:7, color:'#ef4444', fontWeight:900 }}>!</span>}
+            </div>
+          )}
         </div>
 
         {/* 위협 레벨 */}
@@ -1524,7 +1639,7 @@ export function WarRoomView() {
           </div>
 
           {/* 3D 지도 */}
-          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} imgItems={imgItems} theater={theater} newsActiveIds={newsActiveIds} />
+          <Map3D siteScores={siteScores} meAcled={meAcled} meFirms={meFirms} meQuakes={meQuakes} meAircraft={meAircraft} satMode={satMode} imgItems={imgItems} theater={theater} newsActiveIds={newsActiveIds} airspaceRestrictions={airspaceData?.restrictions ?? []} />
 
           {/* 위성 레이어 토글 */}
           <div style={{ position:'absolute', top:36, right:8, zIndex:1001, display:'flex', flexDirection:'column', gap:3 }}>
@@ -1588,7 +1703,7 @@ export function WarRoomView() {
 
           {/* 레전드 */}
           <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:9, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
-            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보'],['◆','이란전력(red)'],['▲','IDF(blue)'],['★','미항모(cyan)'],['📸','뉴스이미지']].map(([i,l])=>(
+            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['▧','분쟁구역'],['⚠','기지경보'],['◆','이란전력(red)'],['▲','IDF(blue)'],['★','미항모(cyan)'],['📸','뉴스이미지'],['📡','라이브방송'],['- -','영공제한']].map(([i,l])=>(
               <span key={l as string}>{i} {l}</span>
             ))}
           </div>
@@ -1709,20 +1824,56 @@ export function WarRoomView() {
 
           {/* 영공 현황 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5 }}>▸ AIRSPACE STATUS</div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-              {AIRSPACE_ZONES.map(zone=>{
-                const { status, color, icon } = airspaceStatus(aircraft, zone);
-                return (
-                  <div key={zone.name} style={{ padding:'2px 7px', border:`1px solid ${color}55`, borderRadius:2, background:`${color}08`, display:'flex', alignItems:'center', gap:4 }}>
-                    <span style={{ fontSize:10 }}>{zone.flag}</span>
-                    <span style={{ fontSize:9, color:'#c0d8e8' }}>{zone.name}</span>
-                    <span style={{ fontSize:9 }}>{icon}</span>
-                    <span style={{ fontSize:9, color, fontWeight:700 }}>{status}</span>
-                  </div>
-                );
-              })}
+            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+              ▸ AIRSPACE STATUS
+              {airspaceData?.summary?.closedFirs > 0 && (
+                <span className="wr-blink" style={{ fontSize:8, color:'#ef4444', fontWeight:700 }}>
+                  ⛔ {airspaceData.summary.closedFirs}FIR 폐쇄
+                </span>
+              )}
             </div>
+            {/* FIR 상태 (api/airspace 데이터 기반) */}
+            {airspaceData?.firs ? (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                {airspaceData.firs.map((fir: any) => {
+                  const col = fir.status==='CLOSED'?'#ef4444':fir.status==='WARNING'?'#f97316':fir.status==='CAUTION'?'#fbbf24':'#22c55e';
+                  const icon = fir.status==='CLOSED'?'⛔':fir.status==='WARNING'?'⚠️':fir.status==='CAUTION'?'🟡':'✅';
+                  return (
+                    <div key={fir.id} title={`${fir.name}: ${fir.status}`}
+                      style={{ padding:'2px 7px', border:`1px solid ${col}55`, borderRadius:2, background:`${col}08`, display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ fontSize:9 }}>{icon}</span>
+                      <span style={{ fontSize:8, color:'#c0d8e8', letterSpacing:0.5 }}>{fir.id}</span>
+                      <span style={{ fontSize:8, color:col, fontWeight:700 }}>{fir.status}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                {AIRSPACE_ZONES.map(zone=>{
+                  const { status, color, icon } = airspaceStatus(aircraft, zone);
+                  return (
+                    <div key={zone.name} style={{ padding:'2px 7px', border:`1px solid ${color}55`, borderRadius:2, background:`${color}08`, display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ fontSize:10 }}>{zone.flag}</span>
+                      <span style={{ fontSize:9, color:'#c0d8e8' }}>{zone.name}</span>
+                      <span style={{ fontSize:9 }}>{icon}</span>
+                      <span style={{ fontSize:9, color, fontWeight:700 }}>{status}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {/* 주요 제한구역 리스트 */}
+            {airspaceData?.restrictions?.slice(0, 3).map((r: any) => {
+              const col = r.severity==='CLOSED'?'#ef4444':r.severity==='WARNING'?'#f97316':'#fbbf24';
+              return (
+                <div key={r.id} style={{ display:'flex', alignItems:'center', gap:5, marginTop:3, fontSize:8, color:'#8aa3ba' }}>
+                  <span style={{ color:col, fontWeight:700 }}>{r.severity}</span>
+                  <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.name}</span>
+                  <span style={{ color:'#2d5a7a', flexShrink:0 }}>{r.radius}km</span>
+                </div>
+              );
+            })}
           </div>
 
           {/* 군용기 감지 패널 */}

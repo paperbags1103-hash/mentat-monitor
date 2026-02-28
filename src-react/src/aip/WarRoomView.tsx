@@ -123,12 +123,16 @@ const MARKET_CHAINS = [
   },
 ];
 
+/* ── 군용기 Callsign 패턴 ──────────────────────────────────────────── */
+const MIL_PREFIXES = ['RCH','FORTE','DUKE','DRAGN','JAKE','MOOSE','AZAZ','MYTCH','GRZLY','TOPSY','VIPER','GHOST','EAGLE','COBRA','HAVOC','FURY','RAVEN','REAPER','UAV','ISR','NATO','USAF','IDF'];
+const isMilitary = (cs: string) => cs && MIL_PREFIXES.some(p => cs.toUpperCase().startsWith(p));
+
 /* ── 원형 폴리곤 생성 ───────────────────────────────────────────────── */
-function circlePoly(lng: number, lat: number, radiusKm: number, sides = 48): number[][] {
+function circlePoly(lng: number, lat: number, radiusKm: number, sides = 48): [number,number][] {
   return Array.from({ length: sides + 1 }, (_, i) => {
     const a = (i * 2 * Math.PI) / sides;
     return [lng + (radiusKm / 111 / Math.cos(lat * Math.PI / 180)) * Math.sin(a),
-            lat + (radiusKm / 111) * Math.cos(a)];
+            lat + (radiusKm / 111) * Math.cos(a)] as [number,number];
   });
 }
 
@@ -145,9 +149,20 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
   const mapRef       = useRef<any>(null);
   const rafRef       = useRef<number>(0);
   const dataRef      = useRef({ siteScores, meAcled, meFirms, meQuakes, meAircraft });
+  const trailsRef    = useRef<Map<string, Array<[number,number]>>>(new Map());
 
   useEffect(() => {
     dataRef.current = { siteScores, meAcled, meFirms, meQuakes, meAircraft };
+    /* 궤적 업데이트 */
+    meAircraft.forEach(ac => {
+      if (!ac.lng || !ac.lat) return;
+      const key = ac.icao24 || ac.callsign || String(ac.lat);
+      const prev = trailsRef.current.get(key) ?? [];
+      const last = prev[prev.length - 1];
+      if (!last || Math.abs(last[0] - ac.lng) > 0.01 || Math.abs(last[1] - ac.lat) > 0.01) {
+        trailsRef.current.set(key, [...prev, [ac.lng, ac.lat] as [number,number]].slice(-10));
+      }
+    });
     updateDynamicLayers();
   });
 
@@ -164,18 +179,28 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
     const fires = { type: 'FeatureCollection' as const, features: d.meFirms.map(f => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [f.lng, f.lat] }, properties: { frp: f.frp } })) };
     const conflicts = { type: 'FeatureCollection' as const, features: d.meAcled.map(e => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] }, properties: { severity: e.severity, title: e.titleKo || e.eventType, isRecent: e.isRecent || false } })) };
     const seismic = { type: 'FeatureCollection' as const, features: d.meQuakes.map(q => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [q.lng, q.lat] }, properties: { mag: q.magnitude } })) };
-    const acft = { type: 'FeatureCollection' as const, features: d.meAircraft.map(a => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [a.lng, a.lat] }, properties: { callsign: a.callsign } })) };
-    return { columns, fires, conflicts, seismic, acft };
+    const acft = { type: 'FeatureCollection' as const, features: d.meAircraft.map(a => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [a.lng, a.lat] }, properties: { callsign: a.callsign, mil: isMilitary(a.callsign) } })) };
+    /* 궤적 (trail) */
+    const trails = { type: 'FeatureCollection' as const, features: Array.from(trailsRef.current.entries()).filter(([,pts])=>pts.length>=2).map(([id,pts])=>({ type:'Feature' as const, geometry:{ type:'LineString' as const, coordinates: pts }, properties:{ id } })) };
+    /* 기지 근접 화재 (FIRMS × 군사기지) */
+    const baseStrikes = { type: 'FeatureCollection' as const, features: MILITARY_BASES.flatMap(base => {
+      const nearby = d.meFirms.filter(f => {
+        const dist = Math.sqrt(Math.pow((f.lat-base.lat)*111,2)+Math.pow((f.lng-base.lng)*111*Math.cos(base.lat*Math.PI/180),2));
+        return dist < 25;
+      });
+      return nearby.length > 0 ? [{ type:'Feature' as const, geometry:{ type:'Point' as const, coordinates:[base.lng, base.lat] }, properties:{ name: base.name, fires: nearby.length, baseColor: BASE_COLOR[base.type]??'#ef4444' } }] : [];
+    })};
+    return { columns, fires, conflicts, seismic, acft, trails, baseStrikes };
   }
 
   function updateDynamicLayers() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded?.()) return;
     try {
-      const { columns, fires, conflicts, seismic, acft } = buildDynGeoJSON();
+      const { columns, fires, conflicts, seismic, acft, trails, baseStrikes } = buildDynGeoJSON();
       const pairs: [string, any][] = [
         ['wr-columns', columns], ['wr-fires', fires], ['wr-conflicts', conflicts],
-        ['wr-seismic', seismic], ['wr-aircraft', acft],
+        ['wr-seismic', seismic], ['wr-aircraft', acft], ['wr-trails', trails], ['wr-base-strikes', baseStrikes],
       ];
       pairs.forEach(([id, data]) => { if (map.getSource(id)) (map.getSource(id) as any).setData(data); });
     } catch {}
@@ -257,9 +282,25 @@ function Map3D({ siteScores, meAcled, meFirms, meQuakes, meAircraft }: Map3DProp
         map.addSource('wr-seismic', { type: 'geojson', data: seismic });
         map.addLayer({ id: 'wr-seismic-dot', type: 'circle', source: 'wr-seismic', paint: { 'circle-radius': ['interpolate',['linear'],['get','mag'], 2.5,5, 6,14], 'circle-color': '#f97316', 'circle-opacity': 0.85, 'circle-stroke-width': 2, 'circle-stroke-color': '#fff7ed' } });
 
-        /* ── OpenSky ── */
+        /* ── OpenSky (일반 항공기) ── */
         map.addSource('wr-aircraft', { type: 'geojson', data: acft });
-        map.addLayer({ id: 'wr-aircraft-dot', type: 'circle', source: 'wr-aircraft', paint: { 'circle-radius': 4, 'circle-color': '#3b82f6', 'circle-opacity': 0.9, 'circle-stroke-width': 1, 'circle-stroke-color': '#93c5fd' } });
+        map.addLayer({ id: 'wr-aircraft-dot', type: 'circle', source: 'wr-aircraft', filter: ['!=', ['get','mil'], true], paint: { 'circle-radius': 4, 'circle-color': '#3b82f6', 'circle-opacity': 0.85, 'circle-stroke-width': 1, 'circle-stroke-color': '#93c5fd' } });
+        /* ── 군용기 — 별도 하이라이트 ── */
+        map.addLayer({ id: 'wr-aircraft-mil-halo', type: 'circle', source: 'wr-aircraft', filter: ['==', ['get','mil'], true], paint: { 'circle-radius': 18, 'circle-color': '#facc15', 'circle-opacity': 0.15, 'circle-blur': 1 } });
+        map.addLayer({ id: 'wr-aircraft-mil-dot', type: 'circle', source: 'wr-aircraft', filter: ['==', ['get','mil'], true], paint: { 'circle-radius': 6, 'circle-color': '#facc15', 'circle-opacity': 1, 'circle-stroke-width': 2, 'circle-stroke-color': '#fef08a' } });
+        map.addLayer({ id: 'wr-aircraft-mil-label', type: 'symbol', source: 'wr-aircraft', filter: ['==', ['get','mil'], true], layout: { 'text-field': ['get','callsign'], 'text-size': 9, 'text-offset': [0,-1.5], 'text-anchor': 'bottom', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']], 'text-optional': true }, paint: { 'text-color': '#facc15', 'text-halo-color': '#000810', 'text-halo-width': 1.5 } });
+
+        /* ── 항공기 궤적 trail ── */
+        const { trails: initialTrails, baseStrikes: initialBaseStrikes } = buildDynGeoJSON();
+        map.addSource('wr-trails', { type: 'geojson', data: initialTrails });
+        map.addLayer({ id: 'wr-trails-line', type: 'line', source: 'wr-trails', paint: { 'line-color': '#60a5fa', 'line-width': 1.5, 'line-opacity': 0.5, 'line-blur': 0.5 } });
+
+        /* ── 기지 근접 화재 경보 ── */
+        map.addSource('wr-base-strikes', { type: 'geojson', data: initialBaseStrikes });
+        map.addLayer({ id: 'wr-base-strike-ring1', type: 'circle', source: 'wr-base-strikes', paint: { 'circle-radius': 30, 'circle-color': '#ef4444', 'circle-opacity': 0.05, 'circle-blur': 1 } });
+        map.addLayer({ id: 'wr-base-strike-ring2', type: 'circle', source: 'wr-base-strikes', paint: { 'circle-radius': 18, 'circle-color': '#ef4444', 'circle-opacity': 0.12, 'circle-blur': 0.5 } });
+        map.addLayer({ id: 'wr-base-strike-dot', type: 'circle', source: 'wr-base-strikes', paint: { 'circle-radius': 8, 'circle-color': '#ef4444', 'circle-opacity': 1, 'circle-stroke-width': 2, 'circle-stroke-color': '#fca5a5' } });
+        map.addLayer({ id: 'wr-base-strike-label', type: 'symbol', source: 'wr-base-strikes', layout: { 'text-field': ['concat', '⚠ ', ['get','name']], 'text-size': 10, 'text-offset': [0, -1.6], 'text-anchor': 'bottom', 'text-font': ['literal',['DIN Offc Pro Medium','Arial Unicode MS Bold']] }, paint: { 'text-color': '#fca5a5', 'text-halo-color': '#000810', 'text-halo-width': 2 } });
 
         /* ── 미사일 사거리 레이블 ── */
         const missileLabels = { type: 'FeatureCollection' as const, features: MISSILE_SYSTEMS.map(m => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [m.lng + (m.rangeKm / 111) * 0.7, m.lat] }, properties: { label: m.name, color: m.color } })) };
@@ -389,8 +430,27 @@ export function WarRoomView() {
   const [breakAnim, setBreakAnim] = useState<'in'|'out'>('in');
   const [freshness, setFreshness] = useState<Record<string,number>>({});
   const [tick,      setTick]      = useState(0);
-  const feedRef = useRef<HTMLDivElement>(null);
+  const [audioOn,   setAudioOn]   = useState(true);
+  const feedRef    = useRef<HTMLDivElement>(null);
   const prevCritRef = useRef<Set<string>>(new Set());
+  const audioCtxRef = useRef<AudioContext|null>(null);
+
+  /* BREAKING beep */
+  const playBeep = useCallback(() => {
+    if (!audioOn) return;
+    try {
+      const ctx = audioCtxRef.current ?? (audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)());
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(); osc.stop(ctx.currentTime + 0.4);
+    } catch {}
+  }, [audioOn]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -429,10 +489,11 @@ export function WarRoomView() {
       if (newIds.length>0) {
         setBreaking(newIds[0]);
         setBreakAnim('in');
+        playBeep();
         prevCritRef.current = new Set(items.map(i=>i.id));
       }
     } finally { setLoading(false); }
-  }, []);
+  }, [playBeep]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { const id=setInterval(loadAll, 5*60_000); return ()=>clearInterval(id); }, [loadAll]);
@@ -460,11 +521,17 @@ export function WarRoomView() {
       + meAcled.filter(e=>Math.abs(e.lat-site.lat)<1.5&&Math.abs(e.lng-site.lng)<1.5).length*5),
   })), [meFirms, meAcled]);
 
-  /* 활성 Market Impact 체인 */
-  const activeChains = useMemo(()=>{
-    const allText = feed.map(f=>`${f.title} ${f.region}`).join(' ');
-    return MARKET_CHAINS.filter(c=>c.keywords.some(k=>allText.toLowerCase().includes(k.toLowerCase())));
-  }, [feed]);
+  /* 군용기 */
+  const milAircraft = useMemo(()=>meAircraft.filter(a=>isMilitary(a.callsign)), [meAircraft]);
+
+  /* 기지 근접 화재 경보 */
+  const baseAlerts = useMemo(()=>MILITARY_BASES.map(base=>{
+    const nearby = meFirms.filter(f=>{
+      const dist = Math.sqrt(Math.pow((f.lat-base.lat)*111,2)+Math.pow((f.lng-base.lng)*111*Math.cos(base.lat*Math.PI/180),2));
+      return dist < 25;
+    });
+    return nearby.length>0 ? { ...base, fires: nearby.length } : null;
+  }).filter(Boolean) as Array<typeof MILITARY_BASES[0]&{fires:number}>, [meFirms]);
 
   const now = new Date();
   const milTime = `${String(now.getUTCHours()).padStart(2,'0')}${String(now.getUTCMinutes()).padStart(2,'0')}${String(now.getUTCSeconds()).padStart(2,'0')}Z`;
@@ -534,6 +601,11 @@ export function WarRoomView() {
           <span className="wr-count" style={{ fontSize:16, fontWeight:900, color:'#ef4444', textShadow:'0 0 8px #ef4444' }}>{meAcled.length+meQuakes.length}</span>
         </div>
 
+        {/* 오디오 토글 */}
+        <button onClick={()=>setAudioOn(v=>!v)} title={audioOn?'경보음 ON (클릭=OFF)':'경보음 OFF (클릭=ON)'} style={{ background:'none', border:`1px solid ${audioOn?'#1a3a4a':'#2d1a1a'}`, borderRadius:2, padding:'3px 8px', cursor:'pointer', fontSize:12, color:audioOn?'#00d4ff':'#4a7a9b', transition:'all 0.2s' }}>
+          {audioOn ? '🔊' : '🔇'}
+        </button>
+
         {/* 군용 시각 */}
         <div style={{ textAlign:'right' }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#00d4ff', letterSpacing:2, textShadow:'0 0 6px #00d4ff66' }}>{milTime}</div>
@@ -561,7 +633,7 @@ export function WarRoomView() {
 
           {/* 레전드 */}
           <div style={{ position:'absolute', bottom:8, left:8, zIndex:1000, background:'rgba(0,8,16,0.85)', border:'1px solid #0a3050', borderRadius:3, padding:'5px 10px', fontSize:9, color:'#4a7a9b', display:'flex', flexWrap:'wrap', gap:'4px 10px', maxWidth:300 }}>
-            {[['🔴','GDELT'],['🟠','USGS'],['🔥','FIRMS'],['✈','항공기'],['▲','군사기지'],['◈','핵시설'],['〇','미사일사거리'],['~','해협']].map(([i,l])=>(
+            {[['🔴','분쟁'],['🟠','지진'],['🔥','화재'],['✈','항공기'],['✦','군용기'],['▲','기지'],['◈','핵'],['〇','사거리'],['〰','해협'],['⚠','기지경보']].map(([i,l])=>(
               <span key={l as string}>{i} {l}</span>
             ))}
           </div>
@@ -603,28 +675,40 @@ export function WarRoomView() {
             </div>
           </div>
 
-          {/* Market Impact 연쇄 패널 */}
+          {/* 군용기 감지 패널 */}
           <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
-            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:6, display:'flex', alignItems:'center', gap:8 }}>
-              ▸ CONFLICT → MARKET IMPACT
-              {activeChains.length > 0 && <span style={{ fontSize:9, color:'#ef4444', fontWeight:700 }}>⚡ {activeChains.length}개 트리거 활성</span>}
+            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+              ▸ MILITARY AIRCRAFT
+              {milAircraft.length>0 && <span className="wr-blink" style={{ fontSize:9, color:'#facc15', fontWeight:700 }}>⚡ {milAircraft.length}기 탐지</span>}
+              {milAircraft.length===0 && <span style={{ fontSize:9, color:'#2d5a7a' }}>탐지 없음</span>}
             </div>
-            {MARKET_CHAINS.map(chain=>{
-              const active = activeChains.some(c=>c.id===chain.id);
+            {milAircraft.length===0 ? (
+              <div style={{ fontSize:9, color:'#1e3a5f', fontStyle:'italic', textAlign:'center', padding:'4px 0' }}>— 군용기 신호 없음 —</div>
+            ) : milAircraft.slice(0,6).map((ac:any)=>(
+              <div key={ac.icao24||ac.callsign} style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 0', borderBottom:'1px solid #0a1f2f' }}>
+                <span style={{ fontSize:10, color:'#facc15' }}>✦</span>
+                <span style={{ fontSize:10, fontWeight:700, color:'#fef08a' }}>{ac.callsign||'UNKNOWN'}</span>
+                <span style={{ fontSize:9, color:'#4a7a9b' }}>{ac.country||''}</span>
+                {ac.altitude && <span style={{ fontSize:9, color:'#2d5a7a', marginLeft:'auto' }}>{Math.round(ac.altitude)}m</span>}
+              </div>
+            ))}
+          </div>
+
+          {/* 기지 근접 화재 경보 */}
+          <div style={{ padding:'7px 12px', borderBottom:'1px solid #0a1f2f', flexShrink:0 }}>
+            <div style={{ fontSize:9, color:'#4a7a9b', letterSpacing:2, marginBottom:5, display:'flex', alignItems:'center', gap:8 }}>
+              ▸ BASE STRIKE ALERTS
+              {baseAlerts.length>0 && <span className="wr-blink" style={{ fontSize:9, color:'#ef4444', fontWeight:700 }}>⚠ {baseAlerts.length}건</span>}
+            </div>
+            {baseAlerts.length===0 ? (
+              <div style={{ fontSize:9, color:'#1e3a5f', fontStyle:'italic', textAlign:'center', padding:'4px 0' }}>— 기지 근접 화재 없음 —</div>
+            ) : baseAlerts.map(alert=>{
+              const color = BASE_COLOR[alert.type]??'#ef4444';
               return (
-                <div key={chain.id} style={{ marginBottom:8, padding:'6px 8px', borderRadius:2, border:`1px solid ${active?'#ef444444':'#0a1f2f'}`, background:active?'#ef444408':'transparent', transition:'all 0.5s' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                    <span style={{ fontSize:12 }}>{chain.icon}</span>
-                    <span style={{ fontSize:10, fontWeight:700, color: active?'#ef4444':'#8aa3ba' }}>{chain.title}</span>
-                    <span style={{ marginLeft:'auto', fontSize:9, color: chain.dir==='up'?'#22c55e':'#ef4444', fontWeight:700 }}>{chain.asset} {chain.dir==='up'?'▲':'▼'}{chain.est}</span>
-                  </div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-                    {chain.stocks.map(s=>(
-                      <span key={s.name} style={{ fontSize:9, padding:'1px 6px', borderRadius:1, background: s.dir==='↑'?'#14532d44':'#7f1d1d44', color: s.dir==='↑'?'#4ade80':'#f87171', border:`1px solid ${s.dir==='↑'?'#16a34a33':'#dc262633'}` }}>
-                        {s.dir} {s.name} <span style={{ opacity:0.6 }}>({s.reason})</span>
-                      </span>
-                    ))}
-                  </div>
+                <div key={alert.name} style={{ display:'flex', alignItems:'center', gap:6, padding:'3px 6px', marginBottom:3, borderRadius:2, border:`1px solid ${color}44`, background:`${color}0a` }}>
+                  <span style={{ fontSize:10 }}>{BASE_SYMBOL[alert.type]??'●'}</span>
+                  <span style={{ fontSize:10, fontWeight:700, color }}>⚠ {alert.name}</span>
+                  <span style={{ fontSize:9, color:'#f97316', marginLeft:'auto' }}>🔥×{alert.fires}</span>
                 </div>
               );
             })}

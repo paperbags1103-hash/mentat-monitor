@@ -822,6 +822,9 @@ interface LayerState {
   semiconductor: boolean;
   nkHistory: boolean;
   acled: boolean;
+  earthquakes: boolean;
+  gdacs: boolean;
+  firms: boolean;
 }
 
 // ─── 북한 도발 이력 ───────────────────────────────────────────────────────────
@@ -1203,6 +1206,42 @@ function LayerControl({
           }}
         >
           ⚔️
+        </button>
+        <button
+          onClick={() => onToggle('earthquakes' as keyof LayerState)}
+          title="USGS 지진 실시간 (분쟁지역 폭격 감지)"
+          style={{
+            background: layers.earthquakes ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${layers.earthquakes ? '#fb923c' : 'rgba(255,255,255,0.1)'}`,
+            color: layers.earthquakes ? '#fed7aa' : '#94a3b8',
+            borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          🌋
+        </button>
+        <button
+          onClick={() => onToggle('gdacs' as keyof LayerState)}
+          title="GDACS UN 재난경보 (Red/Orange)"
+          style={{
+            background: layers.gdacs ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${layers.gdacs ? '#eab308' : 'rgba(255,255,255,0.1)'}`,
+            color: layers.gdacs ? '#fef08a' : '#94a3b8',
+            borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          🚨
+        </button>
+        <button
+          onClick={() => onToggle('firms' as keyof LayerState)}
+          title="NASA FIRMS 위성 화재감지 (폭격/전투지역)"
+          style={{
+            background: layers.firms ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${layers.firms ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
+            color: layers.firms ? '#fca5a5' : '#94a3b8',
+            borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          🔥
         </button>
       </div>
       {layers.convergence && convergenceCount > 0 && (
@@ -1662,6 +1701,9 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
     semiconductor: false,
     nkHistory: false,
     acled: false,
+    earthquakes: false,
+    gdacs: false,
+    firms: false,
   });
 
   // NK 도발 선택 상태
@@ -1674,13 +1716,12 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
   // 범례 표시 상태
   const [legendVisible, setLegendVisible] = useState(true);
 
-  // ACLED 무력충돌 데이터
+  // GDELT 분쟁이벤트 데이터 (5분 자동갱신)
   const [acledEvents, setAcledEvents] = useState<any[]>([]);
   const [acledLoaded, setAcledLoaded] = useState(false);
   const [acledLoading, setAcledLoading] = useState(false);
   const [acledError, setAcledError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!layers.acled || acledLoaded) return;
+  const acledFetch = () => {
     setAcledLoading(true);
     setAcledError(null);
     apiFetch<{ events: any[]; error?: string }>('/api/acled-events')
@@ -1691,7 +1732,55 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
       })
       .catch(e => { setAcledError(e?.message ?? '연결 실패'); setAcledLoaded(true); })
       .finally(() => setAcledLoading(false));
+  };
+  useEffect(() => {
+    if (!layers.acled) return;
+    if (!acledLoaded) acledFetch();
+    const interval = setInterval(acledFetch, 5 * 60_000); // 5분 자동갱신
+    return () => clearInterval(interval);
   }, [layers.acled]);
+
+  // USGS 지진 데이터
+  const [quakeEvents, setQuakeEvents] = useState<any[]>([]);
+  const [quakesLoaded, setQuakesLoaded] = useState(false);
+  const [quakesLoading, setQuakesLoading] = useState(false);
+  const [quakesError, setQuakesError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!layers.earthquakes || quakesLoaded) return;
+    setQuakesLoading(true);
+    apiFetch<{ events: any[]; error?: string }>('/api/usgs-quakes')
+      .then(data => { setQuakeEvents(data?.events ?? []); setQuakesLoaded(true); if (data?.error) setQuakesError(data.error); })
+      .catch(e => { setQuakesError(e?.message ?? '연결 실패'); setQuakesLoaded(true); })
+      .finally(() => setQuakesLoading(false));
+  }, [layers.earthquakes]);
+
+  // GDACS UN 재난경보
+  const [gdacsEvents, setGdacsEvents] = useState<any[]>([]);
+  const [gdacsLoaded, setGdacsLoaded] = useState(false);
+  const [gdacsLoading, setGdacsLoading] = useState(false);
+  const [gdacsError, setGdacsError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!layers.gdacs || gdacsLoaded) return;
+    setGdacsLoading(true);
+    apiFetch<{ events: any[]; error?: string }>('/api/gdacs-alerts')
+      .then(data => { setGdacsEvents(data?.events ?? []); setGdacsLoaded(true); if (data?.error) setGdacsError(data.error); })
+      .catch(e => { setGdacsError(e?.message ?? '연결 실패'); setGdacsLoaded(true); })
+      .finally(() => setGdacsLoading(false));
+  }, [layers.gdacs]);
+
+  // NASA FIRMS 위성 화재
+  const [firmsEvents, setFirmsEvents] = useState<any[]>([]);
+  const [firmsLoaded, setFirmsLoaded] = useState(false);
+  const [firmsLoading, setFirmsLoading] = useState(false);
+  const [firmsError, setFirmsError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!layers.firms || firmsLoaded) return;
+    setFirmsLoading(true);
+    apiFetch<{ events: any[]; error?: string }>('/api/firms-fires')
+      .then(data => { setFirmsEvents(data?.events ?? []); setFirmsLoaded(true); if (data?.error) setFirmsError(data.error); })
+      .catch(e => { setFirmsError(e?.message ?? '연결 실패'); setFirmsLoaded(true); })
+      .finally(() => setFirmsLoading(false));
+  }, [layers.firms]);
 
   // 뉴스 기반 지리 이벤트
   const [geoEvents, setGeoEvents] = useState<GeoEvent[]>([]);
@@ -2292,20 +2381,123 @@ export function WorldMapView({ onGeoEventsChange }: WorldMapViewProps) {
           const SEV_COLOR: Record<string, string> = { critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#65a30d' };
           const color = SEV_COLOR[ev.severity] ?? '#94a3b8';
           const radius = ev.severity === 'critical' ? 8 : ev.severity === 'high' ? 6 : 5;
+          // isRecent 이벤트 = 가장 최신 15분 파일 → 큰 반투명 링 추가
+          return (
+            <React.Fragment key={ev.id}>
+              {ev.isRecent && (
+                <CircleMarker center={[ev.lat, ev.lng]} radius={radius + 7}
+                  pathOptions={{ color, fillColor: color, fillOpacity: 0.12, weight: 1, opacity: 0.5, dashArray: '3 3' }} />
+              )}
+              <CircleMarker center={[ev.lat, ev.lng]} radius={radius}
+                pathOptions={{ color, fillColor: color, fillOpacity: ev.isRecent ? 0.95 : 0.7, weight: ev.isRecent ? 2 : 1.5 }}>
+                <Tooltip direction="top" offset={[0, -radius - 4]} opacity={1}>
+                  <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: 8, border: `1px solid ${color}55`, fontFamily: 'system-ui', maxWidth: 240 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                      <span>⚔️</span>
+                      <span style={{ fontWeight: 700, fontSize: 11 }}>{ev.region}</span>
+                      {ev.isRecent && <span style={{ marginLeft: 'auto', fontSize: 9, color: '#f87171', fontWeight: 700 }}>● 최신</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color, fontWeight: 600, marginBottom: 3 }}>{ev.eventType}</div>
+                    {ev.actors && <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 3 }}>{ev.actors}</div>}
+                    <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>{ev.date} · {ev.source || 'GDELT'}</div>
+                    {ev.notes && <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, lineHeight: 1.4 }}>{ev.notes.slice(0, 100)}{ev.notes.length > 100 ? '...' : ''}</div>}
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            </React.Fragment>
+          );
+        })}
+
+        {/* ── USGS 지진 레이어 ── */}
+        {layers.earthquakes && (quakesLoading || quakesError) && (
+          <div style={{ position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 1001,
+            background: quakesError ? 'rgba(239,68,68,0.15)' : 'rgba(10,15,30,0.9)',
+            border: `1px solid ${quakesError ? '#ef4444' : '#334155'}`,
+            borderRadius: 6, padding: '6px 14px', fontSize: 11, color: quakesError ? '#fca5a5' : '#94a3b8', pointerEvents: 'none' }}>
+            {quakesLoading ? '🌋 USGS 지진 로딩...' : `⚠️ USGS 오류: ${quakesError}`}
+          </div>
+        )}
+        {layers.earthquakes && quakeEvents.map((ev: any) => {
+          const isSuspect = ev.isSuspect;
+          const color = isSuspect ? '#f97316' : ev.severity === 'critical' ? '#dc2626' : ev.severity === 'high' ? '#f59e0b' : '#6366f1';
+          const radius = Math.max(4, Math.min(12, ev.magnitude * 2));
+          return (
+            <React.Fragment key={ev.id}>
+              {isSuspect && (
+                <CircleMarker center={[ev.lat, ev.lng]} radius={radius + 8}
+                  pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.1, weight: 1, opacity: 0.6, dashArray: '4 3' }} />
+              )}
+              <CircleMarker center={[ev.lat, ev.lng]} radius={radius}
+                pathOptions={{ color, fillColor: color, fillOpacity: 0.75, weight: 1.5 }}>
+                <Tooltip direction="top" offset={[0, -radius - 4]} opacity={1}>
+                  <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: 8, border: `1px solid ${color}55`, fontFamily: 'system-ui', maxWidth: 240 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4 }}>🌋 M{ev.magnitude}</div>
+                    <div style={{ fontSize: 11, marginBottom: 3 }}>{ev.place}</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8' }}>깊이 {ev.depth}km</div>
+                    {isSuspect && <div style={{ fontSize: 10, color: '#f97316', fontWeight: 700, marginTop: 4 }}>⚠️ 분쟁지역 이상 진동 ({ev.zone})</div>}
+                    <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>USGS · {new Date(ev.time).toLocaleString('ko-KR')}</div>
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            </React.Fragment>
+          );
+        })}
+
+        {/* ── GDACS UN 재난경보 레이어 ── */}
+        {layers.gdacs && (gdacsLoading || gdacsError) && (
+          <div style={{ position: 'absolute', top: 110, left: '50%', transform: 'translateX(-50%)', zIndex: 1001,
+            background: gdacsError ? 'rgba(239,68,68,0.15)' : 'rgba(10,15,30,0.9)',
+            border: `1px solid ${gdacsError ? '#ef4444' : '#334155'}`,
+            borderRadius: 6, padding: '6px 14px', fontSize: 11, color: gdacsError ? '#fca5a5' : '#94a3b8', pointerEvents: 'none' }}>
+            {gdacsLoading ? '🚨 GDACS 로딩...' : `⚠️ GDACS 오류: ${gdacsError}`}
+          </div>
+        )}
+        {layers.gdacs && gdacsEvents.map((ev: any) => {
+          const COLOR: Record<string, string> = { critical: '#dc2626', high: '#f59e0b', medium: '#22c55e', low: '#6366f1' };
+          const color = COLOR[ev.severity] ?? '#94a3b8';
+          const icons: Record<string, string> = { Red: '🔴', Orange: '🟠', Green: '🟢' };
+          return (
+            <CircleMarker key={ev.id} center={[ev.lat, ev.lng]} radius={10}
+              pathOptions={{ color, fillColor: color, fillOpacity: 0.7, weight: 2 }}>
+              <Tooltip direction="top" offset={[0, -14]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: 8, border: `1px solid ${color}55`, fontFamily: 'system-ui', maxWidth: 240 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4 }}>
+                    {icons[ev.alertLevel] || '🚨'} {ev.eventType}
+                  </div>
+                  <div style={{ fontSize: 11, marginBottom: 3 }}>{ev.country}</div>
+                  <div style={{ fontSize: 10, color, fontWeight: 600 }}>{ev.alertLevel} Alert</div>
+                  <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>GDACS · {ev.date}</div>
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+        {/* ── NASA FIRMS 위성 화재 레이어 ── */}
+        {layers.firms && (firmsLoading || firmsError) && (
+          <div style={{ position: 'absolute', top: 140, left: '50%', transform: 'translateX(-50%)', zIndex: 1001,
+            background: firmsError ? 'rgba(239,68,68,0.15)' : 'rgba(10,15,30,0.9)',
+            border: `1px solid ${firmsError ? '#ef4444' : '#334155'}`,
+            borderRadius: 6, padding: '6px 14px', fontSize: 11, color: firmsError ? '#fca5a5' : '#94a3b8', pointerEvents: 'none' }}>
+            {firmsLoading ? '🔥 NASA FIRMS 로딩...' : `⚠️ FIRMS 오류: ${firmsError}`}
+          </div>
+        )}
+        {layers.firms && firmsEvents.map((ev: any) => {
+          const intensity = Math.min(1, ev.frp / 200);
+          const r = Math.round(255);
+          const g = Math.round(100 - intensity * 80);
+          const b = 0;
+          const color = `rgb(${r},${g},${b})`;
+          const radius = Math.max(3, Math.min(8, 3 + ev.frp / 40));
           return (
             <CircleMarker key={ev.id} center={[ev.lat, ev.lng]} radius={radius}
-              pathOptions={{ color, fillColor: color, fillOpacity: 0.8, weight: 1.5 }}>
-              <Tooltip direction="top" offset={[0, -radius - 4]} opacity={1}>
-                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: 8, border: `1px solid ${color}55`, fontFamily: 'system-ui', maxWidth: 240 }}>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
-                    <span>⚔️</span>
-                    <span style={{ fontWeight: 700, fontSize: 11 }}>{ev.region}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color, fontWeight: 600, marginBottom: 3 }}>{ev.eventType}</div>
-                  {ev.actors && <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 3 }}>{ev.actors}</div>}
-                  {ev.fatalities > 0 && <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>사망 {ev.fatalities}명</div>}
-                  <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>{ev.date} · {ev.source || 'GDELT'}</div>
-                  {ev.notes && <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, lineHeight: 1.4 }}>{ev.notes.slice(0, 100)}{ev.notes.length > 100 ? '...' : ''}</div>}
+              pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: 0.5 }}>
+              <Tooltip direction="top" offset={[0, -radius - 2]} opacity={1}>
+                <div style={{ background: '#0f172a', color: '#f1f5f9', padding: '8px 10px', borderRadius: 8, border: '1px solid #ef444455', fontFamily: 'system-ui', maxWidth: 220 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4 }}>🔥 {ev.zone}</div>
+                  <div style={{ fontSize: 11, color: '#fca5a5', fontWeight: 600 }}>화재 강도 {ev.frp}MW</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>신뢰도 {ev.confidence}%</div>
+                  <div style={{ fontSize: 9, color: '#475569', marginTop: 3 }}>NASA FIRMS · {ev.date} {ev.time}</div>
                 </div>
               </Tooltip>
             </CircleMarker>

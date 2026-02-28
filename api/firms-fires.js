@@ -94,6 +94,7 @@ export default async function handler(req, res) {
 
   try {
     // Fetch all zones in parallel
+    const zoneErrors = [];
     const results = await Promise.allSettled(
       ZONES.map(zone =>
         fetch(
@@ -101,12 +102,25 @@ export default async function handler(req, res) {
           { signal: AbortSignal.timeout(7000) }
         )
           .then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))
-          .then(csv => parseCSVFIRMS(csv, zone.name))
-          .catch(() => [])
+          .then(csv => {
+            const firstLine = csv.trim().split('\n')[0] || '';
+            // FIRMS returns plain-text errors for invalid key/request
+            if (!firstLine.includes(',') && firstLine.length < 100) {
+              zoneErrors.push(firstLine);
+              return [];
+            }
+            return parseCSVFIRMS(csv, zone.name);
+          })
+          .catch(e => { zoneErrors.push(e.message); return []; })
       )
     );
 
+    // If every zone returned an error, surface it
     const allFires = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    if (allFires.length === 0 && zoneErrors.length > 0) {
+      const uniqueError = [...new Set(zoneErrors)][0];
+      return res.status(200).json({ events: [], error: uniqueError, count: 0 });
+    }
 
     // Cluster nearby fires (0.05° = ~5km) to avoid overwhelming the map
     const seen = new Set();
